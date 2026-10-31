@@ -35,7 +35,9 @@ export const SEOHead: React.FC<SEOProps> = ({
     // Canonical link
     const origin = window.location.origin;
     const basePrefix = import.meta.env.BASE_URL.replace(/\/$/, '');
-    const fullCanonical = `${origin}${basePrefix}${canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`}`;
+    const routePath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
+    const normalizedPath = routePath === '/' ? '/' : `${routePath.replace(/\/$/, '')}/`;
+    const fullCanonical = `${origin}${basePrefix}${normalizedPath}`;
     let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) {
       canonical = document.createElement('link');

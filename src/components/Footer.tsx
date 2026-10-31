@@ -28,11 +28,11 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
               </span>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Fast, secure, and private online utilities. Built to process files directly in your browser without tracking or storage.
+              Fast, secure, and private online utilities. Browser-first tools with optional server processing. See our Privacy Policy for details.
             </p>
             <div className="flex items-center gap-2 text-xs text-emerald-700 font-medium">
               <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              <span>Zero file persistence by default</span>
+              <span>Browser processing where supported</span>
             </div>
           </div>
 
@@ -43,58 +43,58 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
             </h3>
             <ul className="mt-3 space-y-2 text-sm">
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/qr-code-generator')}
+                <a
+                  href={`${import.meta.env.BASE_URL}qr-code-generator/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/qr-code-generator'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   QR Code Generator
-                </button>
+                </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/compress-pdf')}
+                <a
+                  href={`${import.meta.env.BASE_URL}compress-pdf/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/compress-pdf'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   PDF Compressor
-                </button>
+                </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/image-to-pdf')}
+                <a
+                  href={`${import.meta.env.BASE_URL}image-to-pdf/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/image-to-pdf'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   Image to PDF Converter
-                </button>
+                </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/edit-pdf')}
+                <a
+                  href={`${import.meta.env.BASE_URL}edit-pdf/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/edit-pdf'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   PDF Editor & Organizer
-                </button>
+                </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/background-remover')}
+                <a
+                  href={`${import.meta.env.BASE_URL}background-remover/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/background-remover'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   AI Background Remover
-                </button>
+                </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/visiting-card-generator')}
+                <a
+                  href={`${import.meta.env.BASE_URL}visiting-card-generator/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/visiting-card-generator'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   Visiting Card Maker
-                </button>
+                </a>
               </li>
             </ul>
           </div>
@@ -106,41 +106,41 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
             </h3>
             <ul className="mt-3 space-y-2 text-sm">
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/blog')}
+                <a
+                  href={`${import.meta.env.BASE_URL}blog/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/blog'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   Guides & Blog
-                </button>
+                </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/about')}
+                <a
+                  href={`${import.meta.env.BASE_URL}about/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/about'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   About RankNova
-                </button>
+                </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/contact')}
+                <a
+                  href={`${import.meta.env.BASE_URL}contact/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/contact'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   Contact & Support
-                </button>
+                </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/admin')}
+                <a
+                  href={`${import.meta.env.BASE_URL}admin/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/admin'); } }}
                   className="text-slate-600 hover:text-blue-600 transition flex items-center gap-1"
                 >
                   <Lock className="h-3 w-3 text-slate-400" />
                   <span>Admin Portal</span>
-                </button>
+                </a>
               </li>
             </ul>
           </div>
@@ -152,40 +152,40 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
             </h3>
             <ul className="mt-3 space-y-2 text-sm">
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/privacy-policy')}
+                <a
+                  href={`${import.meta.env.BASE_URL}privacy-policy/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/privacy-policy'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   Privacy Policy
-                </button>
+                </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/terms')}
+                <a
+                  href={`${import.meta.env.BASE_URL}terms/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/terms'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   Terms of Service
-                </button>
+                </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/acceptable-use')}
+                <a
+                  href={`${import.meta.env.BASE_URL}acceptable-use/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/acceptable-use'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   Acceptable Use Policy
-                </button>
+                </a>
               </li>
               <li>
-                <button
-                  type="button"
-                  onClick={() => navigate('/copyright-dmca')}
+                <a
+                  href={`${import.meta.env.BASE_URL}copyright-dmca/`}
+                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/copyright-dmca'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
                   Copyright & DMCA
-                </button>
+                </a>
               </li>
             </ul>
           </div>
@@ -197,7 +197,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
           <div className="flex items-center gap-6">
             <span className="inline-flex items-center gap-1.5 text-slate-500">
               <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-              All systems operational
+              Free tools • Privacy information available
             </span>
             <button
               type="button"

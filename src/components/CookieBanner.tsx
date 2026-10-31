@@ -53,7 +53,7 @@ export const CookieBanner: React.FC = () => {
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-slate-900">Your Privacy is Protected</h3>
           <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-            RankNova processes your files locally in your browser whenever possible and does not store your uploads.
+            RankNova uses browser processing where supported. Optional cloud features may send files to processing services.
             We use strictly essential storage to deliver tool functionality.
           </p>
 

@@ -10,6 +10,19 @@ on:
       - '.nojekyll'
       - 'robots.txt'
       - 'sitemap.xml'
+      - 'about/**'
+      - 'contact/**'
+      - 'privacy-policy/**'
+      - 'terms/**'
+      - 'acceptable-use/**'
+      - 'copyright-dmca/**'
+      - 'qr-code-generator/**'
+      - 'compress-pdf/**'
+      - 'image-to-pdf/**'
+      - 'edit-pdf/**'
+      - 'background-remover/**'
+      - 'visiting-card-generator/**'
+      - 'blog/**'
   workflow_dispatch:
 
 permissions:
@@ -53,6 +66,7 @@ jobs:
         run: |
           cp index.source.html index.html
           npm run build
+          node scripts/prepare-pages-seo.mjs
           test -d dist/assets
           grep -q '/tools-website/assets/' dist/index.html
           if grep -q 'src/main.tsx' dist/index.html; then
@@ -72,8 +86,12 @@ jobs:
           cp -R dist/assets assets
           cp dist/robots.txt robots.txt
           cp dist/sitemap.xml sitemap.xml
+          for route in about contact privacy-policy terms acceptable-use copyright-dmca qr-code-generator compress-pdf image-to-pdf edit-pdf background-remover visiting-card-generator blog; do
+            rm -rf "$route"
+            cp -R "dist/$route" "$route"
+          done
           touch .nojekyll
-          git add index.html 404.html assets robots.txt sitemap.xml .nojekyll
+          git add index.html 404.html assets robots.txt sitemap.xml .nojekyll about contact privacy-policy terms acceptable-use copyright-dmca qr-code-generator compress-pdf image-to-pdf edit-pdf background-remover visiting-card-generator blog
           if git diff --cached --quiet; then
             echo 'Production build already present at main/root.'
           else

@@ -14,7 +14,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
     'privacy-policy': {
       title: 'Privacy Policy',
       metaTitle: 'Privacy Policy | RankNova',
-      metaDesc: 'RankNova privacy policy: Learn about our client-side processing, zero file retention, and data minimization practices.'
+      metaDesc: 'RankNova privacy policy: Learn how RankNova handles browser tools, optional cloud processing, contact messages, cookies, and Firebase services.'
     },
     terms: {
       title: 'Terms of Service',
@@ -95,7 +95,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
                 {current.title}
               </h1>
               <p className="mt-2 text-xs text-slate-500">
-                Effective Date: October 30, 2026 • Version 1.0
+                Effective Date: October 31, 2026 • Version 1.1
               </p>
             </div>
 
@@ -103,8 +103,8 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs text-amber-900 flex items-start gap-3">
               <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
               <p>
-                <strong>Legal Notice:</strong> These templates are drafted for transparency and technical honesty.
-                They do not constitute formal legal advice and should be reviewed by qualified legal counsel in accordance with your local jurisdiction.
+                <strong>Legal Notice:</strong> These terms describe how the current RankNova website operates.
+                They should be reviewed for accuracy and local legal compliance before a commercial launch.
               </p>
             </div>
 
@@ -112,40 +112,86 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
             {docType === 'privacy-policy' && (
               <div className="prose prose-slate max-w-none text-sm text-slate-700 space-y-6">
                 <section>
-                  <h2 className="text-lg font-bold text-slate-900">1. Core Privacy Principle: Zero Retention</h2>
+                  <h2 className="text-lg font-bold text-slate-900">1. Who We Are and What This Policy Covers</h2>
                   <p>
-                    RankNova operates under the principles of <strong>data minimization, purpose limitation, and privacy by design</strong>.
-                    Our tools are designed to process files locally inside your browser whenever technically feasible.
-                  </p>
-                  <ul className="list-disc pl-5 mt-2 space-y-1">
-                    <li><strong>QR Code Generator:</strong> Encodes payloads completely on your device. We do not fetch or crawl user URLs.</li>
-                    <li><strong>PDF Compressor:</strong> Optimizes document streams in-browser first. If server-side processing is explicitly chosen, the file is held in transient memory and deleted immediately after delivery.</li>
-                    <li><strong>AI Background Remover:</strong> Images are processed in isolated transient memory. No user images are ever stored in permanent databases.</li>
-                  </ul>
-                </section>
-
-                <section>
-                  <h2 className="text-lg font-bold text-slate-900">2. Information We Do Not Collect</h2>
-                  <p>
-                    RankNova does not collect your national ID, credit card details, physical address, age, or date of birth.
-                    We do not sell, rent, or trade user data to third-party data brokers.
+                    RankNova provides online QR code, PDF, image-editing and visiting-card tools at this website.
+                    This policy explains how our site handles information when you use the tools, submit inquiries
+                    or authenticate as an administrator. For privacy inquiries, use our{' '}
+                    <button type="button" onClick={() => navigate('/contact')} className="text-blue-600 hover:underline">Contact Us page</button>.
                   </p>
                 </section>
-
                 <section>
-                  <h2 className="text-lg font-bold text-slate-900">3. Cookies and Analytics</h2>
+                  <h2 className="text-lg font-bold text-slate-900">2. Tool Files and Uploaded Content</h2>
                   <p>
-                    We use strictly essential cookies for site security and CSRF mitigation. Optional anonymous performance analytics
-                    are disabled by default until you grant consent via our Cookie Preferences banner.
+                    QR payloads are generated locally in your browser. PDF and image utilities offer browser-based
+                    processing, but some features may send file content to a server or third-party processing
+                    provider when you explicitly select an online or AI-assisted feature. Please do not use
+                    sensitive documents with these features unless you are comfortable with that processing.
+                  </p>
+                  <p>
+                    Our current application code does not intentionally save processed files to a permanent
+                    public file library. Temporary memory, network transmission and service-provider logs
+                    may still exist. We cannot guarantee that every third-party service retains no data.
+                    On-device processing is the more private option where available.
                   </p>
                 </section>
-
                 <section>
-                  <h2 className="text-lg font-bold text-slate-900">4. Your Privacy Rights (GDPR & CCPA)</h2>
+                  <h2 className="text-lg font-bold text-slate-900">3. Contact Messages and Account Information</h2>
                   <p>
-                    Depending on your location, you have rights to access, delete, or limit the use of any personal data.
-                    Because we do not store accounts or uploaded files, we retain virtually zero personal identifiers.
-                    To submit a formal privacy inquiry, please visit our <button type="button" onClick={() => navigate('/contact')} className="text-blue-600 hover:underline">Contact Form</button>.
+                    When you send a support request we collect the name, email address, category and message you provide,
+                    together with a submission timestamp. The contact form attempts to store these records in Google
+                    Firebase Firestore for us to respond and manage inquiries. It displays a success confirmation only
+                    after storage succeeds. We retain support messages as needed for handling inquiries and related
+                    obligations; you may ask us to review or delete a submission using the contact page.
+                  </p>
+                  <p>
+                    Administrator sign-in uses Firebase Authentication and Google sign-in. Account information,
+                    such as an authorized admin's email address and user ID, may be processed by these services.
+                    Google's and Firebase's infrastructure may process ordinary operational logs and security data.
+                  </p>
+                </section>
+                <section>
+                  <h2 className="text-lg font-bold text-slate-900">4. Cookies, Local Storage and Ads</h2>
+                  <p>
+                    We store your cookie preference selection in browser local storage. Your browser and service
+                    providers may also use storage needed for authentication, security and site operation. Choosing
+                    an analytics preference does not, by itself, mean an analytics service is enabled.
+                  </p>
+                  <p>
+                    Advertising is not activated by default in the current site. If Google AdSense or other advertising
+                    partners are enabled later, third-party vendors including Google may use cookies to serve ads
+                    based on prior visits to this and other websites, subject to applicable consent requirements.
+                    You can manage Google's advertising personalization at{' '}
+                    <a href="https://myadcenter.google.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">My Ad Center</a>
+                    {' '}and find additional advertising opt-out options at{' '}
+                    <a href="https://www.aboutads.info/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">aboutads.info</a>.
+                    We will update this notice and implement appropriate consent controls before enabling applicable ads.
+                  </p>
+                </section>
+                <section>
+                  <h2 className="text-lg font-bold text-slate-900">5. External Services and Data Security</h2>
+                  <p>
+                    We use GitHub Pages to host the public website and Google Firebase for application features.
+                    Optional neural image processing may download model assets from external content delivery networks;
+                    selected cloud AI features may contact their configured providers. Third parties apply their
+                    own privacy and retention practices. We use reasonable technical precautions, but no online
+                    system can guarantee absolute security.
+                  </p>
+                </section>
+                <section>
+                  <h2 className="text-lg font-bold text-slate-900">6. Your Choices and Requests</h2>
+                  <p>
+                    Depending on your location, you may have rights to request access, correction or deletion
+                    of personal information. Contact us with enough detail to identify your request without
+                    including passwords or unnecessary sensitive documents. We may need to verify a request
+                    and may retain limited information where required by law.
+                  </p>
+                </section>
+                <section>
+                  <h2 className="text-lg font-bold text-slate-900">7. Policy Updates</h2>
+                  <p>
+                    We may update this policy when tools, service providers or legal obligations change.
+                    The effective date shown above identifies the most recent published version.
                   </p>
                 </section>
               </div>
@@ -216,7 +262,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
                 <section>
                   <h2 className="text-lg font-bold text-slate-900">1. Notice and Takedown Policy</h2>
                   <p>
-                    RankNova respects the intellectual property rights of creators and adheres to the Digital Millennium Copyright Act (17 U.S.C. § 512).
+                    RankNova respects creators' intellectual property. We review copyright complaints about content hosted on this website.
                     Because RankNova does not host public user galleries or retain uploaded files, user-processed assets do not remain on our servers.
                   </p>
                 </section>

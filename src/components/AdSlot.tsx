@@ -14,19 +14,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   enabled = false // Disabled by default in accordance with master prompt guidelines
 }) => {
   // If ads are not enabled, return empty or a discreet, policy-compliant placeholder
-  if (!enabled) {
-    return (
-      <div
-        aria-hidden="true"
-        className={`my-8 mx-auto rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-center text-xs text-slate-400 select-none ${className}`}
-      >
-        <span className="font-mono tracking-wider uppercase">Reserved Sponsor Space</span>
-        <span className="block text-[11px] text-slate-400/80 mt-0.5">
-          (Ads currently inactive pending publisher configuration)
-        </span>
-      </div>
-    );
-  }
+  if (!enabled) return null;
 
   // Active AdSense unit container
   const dimensions =

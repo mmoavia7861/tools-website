@@ -56,7 +56,7 @@ export default function App() {
   }, []);
 
   const navigate = (path: string) => {
-    const target = `${basePrefix}${path}`;
+    const target = path === '/' ? `${basePrefix}/` : `${basePrefix}${path.replace(/\/$/, '')}/`;
     if (window.location.pathname !== target) {
       window.history.pushState({}, '', target);
       setCurrentPath(path);
