@@ -712,7 +712,7 @@ export const VisitingCardView: React.FC = () => {
       const frontDataUrl = await renderCardToCanvas('front');
       const backDataUrl = await renderCardToCanvas('back');
 
-      const pdfBytes = await createVisitingCardPdf(frontDataUrl, backDataUrl, cardData.size || 'us');
+      const pdfBytes = await createVisitingCardPdf(frontDataUrl, backDataUrl, cardData.size || 'us', cardData.orientation || 'landscape');
       const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
 
