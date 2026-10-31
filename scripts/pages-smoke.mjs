@@ -87,6 +87,10 @@ try {
   await page.getByRole('heading', { name: 'Professional Visiting Card Maker' }).waitFor();
   await page.locator('#card-size').selectOption('eu');
   await page.locator('#card-font').selectOption('serif');
+  await page.locator('#card-orientation').selectOption('portrait');
+  await page.getByLabel('QR color').selectOption('#1E3A8A');
+  assert.ok((await page.locator('#root').innerText()).includes('650 × 1004'), 'Portrait layout must change canvas pixel dimensions');
+  await page.getByRole('img', { name: 'Drag QR code to reposition' }).waitFor({ timeout: 8000 });
   assert.ok((await page.locator('#root').innerText()).includes('85 × 55 mm'), 'International business card size did not render');
   const imageDownload = page.waitForEvent('download', { timeout: 15000 });
   await page.getByRole('button', { name: /Front JPG/i }).click();
