@@ -10,6 +10,7 @@ import { buildVCardPayload } from './qr.ts';
 
 export type CardSizeId = 'us' | 'eu';
 export type CardFontId = 'sans' | 'serif' | 'mono';
+export type CardOrientation = 'landscape' | 'portrait';
 
 export const CARD_SIZES = {
   us: { label: 'US Standard — 3.5 × 2 in', widthPt: 252, heightPt: 144, widthPx: 1050, heightPx: 600 },
@@ -101,6 +102,13 @@ export interface VisitingCardData {
   customText?: string;
   linkedIn?: string;
   instagram?: string;
+  orientation?: CardOrientation;
+  qrSize?: number;
+  qrX?: number;
+  qrY?: number;
+  qrColor?: string;
+  nameX?: number;
+  nameY?: number;
 }
 
 export const CARD_THEMES: Record<CardThemeId, CardThemeDef> = {
@@ -303,7 +311,14 @@ export const DEFAULT_CARD_DATA: VisitingCardData = {
   fontScale: 1,
   logoScale: 1,
   logoX: 88,
-  logoY: 16
+  logoY: 16,
+  orientation: 'landscape',
+  qrSize: 160,
+  qrX: 85,
+  qrY: 68,
+  qrColor: '#111827',
+  nameX: 7,
+  nameY: 27
 };
 
 /**
@@ -372,10 +387,13 @@ export function generateCardVCardPayload(card: VisitingCardData): string {
 export async function createVisitingCardPdf(
   frontPngDataUrl: string,
   backPngDataUrl: string,
-  size: CardSizeId = 'us'
+  size: CardSizeId = 'us',
+  orientation: CardOrientation = 'landscape'
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
-  const { widthPt, heightPt } = CARD_SIZES[size];
+  const dimensions = CARD_SIZES[size];
+  const widthPt = orientation === 'portrait' ? dimensions.heightPt : dimensions.widthPt;
+  const heightPt = orientation === 'portrait' ? dimensions.widthPt : dimensions.heightPt;
 
   const extractBase64 = (dataUrl: string) => {
     return dataUrl.replace(/^data:image\/[a-z]+;base64,/, '');
