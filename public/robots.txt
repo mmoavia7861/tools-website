@@ -1,6 +1,6 @@
 User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /api/
+Allow: /tools-website/
+Disallow: /tools-website/admin/
+Disallow: /tools-website/api/
 
-Sitemap: https://ranknova.app/sitemap.xml
+Sitemap: https://mmoavia7861.github.io/tools-website/sitemap.xml
