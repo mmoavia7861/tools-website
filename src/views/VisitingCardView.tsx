@@ -73,6 +73,8 @@ export const VisitingCardView: React.FC = () => {
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const cardPreviewRef = useRef<HTMLDivElement | null>(null);
   const logoDragActive = useRef(false);
+  const qrDragActive = useRef(false);
+  const nameDragActive = useRef(false);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [history, setHistory] = useState<{ past: VisitingCardData[]; future: VisitingCardData[] }>({ past: [], future: [] });
   const previousCardRef = useRef(cardData);
@@ -118,6 +120,27 @@ export const VisitingCardView: React.FC = () => {
     setCardData(prev => ({ ...prev, logoX: Math.round(x), logoY: Math.round(y) }));
   };
 
+  const moveQrByPointer = (event: React.PointerEvent<HTMLImageElement>) => {
+    if (!qrDragActive.current || !cardPreviewRef.current) return;
+    const rect = cardPreviewRef.current.getBoundingClientRect();
+    setCardData(prev => ({
+      ...prev,
+      qrX: Math.round(Math.max(12, Math.min(88, (event.clientX - rect.left) / rect.width * 100))),
+      qrY: Math.round(Math.max(14, Math.min(88, (event.clientY - rect.top) / rect.height * 100)))
+    }));
+  };
+
+  const moveNameByPointer = (event: React.PointerEvent<HTMLHeadingElement>) => {
+    if (!nameDragActive.current || !cardPreviewRef.current) return;
+    const rect = cardPreviewRef.current.getBoundingClientRect();
+    setCardData(prev => ({
+      ...prev,
+      nameX: Math.round(Math.max(5, Math.min(70, (event.clientX - rect.left) / rect.width * 100))),
+      nameY: Math.round(Math.max(12, Math.min(82, (event.clientY - rect.top) / rect.height * 100)))
+    }));
+  };
+
+  const isPortrait = cardData.orientation === 'portrait';
   const activeTheme = resolveCardTheme(cardData);
   const fontFamily = CARD_FONT_CSS[cardData.font || 'sans'];
   const fontScale = cardData.fontScale || 1;
@@ -144,7 +167,7 @@ export const VisitingCardView: React.FC = () => {
         const url = await QRCode.toDataURL(payload, {
           width: 320,
           margin: 4,
-          color: { dark: '#111827', light: '#FFFFFFFF' },
+          color: { dark: /^#[0-9a-fA-F]{6}$/.test(cardData.qrColor || '') ? cardData.qrColor : '#111827', light: '#FFFFFFFF' },
           errorCorrectionLevel: 'M'
         });
 
@@ -160,7 +183,8 @@ export const VisitingCardView: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [cardData, activeTheme]);
+  }, [cardData.qrType, cardData.website, cardData.fullName, cardData.companyName,
+    cardData.phone, cardData.email, cardData.jobTitle, cardData.address, cardData.qrColor]);
 
   // Helper to determine if a hex color is light
   function isColorLight(hex: string): boolean {
@@ -361,10 +385,10 @@ export const VisitingCardView: React.FC = () => {
    */
   const renderCardToCanvas = async (side: 'front' | 'back', format: 'png' | 'jpeg' = 'png'): Promise<string> => {
     const canvas = document.createElement('canvas');
-    const W = 1050;
-    const H = 600;
-    canvas.width = cardSize.widthPx;
-    canvas.height = cardSize.heightPx;
+    const W = isPortrait ? 600 : 1050;
+    const H = isPortrait ? 1050 : 600;
+    canvas.width = isPortrait ? cardSize.heightPx : cardSize.widthPx;
+    canvas.height = isPortrait ? cardSize.widthPx : cardSize.heightPx;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not get canvas context');
     // Maintain design-coordinate positions at both ISO/US physical sizes.
@@ -380,6 +404,97 @@ export const VisitingCardView: React.FC = () => {
 
     // Decorative graphics & patterns
     drawPattern(ctx, cardData.pattern || theme.pattern, theme, W, H);
+
+    if (isPortrait) {
+      // Portrait composition uses a real vertical design rather than rotating
+      // an existing horizontal image onto portrait paper.
+      ctx.textAlign = 'left';
+      if (side === 'front') {
+        ctx.fillStyle = theme.accent;
+        ctx.fillRect(0, 0, W, 14);
+        ctx.font = `bold ${Math.round(29 * textScale)}px ${face}`;
+        ctx.fillText((cardData.companyName || 'YOUR COMPANY').toUpperCase(), 50, 280, W - 100);
+        ctx.fillStyle = theme.primaryText;
+        ctx.font = `bold ${Math.round(45 * textScale)}px ${face}`;
+        ctx.fillText(cardData.fullName || 'Your Name',
+          W * (cardData.nameX ?? 10) / 100, H * (cardData.nameY ?? 36) / 100, W - 90);
+        ctx.fillStyle = theme.accent;
+        ctx.font = `500 ${Math.round(22 * textScale)}px ${face}`;
+        ctx.fillText(cardData.jobTitle || 'Your Profession', 50, 465, W - 100);
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(50, 505); ctx.lineTo(W - 50, 505); ctx.stroke();
+        const detailLines = [
+          ['TEL', cardData.phone],
+          ['EML', cardData.email],
+          ['WEB', cardData.website],
+          ['LOC', cardData.address]
+        ];
+        detailLines.forEach(([label, value], idx) => {
+          if (!value) return;
+          const y = 570 + idx * 55;
+          ctx.fillStyle = theme.accent;
+          ctx.font = `600 18px ${face}`;
+          ctx.fillText(label, 50, y, 55);
+          ctx.fillStyle = theme.secondaryText;
+          ctx.font = `500 ${Math.round(19 * textScale)}px ${face}`;
+          ctx.fillText(value, 110, y, W - 145);
+        });
+        if (qrDataUrl && cardData.qrType !== 'none') {
+          const qrImg = new Image();
+          qrImg.src = qrDataUrl;
+          await new Promise(resolve => { qrImg.onload = resolve; qrImg.onerror = resolve; });
+          if (qrImg.naturalWidth > 0) {
+            const qrSize = cardData.qrSize || 160;
+            const x = Math.max(0, Math.min(W - qrSize, W * (cardData.qrX ?? 50) / 100 - qrSize / 2));
+            const y = Math.max(0, Math.min(H - qrSize - 22, H * (cardData.qrY ?? 85) / 100 - qrSize / 2));
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(x - 5, y - 5, qrSize + 10, qrSize + 10);
+            ctx.drawImage(qrImg, x, y, qrSize, qrSize);
+            ctx.font = `14px ${face}`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = theme.secondaryText;
+            ctx.fillText(cardData.qrType === 'vcard' ? 'SAVE CONTACT' : 'VISIT WEBSITE', x + qrSize / 2, y + qrSize + 22);
+            ctx.textAlign = 'left';
+          }
+        }
+      } else {
+        ctx.textAlign = 'center';
+        ctx.font = `bold ${Math.round(49 * textScale)}px ${face}`;
+        ctx.fillStyle = theme.primaryText;
+        ctx.fillText(cardData.companyName || 'YOUR COMPANY', W / 2, 555, W - 90);
+        ctx.fillStyle = theme.secondaryText;
+        ctx.font = `500 ${Math.round(26 * textScale)}px ${face}`;
+        ctx.fillText(cardData.tagline || 'Your Brand. Your Story.', W / 2, 620, W - 90);
+        ctx.fillStyle = theme.accent;
+        ctx.font = `500 21px ${face}`;
+        ctx.fillText(cardData.website || 'https://example.com', W / 2, 725, W - 90);
+        const social = [cardData.linkedIn, cardData.instagram].filter(Boolean).join('  •  ');
+        if (social) {
+          ctx.fillStyle = theme.secondaryText;
+          ctx.font = `500 17px ${face}`;
+          ctx.fillText(social, W / 2, 770, W - 90);
+        }
+        ctx.textAlign = 'left';
+      }
+      if (logoPreview) {
+        const image = new Image();
+        image.src = logoPreview;
+        await new Promise(resolve => { image.onload = resolve; image.onerror = resolve; });
+        if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+          const maxWidth = 150 * (cardData.logoScale || 1);
+          const maxHeight = 105 * (cardData.logoScale || 1);
+          const ratio = Math.min(maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+          const w = ratio * image.naturalWidth;
+          const h = ratio * image.naturalHeight;
+          const centerX = side === 'front' ? W * (cardData.logoX ?? 50) / 100 : W / 2;
+          const centerY = side === 'front' ? H * (cardData.logoY ?? 15) / 100 : 340;
+          ctx.drawImage(image, Math.max(0, Math.min(W - w, centerX - w / 2)),
+            Math.max(0, Math.min(H - h, centerY - h / 2)), w, h);
+        }
+      }
+      return canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.94 : undefined);
+    }
 
     if (side === 'front') {
       // Layout variations
@@ -412,7 +527,8 @@ export const VisitingCardView: React.FC = () => {
       // Person Name
       ctx.fillStyle = theme.primaryText;
       ctx.font = `bold ${Math.round(54 * textScale)}px ${face}`;
-      ctx.fillText(cardData.fullName || 'Your Name', startX, 165, 700);
+      ctx.fillText(cardData.fullName || 'Your Name',
+        W * (cardData.nameX ?? 7) / 100, H * (cardData.nameY ?? 27) / 100, 700);
 
       // Job Title Badge
       const titleText = cardData.jobTitle || 'Founder & Senior Engineer';
@@ -472,9 +588,9 @@ export const VisitingCardView: React.FC = () => {
           qrImg.onload = r;
           qrImg.onerror = r;
         });
-        const qrSize = 160;
-        const qrX = W - qrSize - 70;
-        const qrY = 320;
+        const qrSize = cardData.qrSize || 160;
+        const qrX = Math.max(0, Math.min(W - qrSize, W * (cardData.qrX ?? 85) / 100 - qrSize / 2));
+        const qrY = Math.max(0, Math.min(H - qrSize - 26, H * (cardData.qrY ?? 68) / 100 - qrSize / 2));
 
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
@@ -596,7 +712,7 @@ export const VisitingCardView: React.FC = () => {
       const frontDataUrl = await renderCardToCanvas('front');
       const backDataUrl = await renderCardToCanvas('back');
 
-      const pdfBytes = await createVisitingCardPdf(frontDataUrl, backDataUrl, cardData.size || 'us');
+      const pdfBytes = await createVisitingCardPdf(frontDataUrl, backDataUrl, cardData.size || 'us', cardData.orientation || 'landscape');
       const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
 
@@ -949,6 +1065,39 @@ export const VisitingCardView: React.FC = () => {
                 </div>
               </div>
 
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <QrIcon className="h-4 w-4 text-blue-600" /> QR Code Position & Appearance
+                </div>
+                <p className="text-xs text-slate-500">Drag the QR code in the preview, or use sliders for precision. A white quiet zone is preserved for scanning.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="text-xs font-semibold text-slate-700">QR Size: {cardData.qrSize || 160} units
+                    <input type="range" min="110" max="190" step="10" value={cardData.qrSize || 160}
+                      onChange={e => setCardData({ ...cardData, qrSize: Number(e.target.value) })}
+                      className="block w-full mt-2 accent-blue-600" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-700">QR Color
+                    <select aria-label="QR color" value={cardData.qrColor || '#111827'}
+                      onChange={e => setCardData({ ...cardData, qrColor: e.target.value })}
+                      className="block w-full mt-2 rounded-lg border border-slate-200 bg-white p-2">
+                      <option value="#111827">Dark Charcoal</option>
+                      <option value="#1E3A8A">Navy Blue</option>
+                      <option value="#064E3B">Forest Green</option>
+                      <option value="#581C36">Burgundy</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-semibold text-slate-700">Horizontal Position: {cardData.qrX ?? 85}%
+                    <input type="range" min="12" max="88" step="1" value={cardData.qrX ?? 85}
+                      onChange={e => setCardData({ ...cardData, qrX: Number(e.target.value) })}
+                      className="block w-full mt-2 accent-blue-600" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-700">Vertical Position: {cardData.qrY ?? 68}%
+                    <input type="range" min="14" max="88" step="1" value={cardData.qrY ?? 68}
+                      onChange={e => setCardData({ ...cardData, qrY: Number(e.target.value) })}
+                      className="block w-full mt-2 accent-blue-600" />
+                  </label>
+                </div>
+              </div>
               {/* Theme & Layout Selector */}
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
                 <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
@@ -1070,6 +1219,25 @@ export const VisitingCardView: React.FC = () => {
                   ))}
                 </div>
 
+                <div className="border-t border-slate-100 pt-4">                    <label htmlFor="card-orientation" className="block text-xs font-semibold text-slate-700 mb-1">Card Orientation</label>
+                    <select id="card-orientation" value={cardData.orientation || 'landscape'}
+                      onChange={e => {
+                        const orientation = e.target.value as 'landscape' | 'portrait';
+                        setCardData(prev => ({
+                          ...prev, orientation,
+                          logoX: orientation === 'portrait' ? 50 : 88,
+                          logoY: orientation === 'portrait' ? 15 : 16,
+                          nameX: orientation === 'portrait' ? 10 : 7,
+                          nameY: orientation === 'portrait' ? 36 : 27,
+                          qrX: orientation === 'portrait' ? 50 : 85,
+                          qrY: orientation === 'portrait' ? 85 : 68
+                        }));
+                      }}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+                      <option value="landscape">Horizontal (Landscape)</option>
+                      <option value="portrait">Vertical (Portrait)</option>
+                    </select>
+                </div>
                 {/* Pattern Motif Selector */}
                 <div className="pt-2">
                   <label className="text-xs font-semibold text-slate-700 block mb-2">
@@ -1134,13 +1302,13 @@ export const VisitingCardView: React.FC = () => {
                   </div>
 
                   <span className="text-[11px] font-mono text-slate-400">
-                    {cardData.size === 'eu' ? '85 × 55 mm' : '3.5 × 2 in'} — {cardSize.widthPx} × {cardSize.heightPx} px (300 DPI)
+                    {cardData.size === 'eu' ? '85 × 55 mm' : '3.5 × 2 in'} — {isPortrait ? cardSize.heightPx : cardSize.widthPx} × {isPortrait ? cardSize.widthPx : cardSize.heightPx} px (300 DPI)
                   </span>
                 </div>
 
                 {/* Interactive Card Canvas Component */}
                 <div className="relative w-full rounded-2xl overflow-hidden shadow-xl border border-slate-300/60 p-6 transition-all duration-300"
-                  style={{ aspectRatio: cardData.size === 'eu' ? '85 / 55' : '7 / 4', fontFamily }}>
+                  style={{ aspectRatio: isPortrait ? (cardData.size === 'eu' ? '55 / 85' : '4 / 7') : (cardData.size === 'eu' ? '85 / 55' : '7 / 4'), fontFamily }}>
                   {/* Background container */}
                   <div
                     className="absolute inset-0 transition-colors duration-300"
@@ -1185,7 +1353,7 @@ export const VisitingCardView: React.FC = () => {
                       )}
 
                       {/* Header row */}
-                      <div className="flex items-start justify-between">
+                      <div className={isPortrait ? 'absolute left-0 right-0 top-[22%] flex items-start justify-between' : 'flex items-start justify-between'}>
                         <div>
                           <p
                             className="text-[10px] font-bold tracking-wider uppercase"
@@ -1193,12 +1361,7 @@ export const VisitingCardView: React.FC = () => {
                           >
                             {cardData.companyName || 'YOUR COMPANY'}
                           </p>
-                          <h3
-                            className="text-lg sm:text-xl font-bold tracking-tight mt-0.5"
-                            style={{ color: activeTheme.primaryText, fontSize: `${20 * fontScale}px`, fontFamily }}
-                          >
-                            {cardData.fullName || 'Your Name'}
-                          </h3>
+                          <div className="h-5 sm:h-6" aria-hidden="true" />
                           <span
                             className="inline-block mt-1 px-2 py-0.5 text-[11px] font-semibold rounded"
                             style={{
@@ -1236,8 +1399,37 @@ export const VisitingCardView: React.FC = () => {
                           }} />
                       )}
 
+                      <h3 className="absolute z-10 font-bold tracking-tight cursor-grab active:cursor-grabbing touch-none select-none"
+                        title="Drag your name to reposition it" aria-label="Drag the name to a new position"
+                        onPointerDown={e => { nameDragActive.current = true; e.currentTarget.setPointerCapture(e.pointerId); }}
+                        onPointerMove={moveNameByPointer}
+                        onPointerUp={e => { nameDragActive.current = false; if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
+                        onPointerCancel={() => { nameDragActive.current = false; }}
+                        style={{ color: activeTheme.primaryText, fontFamily, fontSize: `${(isPortrait ? 19 : 20) * fontScale}px`,
+                          left: `${cardData.nameX ?? 7}%`, top: `${cardData.nameY ?? 27}%`, transform: 'translateY(-50%)' }}>
+                        {cardData.fullName || 'Your Name'}
+                      </h3>
+                      {qrDataUrl && cardData.qrType !== 'none' && (
+                        <div className="absolute z-10 text-center" style={{
+                          width: `${(cardData.qrSize || 160) / (isPortrait ? 600 : 1050) * 100}%`,
+                          left: `${cardData.qrX ?? 85}%`, top: `${cardData.qrY ?? 68}%`,
+                          transform: 'translate(-50%, -50%)'
+                        }}>
+                          <img src={qrDataUrl} alt="Drag QR code to reposition"
+                            draggable={false}
+                            onPointerDown={e => { qrDragActive.current = true; e.currentTarget.setPointerCapture(e.pointerId); }}
+                            onPointerMove={moveQrByPointer}
+                            onPointerUp={e => { qrDragActive.current = false; if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
+                            onPointerCancel={() => { qrDragActive.current = false; }}
+                            className="w-full aspect-square bg-white p-1 rounded cursor-grab active:cursor-grabbing touch-none select-none"
+                          />
+                          <span className="block text-[8px] mt-1" style={{ color: activeTheme.secondaryText }}>
+                            {cardData.qrType === 'vcard' ? 'SAVE CONTACT' : 'VISIT WEBSITE'}
+                          </span>
+                        </div>
+                      )}
                       {/* Contact details & QR code row */}
-                      <div className="flex items-end justify-between pt-2 border-t border-white/10">
+                      <div className={isPortrait ? 'absolute top-[53%] left-0 right-0 pt-2 border-t border-white/10' : 'flex items-end justify-between pt-2 border-t border-white/10'}>
                         <div className="space-y-1 text-[11px] leading-tight">
                           <div className="flex items-center gap-1.5" style={{ color: activeTheme.secondaryText }}>
                             <Phone className="h-3 w-3 shrink-0" style={{ color: activeTheme.accent }} />
@@ -1257,20 +1449,7 @@ export const VisitingCardView: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Embedded QR code thumbnail */}
-                        {qrDataUrl && cardData.qrType !== 'none' && (
-                          <div className="text-center">
-                            <div className="p-1 rounded bg-white/10 backdrop-blur-xs">
-                              <img src={qrDataUrl} alt="QR Code" className="h-14 w-14 rounded bg-white p-0.5" />
-                            </div>
-                            <span
-                              className="text-[8px] font-mono block mt-0.5 uppercase tracking-tighter"
-                              style={{ color: activeTheme.secondaryText }}
-                            >
-                              {cardData.qrType === 'vcard' ? 'Save Contact' : 'Visit Website'}
-                            </span>
-                          </div>
-                        )}
+
                       </div>
                     </div>
                   ) : (

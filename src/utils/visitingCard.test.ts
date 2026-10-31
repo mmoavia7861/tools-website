@@ -61,12 +61,16 @@ test('correct 300 DPI output and page physical size for both business card stand
   assert.equal(CARD_SIZES.eu.heightPx, 650);
   const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
   for (const size of ['us', 'eu'] as const) {
-    const bytes = await createVisitingCardPdf(png, png, size);
-    const pdf = await PDFDocument.load(bytes);
-    assert.equal(pdf.getPageCount(), 2);
-    const actual = pdf.getPage(0).getSize();
-    assert.ok(Math.abs(actual.width - CARD_SIZES[size].widthPt) < 0.02);
-    assert.ok(Math.abs(actual.height - CARD_SIZES[size].heightPt) < 0.02);
+    for (const orientation of ['landscape', 'portrait'] as const) {
+      const bytes = await createVisitingCardPdf(png, png, size, orientation);
+      const pdf = await PDFDocument.load(bytes);
+      assert.equal(pdf.getPageCount(), 2);
+      const actual = pdf.getPage(0).getSize();
+      const expectedWidth = orientation === 'portrait' ? CARD_SIZES[size].heightPt : CARD_SIZES[size].widthPt;
+      const expectedHeight = orientation === 'portrait' ? CARD_SIZES[size].widthPt : CARD_SIZES[size].heightPt;
+      assert.ok(Math.abs(actual.width - expectedWidth) < 0.02);
+      assert.ok(Math.abs(actual.height - expectedHeight) < 0.02);
+    }
   }
 });
 
