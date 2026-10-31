@@ -120,7 +120,7 @@ export const AdminView: React.FC = () => {
     }
   };
 
-  const isOwner = currentUser && (currentUser.email === OWNER_EMAIL || currentUser.email?.endsWith('@google.com'));
+  const isOwner = currentUser && (currentUser.email === OWNER_EMAIL);
 
   if (authLoading) {
     return (
