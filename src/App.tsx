@@ -27,15 +27,23 @@ import { AdminView } from './views/AdminView';
 import { NotFoundView } from './views/NotFoundView';
 import { testConnection } from './services/firebase';
 
+// Vite BASE_URL is /tools-website/ on GitHub Pages and / on standalone hosting.
+const basePrefix = import.meta.env.BASE_URL.replace(/\/$/, '');
+const browserPath = () => {
+  const pathname = window.location.pathname;
+  if (basePrefix && (pathname === basePrefix || pathname.startsWith(basePrefix + '/'))) {
+    return pathname.slice(basePrefix.length) || '/';
+  }
+  return pathname || '/';
+};
+
 export default function App() {
-  const [currentPath, setCurrentPath] = useState<string>(() => {
-    return window.location.pathname || '/';
-  });
+  const [currentPath, setCurrentPath] = useState<string>(browserPath);
 
   // Handle browser back/forward buttons
   useEffect(() => {
     const onPopState = () => {
-      setCurrentPath(window.location.pathname || '/');
+      setCurrentPath(browserPath());
     };
     window.addEventListener('popstate', onPopState);
 
@@ -48,8 +56,9 @@ export default function App() {
   }, []);
 
   const navigate = (path: string) => {
-    if (window.location.pathname !== path) {
-      window.history.pushState({}, '', path);
+    const target = `${basePrefix}${path}`;
+    if (window.location.pathname !== target) {
+      window.history.pushState({}, '', target);
       setCurrentPath(path);
       window.scrollTo(0, 0);
     }
