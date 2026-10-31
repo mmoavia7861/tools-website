@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve, sep, extname } from 'node:path';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
@@ -24,8 +24,11 @@ const server = createServer((req, res) => {
   if (!target.startsWith(root + sep)) {
     res.writeHead(403); res.end(); return;
   }
-  // GitHub Pages serves this copied 404 page on direct visits to SPA routes.
-  const real = existsSync(target) ? target : resolve(root, '404.html');
+  // GitHub Pages serves generated /route/index.html with HTTP 200, rather
+  // than a 404 fallback that cannot be indexed by Google.
+  const real = existsSync(target)
+    ? (statSync(target).isDirectory() ? resolve(target, 'index.html') : target)
+    : resolve(root, '404.html');
   if (!existsSync(real)) { res.writeHead(404); res.end(); return; }
   res.statusCode = existsSync(target) ? 200 : 404;
   res.setHeader('Content-Type', mime[extname(real)] || 'application/octet-stream');
@@ -59,16 +62,33 @@ try {
   assert.equal(runtimeErrors.length, 0, 'Homepage JavaScript crashes: ' + JSON.stringify(runtimeErrors));
 
   await page.locator('header nav button').filter({ hasText: 'QR Generator' }).click();
-  assert.equal(new URL(page.url()).pathname, '/tools-website/qr-code-generator', 'App navigation lost project base path');
+  assert.equal(new URL(page.url()).pathname, '/tools-website/qr-code-generator/', 'App navigation lost project base path');
   assert.ok((await page.locator('#root').innerText()).includes('QR'), 'QR tool page did not render');
 
-  // Direct deep-link reload: Pages serves copied 404.html containing the app.
-  await page.goto(rootUrl + 'qr-code-generator', { waitUntil: 'domcontentloaded', timeout: 25000 });
+  // These deep links must return actual 200 pages, not SEO-hostile 404 fallbacks.
+  const qrResponse = await page.goto(rootUrl + 'qr-code-generator/', { waitUntil: 'domcontentloaded', timeout: 25000 });
+  assert.equal(qrResponse?.status(), 200);
   await page.waitForSelector('#root header', { timeout: 25000 });
   assert.ok((await page.locator('#root').innerText()).includes('QR'), 'Direct deep link did not render on static fallback');
+  for (const [slug, expectedTitle] of [
+    ['about', 'About RankNova'],
+    ['contact', 'Contact RankNova'],
+    ['privacy-policy', 'Privacy Policy'],
+    ['terms', 'Terms of Service']
+  ]) {
+    const response = await page.goto(rootUrl + slug + '/', { waitUntil: 'domcontentloaded', timeout: 25000 });
+    assert.equal(response?.status(), 200, slug + ' returned HTTP 404, which blocks indexing');
+    await page.waitForSelector('#root header', { timeout: 25000 });
+    assert.ok((await page.title()).includes(expectedTitle.split(' ')[0]), 'Missing title for ' + slug);
+  }
+  const sitemapResponse = await page.goto(rootUrl + 'sitemap.xml');
+  assert.equal(sitemapResponse?.status(), 200);
+  const sitemap = await sitemapResponse?.text();
+  assert.ok(sitemap?.includes('https://mmoavia7861.github.io/tools-website/privacy-policy/'), 'Legal page absent from sitemap');
+  assert.ok(!sitemap?.includes('https://ranknova.app'), 'Unverified other domain remains in sitemap');
   assert.equal(runtimeErrors.length, 0, 'Browser errors after navigation: ' + JSON.stringify(runtimeErrors));
 
-  console.log('PASS: tools-website home, Vite JS assets, QR tool routing, and SPA deep links render.');
+  console.log('PASS: tools-website home, Vite JS assets, QR tool routing, crawlable legal pages and sitemap render.');
 } finally {
   await browser?.close();
   server.closeAllConnections();
