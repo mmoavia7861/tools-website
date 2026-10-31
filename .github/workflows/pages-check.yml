@@ -24,6 +24,8 @@ jobs:
         env:
           GITHUB_PAGES: 'true'
         run: npm run build
+      - name: Prepare indexable pages and sitemap
+        run: node scripts/prepare-pages-seo.mjs
       - name: Create GitHub Pages SPA fallback
         run: cp dist/index.html dist/404.html
       - name: Install browser smoke-test dependencies
