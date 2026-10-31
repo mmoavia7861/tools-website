@@ -218,7 +218,7 @@ export const VisitingCardView: React.FC = () => {
     if (!promptToUse) return;
 
     setIsGeneratingAi(true);
-    setAiStatusMessage('AI is analyzing business profile and crafting bespoke palette...');
+    setAiStatusMessage('Selecting a palette for your card...');
 
     try {
       if (window.location.hostname.endsWith('.github.io')) {
@@ -618,13 +618,13 @@ export const VisitingCardView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="AI Visiting Card Generator — Free Professional Business Cards | RankNova"
-        description="Create AI-designed business cards and visiting cards in seconds. Custom themes, smart taglines, QR codes, vCards, and print-ready 300 DPI PDF export."
+        title="Free Visiting Card Maker — Business Card Generator with QR Code | RankNova"
+        description="Free visiting card maker online with customizable templates, logo editing, scannable QR codes and 300 DPI JPG, PNG or print-size PDF exports."
         canonicalPath="/visiting-card-generator"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'RankNova AI Visiting Card Maker',
+          name: 'RankNova Visiting Card Maker',
           applicationCategory: 'DesignApplication',
           operatingSystem: 'Any',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
@@ -637,13 +637,13 @@ export const VisitingCardView: React.FC = () => {
           <div className="text-center max-w-3xl mx-auto mb-10">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3.5 py-1 text-xs font-semibold text-blue-700 border border-blue-200/80 mb-3">
               <Sparkles className="h-3.5 w-3.5" />
-              <span>AI Theme Generator • 12+ Design Styles • 300 DPI Print PDF</span>
+              <span>12+ Premium Templates • QR Code • 300 DPI PNG, JPG & PDF</span>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               Professional Visiting Card Maker
             </h1>
             <p className="mt-3 text-sm sm:text-base text-slate-600">
-              Generate bespoke, print-ready business cards with custom AI design styling. Customize contact info, embed digital vCard QR codes, and export 2-page print PDFs.
+              Design your own professional front-and-back business card. Customize fonts, colors, logo placement and QR codes, then download at the correct print size.
             </p>
           </div>
 
@@ -656,16 +656,16 @@ export const VisitingCardView: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Wand2 className="h-5 w-5 text-indigo-400" />
                     <h2 className="text-sm font-bold uppercase tracking-wider text-white">
-                      AI Smart Card Designer
+                      Smart Style Ideas
                     </h2>
                   </div>
                   <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-                    Gemini 3.8 Powered
+                    On-device fallback
                   </span>
                 </div>
 
                 <p className="text-xs text-slate-300">
-                  Describe your business vibe or aesthetic. AI will automatically craft a harmonized color palette, tailored layout, tagline, and decorative motif.
+                  Describe a business style to try a curated design instantly. When a real AI backend is configured it can also generate a custom palette. Offline suggestions are not AI-generated.
                 </p>
 
                 {/* Prompt input */}
@@ -723,6 +723,9 @@ export const VisitingCardView: React.FC = () => {
                   </div>
                 </div>
 
+                {aiStatusMessage && (
+                  <p role="status" className="rounded-lg bg-indigo-950/60 border border-indigo-500/30 p-2 text-xs text-indigo-100">{aiStatusMessage}</p>
+                )}
                 {/* AI Rationale Notice */}
                 {cardData.aiRationale && (
                   <div className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-xs text-indigo-200">
@@ -743,14 +746,16 @@ export const VisitingCardView: React.FC = () => {
                       Card Details & Contact Info
                     </h2>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setCardData({ ...DEFAULT_CARD_DATA })}
-                    className="text-xs text-slate-500 hover:text-blue-600 flex items-center gap-1"
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                    <span>Reset to Sample</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={undo} disabled={history.past.length === 0}
+                      aria-label="Undo edit" title="Undo last edit" className="rounded-md border border-slate-200 p-1.5 disabled:opacity-40 hover:bg-slate-50"><Undo2 className="h-4 w-4" /></button>
+                    <button type="button" onClick={redo} disabled={history.future.length === 0}
+                      aria-label="Redo edit" title="Redo last edit" className="rounded-md border border-slate-200 p-1.5 disabled:opacity-40 hover:bg-slate-50"><Redo2 className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => { setCardData({ ...DEFAULT_CARD_DATA }); setEditorError(null); }}
+                      className="text-xs text-slate-500 hover:text-blue-600 flex items-center gap-1">
+                      <RotateCcw className="h-3 w-3" /><span>Reset</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -867,6 +872,22 @@ export const VisitingCardView: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="card-linkedin" className="text-xs font-semibold text-slate-700 block mb-1">LinkedIn URL / handle (optional)</label>
+                    <input id="card-linkedin" type="text" maxLength={90} value={cardData.linkedIn || ''}
+                      onChange={e => setCardData({ ...cardData, linkedIn: e.target.value })}
+                      placeholder="linkedin.com/in/your-name" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label htmlFor="card-instagram" className="text-xs font-semibold text-slate-700 block mb-1">Instagram handle (optional)</label>
+                    <input id="card-instagram" type="text" maxLength={60} value={cardData.instagram || ''}
+                      onChange={e => setCardData({ ...cardData, instagram: e.target.value })}
+                      placeholder="@yourbusiness" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+                  </div>
+                </div>
+
+                {editorError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2"><AlertCircle className="h-4 w-4" />{editorError}</div>}
                 {/* Logo Upload & QR Selection */}
                 <div className="pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -880,12 +901,12 @@ export const VisitingCardView: React.FC = () => {
                         className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-700 hover:bg-slate-100 transition"
                       >
                         <UploadCloud className="h-4 w-4 text-blue-600" />
-                        <span>{logoPreview ? 'Change Logo' : 'Upload PNG/SVG'}</span>
+                        <span>{logoPreview ? 'Change Logo' : 'Upload PNG/JPG/WebP'}</span>
                       </button>
                       <input
                         ref={logoInputRef}
                         type="file"
-                        accept="image/png,image/jpeg,image/svg+xml"
+                        accept="image/png,image/jpeg,image/webp"
                         className="hidden"
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
@@ -951,7 +972,7 @@ export const VisitingCardView: React.FC = () => {
                         <button
                           key={themeKey}
                           type="button"
-                          onClick={() => setCardData({ ...cardData, theme: themeKey })}
+                          onClick={() => setCardData({ ...cardData, theme: themeKey, customAccent: undefined, customBgFront: undefined, customBgBack: undefined, customText: undefined })}
                           className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition ${
                             isSelected
                               ? 'border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/30'
@@ -1002,6 +1023,51 @@ export const VisitingCardView: React.FC = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Professional print, typography & logo controls */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 pt-5">
+                  <div>
+                    <label htmlFor="card-size" className="block text-xs font-semibold text-slate-700 mb-1">Print Size</label>
+                    <select id="card-size" value={cardData.size || 'us'} onChange={e => setCardData({ ...cardData, size: e.target.value as 'us' | 'eu' })}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+                      {Object.entries(CARD_SIZES).map(([key, size]) => <option key={key} value={key}>{size.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="card-font" className="block text-xs font-semibold text-slate-700 mb-1">Typography</label>
+                    <select id="card-font" value={cardData.font || 'sans'}
+                      onChange={e => setCardData({ ...cardData, font: e.target.value as 'sans' | 'serif' | 'mono' })}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+                      <option value="sans">Modern Sans (Arial)</option><option value="serif">Elegant Serif (Georgia)</option><option value="mono">Technical Mono (Courier)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="card-font-scale" className="block text-xs font-semibold text-slate-700 mb-1">Text Scale: {Math.round(fontScale * 100)}%</label>
+                    <input id="card-font-scale" type="range" min="0.75" max="1.25" step="0.05" value={fontScale}
+                      onChange={e => setCardData({ ...cardData, fontScale: Number(e.target.value) })} className="w-full accent-blue-600" />
+                  </div>
+                  <div>
+                    <label htmlFor="card-logo-scale" className="block text-xs font-semibold text-slate-700 mb-1">Logo Size: {Math.round((cardData.logoScale || 1) * 100)}%</label>
+                    <input id="card-logo-scale" type="range" min="0.6" max="1.6" step="0.1" value={cardData.logoScale || 1}
+                      onChange={e => setCardData({ ...cardData, logoScale: Number(e.target.value) })} className="w-full accent-blue-600" />
+                    <p className="mt-1 text-[10px] text-slate-500">Drag your uploaded logo in the preview to position it.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {([
+                    ['customAccent', 'Accent', activeTheme.accent],
+                    ['customBgFront', 'Front BG', activeTheme.bgFront],
+                    ['customBgBack', 'Back BG', activeTheme.bgBack],
+                    ['customText', 'Text', activeTheme.primaryText]
+                  ] as const).map(([key, label, color]) => (
+                    <label key={key} className="text-[11px] font-semibold text-slate-700 flex items-center gap-2">
+                      <input type="color" aria-label={label + ' color'} value={color.match(/^#[0-9a-fA-F]{6}$/) ? color : '#2563eb'}
+                        onChange={e => setCardData({ ...cardData, [key]: e.target.value })}
+                        className="h-9 w-9 rounded-md cursor-pointer" />
+                      {label}
+                    </label>
+                  ))}
                 </div>
 
                 {/* Pattern Motif Selector */}
