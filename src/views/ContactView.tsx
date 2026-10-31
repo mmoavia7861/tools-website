@@ -44,26 +44,14 @@ export const ContactView: React.FC = () => {
         createdAt: new Date().toISOString()
       };
 
-      // 1. Try persisting directly to Firestore
-      try {
-        await setDoc(doc(db, 'contact_messages', messageId), messageData);
-      } catch (firestoreErr) {
-        console.warn('Firestore write warning (falling back to server API):', firestoreErr);
-      }
-
-      // 2. Also submit to server API endpoint
-      await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...messageData,
-          honeypot
-        })
-      });
-
+      // Show success only after the inquiry is genuinely stored.
+      // GitHub Pages has no /api/contact backend, and the old API fallback
+      // acknowledged messages without persisting them.
+      await setDoc(doc(db, 'contact_messages', messageId), messageData);
       setSubmitted(true);
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to submit your message. Please try again.');
+      console.warn('Contact message was not saved:', err);
+      setErrorMessage('We could not save your message. Please try again shortly; no submission was confirmed.');
     } finally {
       setIsSubmitting(false);
     }
@@ -101,7 +89,7 @@ export const ContactView: React.FC = () => {
                 </div>
                 <h2 className="text-xl font-bold text-slate-900">Message Received</h2>
                 <p className="text-sm text-slate-600 max-w-md mx-auto">
-                  Thank you for reaching out. We have logged your request and our team will review it promptly.
+                  Thank you for reaching out. Your message was saved for our team to review. We cannot promise a specific response time.
                 </p>
                 <button
                   type="button"
