@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwnerEmail() {
+      return isSignedIn() && request.auth.token.email == 'moaviah760@gmail.com';
+    }
+
+    function isAdmin() {
+      return isOwnerEmail() || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Admins collection
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin();
+      allow write: if isOwnerEmail();
+    }
+
+    // Blog posts
+    match /blog_posts/{postId} {
+      // Public can read published posts
+      allow get: if resource.data.published == true || isAdmin();
+      allow list: if (resource.data.published == true) || isAdmin();
+
+      // Only admins can create, update, or delete blog posts
+      allow create: if isAdmin() && isValidId(postId) &&
+        incoming().slug is string && incoming().slug.size() <= 128 &&
+        incoming().title is string && incoming().title.size() <= 200 &&
+        incoming().excerpt is string && incoming().excerpt.size() <= 500 &&
+        incoming().content is string && incoming().content.size() <= 50000 &&
+        incoming().published is bool;
+
+      allow update: if isAdmin() &&
+        incoming().slug is string && incoming().slug.size() <= 128 &&
+        incoming().title is string && incoming().title.size() <= 200 &&
+        incoming().excerpt is string && incoming().excerpt.size() <= 500 &&
+        incoming().content is string && incoming().content.size() <= 50000 &&
+        incoming().published is bool;
+
+      allow delete: if isAdmin();
+    }
+
+    // Site content CMS
+    match /site_content/{contentId} {
+      allow get: if true;
+      allow list: if true;
+      allow write: if isAdmin();
+    }
+
+    // Contact form submissions
+    match /contact_messages/{messageId} {
+      allow get, list: if isAdmin();
+      allow create: if isValidId(messageId) &&
+        incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 120 &&
+        incoming().email is string && incoming().email.size() > 3 && incoming().email.size() <= 256 &&
+        incoming().message is string && incoming().message.size() > 0 && incoming().message.size() <= 5000 &&
+        incoming().category in ['General question', 'Tool issue', 'Privacy request', 'Copyright/DMCA', 'Security report'] &&
+        incoming().status == 'new';
+      allow update, delete: if isAdmin();
+    }
+
+    // Admin settings
+    match /admin_settings/{settingId} {
+      allow get: if true; // Public read for feature flags / non-secret settings like adsenseEnabled
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Health check document
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

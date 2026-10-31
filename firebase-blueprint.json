@@ -1,0 +1,180 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "Authorized administrator profile",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email of the admin user",
+          "maxLength": 256
+        },
+        "role": {
+          "type": "string",
+          "enum": ["owner", "admin"]
+        },
+        "addedAt": {
+          "type": "string",
+          "description": "Timestamp when added"
+        }
+      },
+      "required": ["email", "role"]
+    },
+    "BlogPost": {
+      "title": "BlogPost",
+      "description": "Educational blog articles published or drafted on RankNova",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "description": "URL-safe unique identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Article headline",
+          "maxLength": 200
+        },
+        "metaTitle": {
+          "type": "string",
+          "description": "SEO title tag",
+          "maxLength": 100
+        },
+        "metaDescription": {
+          "type": "string",
+          "description": "SEO meta description",
+          "maxLength": 300
+        },
+        "excerpt": {
+          "type": "string",
+          "description": "Summary teaser",
+          "maxLength": 500
+        },
+        "content": {
+          "type": "string",
+          "description": "Markdown article body",
+          "maxLength": 50000
+        },
+        "author": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "published": {
+          "type": "boolean"
+        },
+        "readTime": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["slug", "title", "excerpt", "content", "published"]
+    },
+    "SiteContent": {
+      "title": "SiteContent",
+      "description": "Customizable CMS text and metadata",
+      "type": "object",
+      "properties": {
+        "section": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "data": {
+          "type": "object"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "updatedBy": {
+          "type": "string"
+        }
+      },
+      "required": ["section", "data"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "User inquiries and support requests",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "category": {
+          "type": "string",
+          "enum": ["General question", "Tool issue", "Privacy request", "Copyright/DMCA", "Security report"]
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 5000
+        },
+        "status": {
+          "type": "string",
+          "enum": ["new", "in_progress", "resolved", "archived"]
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": ["name", "email", "category", "message", "status"]
+    },
+    "AdminSettings": {
+      "title": "AdminSettings",
+      "description": "Global application and ad configuration",
+      "type": "object",
+      "properties": {
+        "adsenseEnabled": {
+          "type": "boolean"
+        },
+        "publisherId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "aiProvider": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "maxUploadSizeMb": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["adsenseEnabled"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Collection of verified administrator user IDs"
+    },
+    "/blog_posts/{postId}": {
+      "schema": "BlogPost",
+      "description": "Articles collection; published posts are public readable"
+    },
+    "/site_content/{contentId}": {
+      "schema": "SiteContent",
+      "description": "CMS key-value documents for editable site sections"
+    },
+    "/contact_messages/{messageId}": {
+      "schema": "ContactMessage",
+      "description": "User contact inquiries submitted via contact form"
+    },
+    "/admin_settings/{settingId}": {
+      "schema": "AdminSettings",
+      "description": "Site-wide configuration flags and ad placement parameters"
+    }
+  }
+}

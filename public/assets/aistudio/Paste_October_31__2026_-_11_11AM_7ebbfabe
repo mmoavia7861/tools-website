@@ -1,0 +1,1490 @@
+# RankNova Production-Ready Web App Research and Google AI Studio Master Prompt
+
+## Executive summary
+
+**RankNova** is technically viable as a focused three-tool utility website built in Google AI Studio Build mode. Google AI Studio currently supports full-stack web apps with a React frontend, Node.js server runtime, server-side secret handling, Firebase Authentication/Firestore integration, GitHub two-way sync, and direct deployment to Cloud Run. That makes it suitable for a real production implementation rather than only a visual prototype. citeturn430749search0turn696138search4turn696138search3
+
+The recommended launch scope is exactly the three tools you specified: **QR Code Generator, PDF Compressor, and AI Background Remover**. Existing products demonstrate sustained utility around these workflows: Adobe Express offers QR generation with customization and downloadable formats; iLovePDF offers multiple PDF compression levels; and remove.bg operates a dedicated automated background-removal service. These references demonstrate mature user use cases, but they do **not** prove that RankNova will rank automatically or that any keyword has low SEO competition. citeturn406183search1turn406183search3turn406183search2
+
+There are two important implementation corrections. First, a QR code containing a URL should simply encode the URL locally; the server should **not fetch that URL**, because doing so adds unnecessary SSRF exposure. OWASP specifically identifies user-controlled remote URLs as a common SSRF vector and recommends strong URL/IP controls whenever server-side fetching exists. citeturn536294search8 Second, the default transparent background-removal download should be **PNG**. PNG explicitly supports alpha transparency. A conventional JPEG export should flatten the cutout onto a selected solid background rather than claim to preserve transparent pixels. citeturn559674search0turn559674search17
+
+For background removal, the safest commercial architecture is to make the processing provider configurable. A hosted API such as remove.bg is operationally simple, whereas self-hosted/open-source models require careful license review. For example, `rembg` itself is MIT-licensed, but its documentation warns that individual model weights can have separate licenses; its current default BRIA model requires a commercial agreement for commercial use. IMG.LY's browser background-removal package is AGPL unless another license is obtained. This is exactly why RankNova should never assume that “open source code” automatically means every bundled model is commercially unrestricted. citeturn914894search5turn914894search7turn914894search8turn536294search3
+
+For PDF processing, the product should use a **client-first / server-fallback** design. Lightweight browser-side optimizations can avoid uploading documents, while difficult PDFs can be sent to an isolated server worker after explicit user action. A production pipeline must honestly report the before/after file size and must never claim compression when the output is not actually smaller. `pdfcpu`, for example, provides PDF validation and optimization under Apache 2.0, but its “optimize” operation primarily targets redundant PDF resources; a true quality slider that aggressively downsamples embedded images requires an appropriately licensed processing pipeline rather than a fake percentage control. citeturn536294search0turn536294search1turn536294search2
+
+AdSense readiness should be designed from day one but **ads should remain disabled until the site is accepted and publisher IDs are configured**. Google prohibits artificial clicks/impressions, misleading ad placement, encouraging users to interact with ads, and layouts in which ads can be confused with navigation or download controls. Google also requires a certified CMP integrated with the IAB TCF for personalized ads served through its publisher products to users in the EEA, UK, and Switzerland. citeturn696138search0turn696138search1turn696138search2turn817648search0
+
+Legal compliance cannot be reduced to generating a Privacy Policy template. GDPR principles include purpose limitation, data minimization, storage limitation, security, transparency, and privacy by design/default. California's CCPA applies only when statutory thresholds and conditions are met, but covered businesses must provide relevant privacy rights. COPPA creates additional requirements if a service is directed to children under 13 or has actual knowledge that it collects their personal information. These requirements vary by jurisdiction, so the application should implement privacy-oriented defaults and treat generated legal text as a starting point for legal review, not a guarantee of compliance. citeturn832256search0turn832256search2turn832256search4
+
+The keyword recommendations below are therefore **priority keyword candidates**, not verified “low-competition” claims. Google Keyword Planner itself provides estimated monthly searches and advertiser competition, and Google notes that shorter/general keywords can face stronger competition. Validate the final targets in Keyword Planner for the countries RankNova intends to target before publishing the landing pages. citeturn666021search0turn666021search2turn666021search10
+
+## Product architecture and implementation decisions
+
+RankNova should use public, crawlable landing pages plus an application layer for actual tool execution. Google states that pages need to be accessible to Googlebot, return successful responses, and contain indexable content to be eligible for indexing; eligibility still does not guarantee indexing. Google also documents sitemaps, canonicalization, metadata, logical URLs, and JavaScript considerations as part of crawl/index management. citeturn817648search3turn817648search4turn817648search5
+
+The public information architecture should be:
+
+| Route | Purpose |
+|---|---|
+| `/` | RankNova homepage |
+| `/qr-code-generator` | QR Code Generator |
+| `/compress-pdf` | PDF Compressor |
+| `/background-remover` | AI Background Remover |
+| `/blog` | Original educational content |
+| `/blog/[slug]` | Individual article |
+| `/about` | Business and service explanation |
+| `/contact` | Contact/support |
+| `/privacy-policy` | Privacy practices |
+| `/terms` | Terms of use |
+| `/copyright-dmca` | Copyright and takedown procedure |
+| `/acceptable-use` | User-content and abuse rules |
+| `/admin` | Owner-only dashboard, noindex |
+
+The homepage should promote **only these three tools at launch**. Blog posts, legal pages, an admin panel, analytics, and CMS functionality are supporting infrastructure, not additional public tools.
+
+Google AI Studio's current full-stack environment already provides a React frontend and Node.js server runtime, supports npm packages and server-side secrets, can provision Firestore and Firebase Authentication, and supports GitHub synchronization. Production deployment can create a Cloud Run service. citeturn696138search4turn430749search0turn696138search3
+
+For a custom domain, Google Cloud currently recommends putting a **global external Application Load Balancer** in front of Cloud Run; direct Cloud Run domain mapping is described as limited-availability/preview, while Firebase Hosting is another supported option. The load-balancer approach also enables Cloud CDN and Cloud Armor if those become useful later. citeturn430749search3
+
+### Tool implementation choices
+
+**QR Code Generator:** perform QR generation in-browser wherever practical. Support URL, plain text, Wi-Fi, and vCard payloads; custom dimensions; error-correction setting; foreground/background colors; and PNG/SVG export. The user-entered URL should be encoded, not fetched. Adobe's current QR tool similarly exposes customization and downloadable formats, confirming the workflow is understandable to mainstream users. citeturn406183search1turn406183search7
+
+**PDF Compressor:** attempt browser-side processing first and clearly tell users when their document remains on-device. When the selected mode requires server processing, ask for confirmation before upload. Server-side uploads should use strict file-type/signature validation, size limits, generated temporary filenames, resource limits, isolated processing, and immediate cleanup. OWASP recommends extension allowlisting, independent MIME/signature validation, filename controls, upload size limits, storage isolation, secure libraries, and antivirus/sandboxing where appropriate. citeturn536294search9
+
+**AI Background Remover:** allow JPG, JPEG, PNG, and optionally WebP input, validate actual file content, strip unnecessary metadata from output, and create a transparent PNG. JPEG output should require the user to select a white, black, or custom solid background. remove.bg demonstrates that background removal is commonly exposed as both an interactive tool and an API, while open-source alternatives such as `rembg` can run locally but require per-model license review. citeturn406183search2turn406183search8turn914894search5
+
+A commercially deployable open-source choice is still **unspecified** until you perform license due diligence on the exact model, weights, training-data terms, and dependencies you intend to ship. This is important because current repositories show real licensing complexity: IMG.LY's package is AGPL, BRIA RMBG 2.0 requires a commercial agreement for commercial deployment, and even BiRefNet's maintainer has publicly discussed licensing complications caused by training datasets. citeturn536294search3turn914894search8turn536294search7
+
+For the MVP, the lowest-risk setup is therefore:
+
+**Development:** configurable background-removal provider adapter.
+
+**Production option A:** licensed commercial API.
+
+**Production option B:** self-hosted model only after written license review.
+
+**Fallback behavior:** if no valid provider is configured, clearly display “Background removal service not configured” rather than generating a fake cutout.
+
+## Copy-ready Google AI Studio Master Prompt
+
+The following prompt is intentionally strict. It reflects AI Studio's current full-stack capabilities, Firebase integration, GitHub sync, Cloud Run deployment path, AdSense requirements, Google Search technical guidance, and the security/privacy controls described above. citeturn430749search0turn696138search4turn696138search0turn536294search9
+
+```text
+MASTER PROMPT — BUILD RANKNOVA AS A REAL PRODUCTION-READY FULL-STACK WEB APP
+
+Act as a senior full-stack engineer, cloud architect, application-security engineer, accessibility specialist, technical SEO specialist, privacy engineer, UX designer, QA engineer, and SaaS product architect.
+
+Build a complete, production-oriented web application named:
+
+RankNova
+
+Tagline:
+“Free Online Tools — Fast, Secure, Private”
+
+PUBLIC LANGUAGE:
+English (en-US)
+
+PRIMARY GOAL:
+Create a fast, trustworthy, privacy-first online utility website that launches with EXACTLY THREE public tools:
+
+1. QR Code Generator
+2. PDF Compressor
+3. AI Background Remover
+
+DO NOT ADD ANY OTHER PUBLIC TOOL AT LAUNCH.
+
+The site must be suitable for future Google AdSense monetization, but AdSense must remain disabled until real publisher configuration is supplied.
+
+CRITICAL NON-NEGOTIABLE RULES
+
+1. NO FAKE RESULTS.
+2. NO MOCK PROCESSING PRESENTED AS REAL.
+3. NO SIMULATED BACKEND RESPONSES.
+4. NO BUTTON MAY PRETEND TO PROCESS a file if processing is not implemented.
+5. REAL BACKEND REQUIRED whenever functionality cannot be completed securely in the browser.
+6. If a capability cannot be implemented in Google AI Studio, generate the actual production-ready fallback source files and deployment instructions instead of pretending it works.
+7. Never fabricate analytics, upload counts, compression savings, AI results, AdSense revenue, reviews, testimonials, ratings, user counts, or security claims.
+8. Never claim AdSense approval, Google ranking, or legal compliance is guaranteed.
+9. Public launch must contain exactly the three tools listed above.
+10. Do not add converters, image resizers, password tools, PDF mergers, SEO tools, text tools, or any additional utility.
+
+==================================================
+PROJECT STACK
+==================================================
+
+Use:
+
+- React
+- TypeScript
+- Tailwind CSS
+- Node.js server-side runtime
+- Firebase Authentication for owner-only admin access
+- Cloud Firestore for CMS/settings
+- Google Analytics 4 integration, configurable by environment variable
+- Google Search Console verification placeholder
+- GitHub-compatible repository structure
+- Google Cloud Run production deployment
+- Environment variables / secret manager for every private credential
+
+Prefer stable, maintained dependencies with licenses compatible with commercial deployment.
+
+Create a LICENSE_NOTICES.md or THIRD_PARTY_LICENSES.md file that documents important production dependencies and model licenses.
+
+Never expose API keys, Firebase admin credentials, AI provider credentials, analytics secrets, or service-account secrets in public frontend code.
+
+==================================================
+BRAND AND VISUAL DESIGN
+==================================================
+
+Brand:
+RankNova
+
+Tagline:
+Free Online Tools — Fast, Secure, Private
+
+Color palette:
+
+Primary Blue: #2563EB
+Dark Navy: #0F172A
+White: #FFFFFF
+Page Background: #F8FAFC
+Accent Violet: #7C3AED
+
+Use light mode by default.
+
+Design direction:
+
+- Premium SaaS aesthetic
+- Extremely clean layout
+- Strong spacing
+- Large readable typography
+- White and soft-gray surfaces
+- Navy headings
+- Blue primary buttons
+- Violet only as a restrained accent
+- Rounded cards
+- Subtle shadows
+- Lightweight microanimations
+- No excessive gradients
+- No clutter
+- No fake social proof
+- No distracting animation around advertisements
+- Mobile-first
+- Responsive at all breakpoints
+
+Create a simple RankNova logo placeholder:
+- abstract four-point “nova/spark” icon
+- subtle combination of a tool/spark motif
+- wordmark “RankNova”
+- SVG implementation
+- must work in header, favicon, and monochrome mode
+
+Accessibility target:
+WCAG 2.2 AA where practical.
+
+Include:
+- semantic HTML
+- logical heading structure
+- keyboard navigation
+- visible focus states
+- accessible labels
+- ARIA only where appropriate
+- adequate contrast
+- accessible errors
+- screen-reader announcements for processing status
+- reduced-motion support
+- touch targets suitable for mobile
+
+==================================================
+SITE ROUTES
+==================================================
+
+Public routes:
+
+/
+ /qr-code-generator
+ /compress-pdf
+ /background-remover
+ /blog
+ /blog/:slug
+ /about
+ /contact
+ /privacy-policy
+ /terms
+ /copyright-dmca
+ /acceptable-use
+
+Private route:
+
+/admin
+
+The admin route must:
+- require authentication
+- be owner-authorized
+- return noindex metadata
+- never expose private content through public APIs
+
+Add a polished custom 404 page.
+
+==================================================
+HOMEPAGE
+==================================================
+
+Build a premium homepage containing:
+
+1. Navigation
+2. Hero
+3. Three-tool card grid
+4. Trust/privacy section
+5. “How It Works”
+6. Why use RankNova
+7. Helpful FAQ
+8. Educational content links
+9. Reserved AdSense-safe ad locations
+10. Footer
+
+Hero example direction:
+
+Headline:
+“Free Online Tools. Fast, Secure, Private.”
+
+Supporting copy:
+“Create QR codes, compress PDFs, and remove image backgrounds with simple tools built for speed and privacy.”
+
+Primary CTA:
+“Explore Free Tools”
+
+Show exactly three tool cards.
+
+Do not create cards for future or “coming soon” tools.
+
+==================================================
+TOOL ONE — QR CODE GENERATOR
+==================================================
+
+Create a genuinely functional QR Code Generator.
+
+Supported QR content types:
+
+A. URL
+B. Plain text
+C. Wi-Fi
+D. vCard
+
+URL:
+- validate basic URL structure
+- allow http and https
+- DO NOT fetch or visit the URL
+- encode it only
+
+Plain text:
+- text input
+- clear character guidance
+
+Wi-Fi:
+- SSID
+- password
+- security type
+- hidden network toggle
+- correctly escape special characters according to QR Wi-Fi payload requirements
+
+vCard:
+- first name
+- last name
+- organization
+- job title
+- phone
+- email
+- website
+- optional address
+
+Customization:
+
+- size control
+- error-correction level
+- foreground color
+- background color
+- margin
+- preview
+- reset
+
+Downloads:
+
+- PNG
+- SVG
+
+PNG sizes:
+- configurable sensible presets
+- support high-resolution export
+
+SVG:
+- clean vector output
+- safe filename
+
+Buttons:
+- Generate
+- Download PNG
+- Download SVG
+- Copy encoded content where useful
+- Reset
+
+Generation should happen client-side unless there is a genuine technical reason not to.
+
+Never transmit QR payload content to the server unless strictly necessary.
+
+Do not call user QR codes “dynamic QR codes” unless RankNova actually provides a redirect/tracking service. This launch does NOT require a hosted dynamic-QR redirect service.
+
+==================================================
+TOOL TWO — PDF COMPRESSOR
+==================================================
+
+Create a REAL PDF compressor.
+
+User flow:
+
+1. Select or drag/drop PDF
+2. Validate file
+3. Display original filename and size
+4. Select compression level with a quality slider/presets
+5. Compress
+6. Show real progress
+7. Display actual before/after file sizes
+8. Display actual percentage reduction
+9. Download the processed PDF
+
+Presets:
+- Light
+- Balanced
+- Strong
+
+Quality slider:
+Must map to genuine processing parameters.
+It must NOT be a decorative slider.
+
+PRIVACY-FIRST PROCESSING STRATEGY
+
+Attempt client-side processing first where technically practical.
+
+Client-side mode should:
+- avoid uploading the PDF
+- perform only real optimizations
+- never claim a reduction that did not happen
+
+If meaningful compression cannot be achieved safely in-browser, use a secure Node/server-side processing route.
+
+Server-side fallback:
+- user must know the file will be uploaded for processing
+- process only after user action
+- temporary files only
+- delete input/output in finally blocks
+- no permanent storage by default
+- do not put uploaded PDFs in Firestore
+- do not create public storage URLs
+
+File restrictions:
+- configurable maximum upload size
+- default starting limit around 25 MB unless infrastructure testing justifies another value
+- PDF only
+- validate extension
+- validate MIME
+- inspect file signature/magic bytes
+- reject malformed files
+- reject encrypted/password-protected PDFs unless supported safely
+- enforce page/resource limits
+- enforce request timeout
+- enforce memory limits
+
+Security:
+- generated UUID filenames
+- never execute user-supplied filenames
+- process outside public webroot
+- sandbox or isolate processing
+- rate limit compression endpoint
+- optional malware/antivirus scanning hook
+- keep file-processing dependencies patched
+- log only operational metadata, not document contents
+
+Compression engine:
+Choose a production-suitable, commercially compatible library/process.
+
+Do NOT silently use AGPL/proprietary components without explicitly documenting licensing obligations.
+
+If using pdfcpu, understand that its optimize operation may remove redundant resources but may not provide aggressive image-quality downsampling by itself.
+
+For strong compression requiring embedded-image resampling:
+- use a properly licensed pipeline
+- document the library/license
+- implement actual image downsampling/recompression
+- preserve text/vector quality where possible
+- do not rasterize entire PDFs by default
+
+Important:
+If output is the same size or larger, tell the user:
+“This file could not be reduced meaningfully with the selected settings.”
+
+Never fabricate compression success.
+
+Display:
+- original size
+- compressed size
+- actual reduction
+- processing method: “On-device” or “Secure server processing”
+- privacy note
+
+==================================================
+TOOL THREE — AI BACKGROUND REMOVER
+==================================================
+
+Create a REAL AI Background Remover.
+
+Inputs:
+- PNG
+- JPG/JPEG
+- optionally WebP if fully supported
+
+Validate:
+- extension
+- MIME
+- file signature
+- pixel dimensions
+- maximum decoded image area
+- file size
+
+Prevent:
+- decompression bombs
+- parser abuse
+- excessive memory use
+
+User flow:
+
+1. Upload or drag image
+2. Preview original
+3. Start background removal
+4. Show progress/status
+5. Display before/after preview
+6. Download result
+
+Primary output:
+Transparent PNG.
+
+JPEG:
+JPEG must NOT be described as transparent output.
+If user chooses JPEG:
+- require a solid background color
+- flatten the cutout onto that background
+- then export JPEG
+
+Optional:
+- white background
+- black background
+- custom color
+
+AI provider architecture:
+
+Implement a provider adapter so the background-removal engine can be switched without rewriting the UI.
+
+Support configuration for:
+
+A. Licensed commercial API
+OR
+B. Self-hosted/open-source model whose exact code, model weights, datasets, and dependencies have been verified for commercial use
+
+The exact AI model is UNSPECIFIED until a commercially acceptable model/provider is selected.
+
+Do NOT bundle a model merely because its code repository says “open source.”
+
+Check:
+- code license
+- model weights license
+- dataset restrictions
+- commercial-use rights
+- attribution requirements
+- redistribution requirements
+- export/restricted-country terms where applicable
+
+If using a third-party API:
+- credentials server-side only
+- timeout
+- retry limit
+- rate limit
+- cost quota
+- explicit privacy disclosure
+- do not log image contents
+- immediately delete temporary files
+
+If no valid AI provider is configured:
+DO NOT generate fake results.
+
+Instead show:
+“Background removal service is not configured.”
+
+Provide an admin configuration status indicator.
+
+==================================================
+NO UNNECESSARY SERVER-SIDE URL FETCHING
+==================================================
+
+RankNova's three launch tools do not require server-side fetching of arbitrary user-entered websites.
+
+The QR Code Generator must encode URLs locally rather than fetch them.
+
+If ANY remote-fetch feature is later added:
+- allow only http/https
+- resolve DNS safely
+- block localhost
+- block loopback
+- block private IPv4 ranges
+- block link-local ranges
+- block private/unique-local IPv6
+- block multicast
+- block cloud metadata addresses/hostnames
+- revalidate every redirect destination
+- set strict redirect count
+- enforce DNS/IP validation after resolution
+- prevent DNS rebinding where possible
+- enforce timeout
+- enforce maximum response size
+- do not support file://, ftp://, gopher://, data://, or other schemes
+
+==================================================
+SECURE FILE UPLOAD ARCHITECTURE
+==================================================
+
+For PDFs and images:
+
+- extension allowlist
+- MIME validation
+- magic-byte/file-signature validation
+- generated temporary filenames
+- path traversal protection
+- file-size limits
+- decoded image dimension limits
+- processing timeouts
+- memory/CPU limits
+- rate limiting
+- no direct execution
+- isolated temporary working directory
+- cleanup on success
+- cleanup on failure
+- no permanent storage by default
+
+If temporary Cloud Storage is ever used:
+- private bucket
+- no public ACL
+- short TTL
+- automatic deletion lifecycle
+- random object IDs
+- least-privilege service account
+- signed URLs only if genuinely necessary
+
+Add an optional virus/malware scanning integration point for server-processed files.
+
+==================================================
+PRIVACY
+==================================================
+
+Default privacy principle:
+Process as much as possible in the user's browser.
+
+Do not store uploaded user PDFs or images by default.
+
+Do not store QR contents by default.
+
+If server processing is required:
+- temporary processing only
+- delete files immediately after result creation/download flow
+- document exact retention behavior
+- never say “we never upload your file” on a page that sometimes uses server fallback
+
+Privacy Policy must explain:
+
+- what data is collected
+- what files are processed
+- client-side vs server-side processing
+- temporary retention
+- logs
+- cookies
+- analytics
+- advertising
+- AI processing providers
+- third-party processors
+- international transfers where relevant
+- user privacy choices
+- contact method
+- retention policy
+- deletion procedures where applicable
+
+Apply:
+- data minimization
+- purpose limitation
+- storage limitation
+- privacy by design/default
+
+Implement configurable cookie/consent handling.
+
+For regions where legally required:
+- do not load optional analytics/advertising cookies before the relevant consent state
+- provide withdrawal/revocation controls
+
+For AdSense in EEA/UK/Switzerland:
+prepare integration with a Google-certified consent management platform compatible with Google's applicable requirements.
+
+CCPA:
+prepare a configurable “Your Privacy Choices” mechanism if the business becomes subject to applicable requirements.
+
+COPPA:
+RankNova is a general-audience productivity service, not a child-directed service.
+Do not intentionally collect age/date-of-birth information.
+If the business later knowingly collects children's personal data, require legal review before launch.
+
+==================================================
+CYBERSECURITY
+==================================================
+
+Implement:
+
+- secure headers
+- Content-Security-Policy
+- HSTS in production
+- Referrer-Policy
+- Permissions-Policy
+- X-Content-Type-Options
+- clickjacking protection through CSP frame-ancestors
+- CSRF protection where cookies/session state are used
+- output encoding
+- XSS prevention
+- dependency scanning
+- lockfile
+- least privilege
+- structured server logs
+- rate limiting
+- request body limits
+- safe error responses
+- no stack traces to public users
+- production CORS rules
+- secure authentication cookies/tokens
+- abuse throttling
+
+Add Firebase App Check where technically appropriate and supported.
+
+Admin actions must require server-side authorization.
+
+Never rely only on hiding the /admin URL.
+
+==================================================
+OWNER-ONLY ADMIN DASHBOARD
+==================================================
+
+Use Firebase Authentication.
+
+Create owner-only authorization.
+
+Prefer:
+- explicit allowlisted Firebase UID or admin custom claim
+- server-side verification
+- deny by default
+
+Admin dashboard sections:
+
+1. Overview
+2. Content
+3. Blog
+4. Tool settings
+5. AI provider status
+6. Analytics summary
+7. Ad settings
+8. Error logs
+9. Privacy/legal content
+10. Backups/status
+
+Content management:
+- homepage copy
+- FAQs
+- tool help text
+- SEO metadata
+- About page
+- legal-page editable content
+
+Blog CMS:
+- create
+- edit
+- draft
+- publish
+- unpublish
+- delete
+- slug
+- title
+- meta title
+- meta description
+- excerpt
+- article content
+- featured image metadata
+- canonical
+- author
+- publication date
+- updated date
+
+Start with only a few high-quality draft educational posts, not dozens of filler articles.
+
+Suggested starter topics:
+- How QR Codes Work and When to Use Them
+- How to Reduce PDF File Size Without Ruining Readability
+- Transparent PNG vs JPEG: Which Format Should You Use?
+
+Do not invent statistics in blog content.
+
+==================================================
+FIRESTORE SECURITY
+==================================================
+
+Use production/locked rules by default.
+
+Public:
+- read only published blog/content that is intentionally public
+
+Admin:
+- only authorized owner UID/custom claim can create/update/delete CMS data
+
+Never allow:
+allow read, write: if true
+
+Add Firestore rules tests using Firebase Emulator Suite.
+
+Server-side Firestore code must also use least-privilege IAM because server SDKs are not protected by client Firestore rules in the same way.
+
+==================================================
+ANALYTICS
+==================================================
+
+Support Google Analytics 4.
+
+Configuration must be optional and environment-based.
+
+Track privacy-conscious events:
+
+- tool_view
+- tool_start
+- tool_success
+- tool_error
+- qr_generate
+- qr_download
+- pdf_compress_start
+- pdf_compress_success
+- pdf_download
+- background_remove_start
+- background_remove_success
+- background_download
+
+Do not send:
+- QR payload contents
+- PDF filenames
+- document contents
+- image filenames
+- image contents
+- user-entered personal data
+- full IP addresses from app-level custom logging
+unless legally justified and explicitly designed
+
+Admin analytics may show aggregated metrics only.
+
+Never fabricate traffic numbers.
+
+==================================================
+GOOGLE ADSENSE READINESS
+==================================================
+
+Create reserved ad components but keep ads OFF by default.
+
+Environment/configuration fields:
+- ADSENSE_ENABLED=false
+- publisher ID
+- approved ad unit IDs
+- consent status integration
+
+Reserved potential ad locations:
+
+- homepage below substantial introductory/tool content
+- tool page below instructional content or below completed workflow
+- blog article between natural content sections
+
+DO NOT place advertisements:
+- inside upload drop zones
+- immediately adjacent to Download buttons
+- immediately adjacent to Generate buttons
+- immediately adjacent to Compress buttons
+- immediately adjacent to Remove Background buttons
+- in a way that looks like navigation
+- in a way that resembles a tool action
+- as forced pre-roll before a user's result
+- inside pop-ups that interfere with usage
+
+Never:
+- request ad clicks
+- reward ad clicks
+- force ad viewing to access a result
+- simulate ads
+- generate fake ad traffic
+- click test production ads
+- auto-refresh ad units outside permitted implementations
+
+Clearly label advertising where appropriate.
+
+==================================================
+LEGAL PAGES AND USER CONTENT RULES
+==================================================
+
+Generate initial drafts for legal review:
+
+- Privacy Policy
+- Terms of Use
+- Acceptable Use Policy
+- Copyright/DMCA page
+- Cookie/Consent information
+
+Clearly state:
+“These templates are not legal advice and should be reviewed for the operator's jurisdictions and business model.”
+
+Acceptable Use Policy must prohibit:
+- unlawful content
+- malware
+- abuse
+- privacy violations
+- unauthorized copyrighted content
+- attempts to attack or overload the service
+- circumventing limits
+- illegal use of generated assets
+
+DMCA/copyright process:
+- public copyright contact
+- process for notices
+- required notice information
+- counter-notice workflow where applicable
+- repeat-infringer process if persistent user storage/accounts are later introduced
+- do not falsely claim registered DMCA safe-harbor status unless the operator actually registers the required designated agent
+
+Copyright footer:
+© current year RankNova. All rights reserved.
+
+AI/model compliance:
+Document provider terms and any geographic/export restrictions applicable to the exact provider/model actually deployed.
+
+Do not create generic claims like:
+“Fully compliant with every law worldwide.”
+
+==================================================
+DATA RETENTION AND LOGGING
+==================================================
+
+Create a written retention policy.
+
+Recommended defaults:
+
+User uploaded files:
+- no permanent storage
+- temporary only
+- delete immediately after processing where practical
+- hard maximum temporary retention only as a recovery safeguard
+
+Application logs:
+- avoid file contents and personal payloads
+- configurable retention
+- record:
+  request ID
+  tool type
+  status
+  duration
+  error class
+  approximate file size bucket where useful
+- do not log private file content
+
+Admin audit events:
+- login
+- content publish
+- settings changes
+- ad configuration changes
+
+==================================================
+SEO
+==================================================
+
+Public landing pages must be crawlable HTML.
+
+Do not rely only on client-side rendering for essential landing-page copy.
+
+Use SSR/SSG/pre-rendering where appropriate for:
+
+/
+ /qr-code-generator
+ /compress-pdf
+ /background-remover
+ /about
+ /blog
+ /blog/:slug
+
+Implement:
+
+- unique title tags
+- unique meta descriptions
+- canonical tags
+- Open Graph tags
+- Twitter/card metadata where useful
+- semantic headings
+- crawlable internal links
+- sitemap.xml
+- robots.txt
+- useful alt text
+- clean URL paths
+- 404 handling
+- correct HTTP status codes
+- noindex for admin
+- noindex for non-content processing endpoints
+- appropriate structured data only where valid
+- no spam schema
+- automatic blog sitemap updates
+
+Do not keyword-stuff.
+
+Write substantial original supporting content for each tool page:
+- what the tool does
+- how to use it
+- privacy explanation
+- common use cases
+- FAQs
+- limitations
+
+Do not create hundreds of doorway pages such as thin pages for every possible target file size.
+
+==================================================
+RECOMMENDED PAGE SEO COPY
+==================================================
+
+Homepage title:
+RankNova — Free QR Code, PDF Compression & Background Removal Tools
+
+Homepage meta description:
+Create QR codes, compress PDF files, and remove image backgrounds online with RankNova. Fast, simple tools designed with privacy and security in mind.
+
+QR page title:
+Free QR Code Generator — PNG & SVG | RankNova
+
+QR meta:
+Create QR codes for URLs, text, Wi-Fi, and vCards. Customize size and colors, then download your QR code as PNG or SVG for free.
+
+PDF page title:
+Compress PDF Online — Reduce PDF File Size | RankNova
+
+PDF meta:
+Compress PDF files online with adjustable quality settings. See real before-and-after file sizes and download the smaller PDF securely.
+
+Background page title:
+Remove Image Background Online — Transparent PNG | RankNova
+
+Background meta:
+Remove image backgrounds automatically and download a transparent PNG. Fast background removal with secure file handling and clear privacy controls.
+
+==================================================
+PERFORMANCE
+==================================================
+
+Target excellent Core Web Vitals but do not claim scores before testing.
+
+Implement:
+
+- route/code splitting
+- lazy loading
+- optimized fonts
+- responsive images
+- minimal JavaScript on content pages
+- image dimensions to avoid layout shift
+- compression
+- caching headers
+- CDN-compatible static assets
+- avoid loading AI model assets until the background-remover page is opened
+- do not download huge ML weights on initial homepage load
+- web workers for expensive browser processing where appropriate
+- cancelable processing jobs
+- streaming/progress where practical
+
+==================================================
+COST CONTROL
+==================================================
+
+Client-side process whenever reasonable.
+
+Add:
+- per-IP/request throttles without invasive tracking
+- daily/monthly provider quota
+- AI cost configuration
+- maximum file size
+- maximum concurrent server jobs
+- timeout limits
+- caching for public CMS content
+- Cloud billing alert instructions
+- provider usage monitoring
+
+Paid APIs must be optional/configurable.
+
+If an AI quota is exhausted:
+show a truthful service-unavailable message.
+Do not silently return fake output.
+
+==================================================
+CONTACT AND USER SUPPORT
+==================================================
+
+Contact form:
+- name
+- email
+- category
+- message
+
+Categories:
+- General question
+- Tool issue
+- Privacy request
+- Copyright/DMCA
+- Security report
+
+Protect against spam.
+
+Do not expose private recipient credentials.
+
+Create a security-contact workflow.
+
+==================================================
+EMAIL FEATURES
+==================================================
+
+Do NOT email processed PDFs/images by default.
+
+Optional email report/result functionality:
+DISABLED by default.
+
+Do not store user email addresses unless the feature is intentionally enabled with appropriate consent, privacy disclosure, retention rules, and security.
+
+==================================================
+BACKUPS
+==================================================
+
+Back up only persistent business/CMS data, not temporary user files.
+
+Document:
+- Firestore backup/export procedure
+- restore procedure
+- configuration backup
+- GitHub source-code backup/version history
+
+Ensure restored data is rechecked for security/IAM configuration.
+
+==================================================
+GITHUB / DEVELOPMENT WORKFLOW
+==================================================
+
+Prepare:
+- .gitignore
+- env example
+- README
+- installation instructions
+- production build instructions
+- test instructions
+- deployment instructions
+
+GitHub:
+- no secrets committed
+- protected main branch recommendation
+- pull-request workflow
+- automated build/test workflow where practical
+- dependency update workflow
+
+==================================================
+GOOGLE CLOUD RUN
+==================================================
+
+Prepare a production deployment path for Google Cloud Run.
+
+Include:
+- Dockerfile if needed
+- production Node start command
+- health endpoint
+- environment variables
+- secret configuration
+- service account permissions
+- memory/CPU recommendations
+- request timeout configuration
+- autoscaling notes
+- minimum instances default 0 unless latency testing justifies otherwise
+- maximum instances for cost protection
+- logging configuration
+
+Explain how to deploy:
+A. directly from Google AI Studio where supported
+B. from GitHub/source
+C. from a built container
+
+==================================================
+CUSTOM DOMAIN
+==================================================
+
+Document production domain connection.
+
+Prefer a supported production architecture such as:
+- global external Application Load Balancer in front of Cloud Run
+OR
+- Firebase Hosting fronting Cloud Run where appropriate
+
+Include:
+- DNS verification
+- HTTPS/TLS
+- canonical host choice
+- redirect www/non-www consistently
+- Search Console verification
+- sitemap submission
+
+==================================================
+TESTING — MANDATORY BEFORE “DONE”
+==================================================
+
+UNIT TESTS
+
+QR:
+- URL payload
+- text payload
+- Wi-Fi escaping
+- vCard escaping
+- PNG generation
+- SVG generation
+- invalid input
+
+PDF:
+- valid PDF
+- malformed PDF
+- wrong MIME
+- wrong extension
+- password-protected PDF
+- file over limit
+- timeout
+- output smaller
+- output not smaller
+- cleanup after failure
+
+Background removal:
+- PNG input
+- JPEG input
+- oversized image
+- invalid file
+- provider success
+- provider timeout
+- provider error
+- provider quota exhausted
+- transparent PNG
+- JPEG flattened onto selected background
+
+SECURITY TESTS
+
+- auth bypass attempts
+- unauthorized admin access
+- Firestore rules
+- oversized request
+- path traversal filename
+- MIME spoofing
+- malformed upload
+- rapid repeated requests
+- CSRF where relevant
+- XSS in CMS/contact forms
+- secrets absent from client bundle
+- security headers present
+
+ACCESSIBILITY TESTS
+
+- keyboard-only navigation
+- visible focus
+- labels
+- contrast
+- screen-reader status
+- mobile zoom
+- reduced-motion behavior
+
+SEO TESTS
+
+Verify rendered HTML contains:
+- title
+- description
+- canonical
+- headings
+- internal links
+
+Verify:
+- sitemap works
+- robots works
+- admin is noindex
+- public pages return 200
+- missing pages return 404
+
+RESPONSIVE TESTS
+
+Test at:
+- small mobile
+- large mobile
+- tablet
+- laptop
+- wide desktop
+
+FUNCTIONAL ACCEPTANCE TEST
+
+No project is “complete” until:
+- all three tools produce real outputs
+- every download button works
+- every error state works
+- temporary files are deleted
+- admin is protected
+- no private secret appears in browser bundle
+- production build succeeds
+- production server starts successfully
+
+==================================================
+ADMIN AD CONFIGURATION
+==================================================
+
+Admin should be able to:
+- enable/disable approved ad slots
+- store non-secret ad unit identifiers/settings
+- preview ad locations
+- see whether consent integration is configured
+
+Do not provide controls that encourage policy-violating placement.
+
+==================================================
+STARTER BLOG CONTENT
+==================================================
+
+Create only 3 high-quality draft posts.
+
+Keep drafts unpublished by default until owner review.
+
+Articles must be original and genuinely useful.
+
+Do not mass-generate low-quality SEO content.
+
+==================================================
+FILE-BY-FILE FALLBACK REQUIREMENT
+==================================================
+
+If Google AI Studio cannot directly implement any required backend, model runtime, PDF engine, Firebase configuration, Cloud Run deployment file, or security control:
+
+DO NOT omit it.
+
+Instead:
+
+1. Clearly identify the unsupported/unfinished capability.
+2. Generate the complete fallback files.
+3. State the exact filepath for each file.
+4. Provide dependencies.
+5. Provide environment variables.
+6. Provide local test commands.
+7. Provide deployment commands/instructions.
+8. Explain how the frontend calls the backend.
+9. Provide a temporary truthful disabled state until the backend is configured.
+
+Expected fallback file categories may include:
+
+/server
+/server/routes
+/server/services
+/server/middleware
+/server/security
+/server/processors
+/firebase
+/tests
+/Dockerfile
+/.env.example
+/firestore.rules
+/firestore.indexes.json
+/README.md
+
+Never replace a missing server component with mocked success JSON.
+
+==================================================
+FINAL DELIVERY
+==================================================
+
+Deliver:
+
+1. Complete frontend
+2. Real server implementation
+3. Exactly three public tools
+4. Firebase authentication
+5. Firestore CMS
+6. Admin dashboard
+7. Analytics hooks
+8. AdSense-ready placeholders
+9. Legal-page drafts
+10. Secure file handling
+11. SEO metadata
+12. sitemap.xml
+13. robots.txt
+14. tests
+15. documentation
+16. GitHub-ready project
+17. Cloud Run deployment instructions
+18. custom-domain instructions
+19. environment variable documentation
+20. third-party/model license documentation
+
+At the end, output a deployment-status report containing:
+
+READY:
+features that genuinely work
+
+CONFIGURATION REQUIRED:
+features needing IDs/keys/domain settings
+
+BLOCKED:
+anything that cannot function yet
+
+SECURITY REVIEW:
+remaining manual checks
+
+LEGAL REVIEW:
+items requiring jurisdiction-specific review
+
+DO NOT state “production ready” unless all critical acceptance tests pass.
+
+Now build the complete RankNova application. Do not stop after generating the homepage.
+```
+
+## Deployment checklist
+
+Google AI Studio can currently publish a generated full-stack app to Cloud Run directly, and standard deployment requires an associated Google Cloud project with billing unless the account qualifies for the limited Starter Tier. AI Studio also supports linking the project to GitHub for two-way source synchronization. citeturn696138search3turn430749search0
+
+Use this deployment sequence:
+
+1. **Create the AI Studio project.** Paste the Master Prompt into Build mode, select a web app, allow it to generate the full-stack React/Node project, and fix every build/test failure before publication. AI Studio's web environment supports a React client and Node.js server component. citeturn430749search0turn696138search4
+
+2. **Connect GitHub immediately.** Create or link a repository through AI Studio Settings, then verify that `.env`, service-account credentials, API keys, and other secrets are excluded from source control. AI Studio currently supports push/pull synchronization with GitHub. citeturn430749search0
+
+3. **Enable Firebase Authentication and Firestore.** Configure only the owner's login initially. Start Firestore rules in locked/production mode and explicitly grant public reads only for intentionally published CMS content; Firebase recommends deny-by-default rules and testing rules with the Emulator Suite. citeturn696138search6turn696138search5
+
+4. **Configure background-removal processing.** Choose either a commercially licensed API or a model whose code, weights, datasets, and commercial-use conditions have been reviewed. Do not assume the license of a wrapper such as `rembg` covers every model it can download. citeturn914894search5turn914894search7
+
+5. **Configure the PDF backend.** Test compression against text-heavy, scanned, mixed-image, malformed, encrypted, and large PDFs. File uploads should use defense-in-depth controls rather than trusting only extension or MIME headers. citeturn536294search9
+
+6. **Set Cloud Run limits.** Configure memory, CPU, timeouts, maximum instances, concurrency, environment variables, and service-account permissions. A public website can be deployed as a public Cloud Run service; Google documents source/container deployment and public invocation configuration. citeturn696138search7
+
+7. **Create billing alerts.** Google Cloud budgets can generate actual/forecast spend alerts, but an alerts-only budget does not itself cap spending, so maximum instances and provider quotas remain important. citeturn430749search4
+
+8. **Connect the domain.** For a production custom domain, Google's current preferred Cloud Run option is a global external Application Load Balancer; Firebase Hosting is another documented option, while direct Cloud Run domain mapping has more limited availability. citeturn430749search3
+
+9. **Enable HTTPS, canonical host, Search Console and sitemap.** Put `sitemap.xml` at the site root and submit it through Search Console. Google recommends absolute canonical URLs in sitemaps. citeturn817648search5
+
+10. **Enable GA4 after privacy configuration.** GA4 supports automatically collected, enhanced measurement, recommended, and custom events; RankNova should use custom tool events without sending document contents or QR payloads. citeturn817648search2
+
+11. **Configure a CMP before relevant AdSense traffic.** Google's current publisher requirements require a Google-certified CMP integrated with the IAB TCF for personalized ads served in the EEA, UK and Switzerland. citeturn817648search0turn817648search1
+
+12. **Apply to AdSense only after the site is genuinely complete.** Keep the ad system disabled until your account/site configuration is approved. Compliance with published policies is necessary, but approval or future earnings should never be represented as guaranteed. Google may disable ad serving/accounts for policy violations. citeturn696138search0
+
+For Firestore business data, scheduled backups are available but require the Blaze plan; managed exports/imports also require billing. Backups should cover CMS/settings—not transient user PDFs/images. citeturn430749search1turn430749search2
+
+## Keyword and brand plan
+
+These are **priority search-intent candidates**, not independently verified low-KD keywords. Google's Keyword Planner is the appropriate Google source for estimated monthly searches and advertiser competition, and its metrics vary by location and targeting. Validate RankNova's final keywords for the US, UK, Canada, Australia and other desired markets before committing to content clusters. citeturn666021search0turn666021search2
+
+| Tool | Primary keyword candidate | Supporting keywords | Suggested page title | Suggested meta description |
+|---|---|---|---|---|
+| QR Code Generator | **free qr code generator** | `wifi qr code generator`, `qr code generator png`, `qr code generator svg` | **Free QR Code Generator — PNG & SVG \| RankNova** | Create QR codes for URLs, text, Wi-Fi and vCards. Customize size and colors, then download your QR code as PNG or SVG for free. |
+| PDF Compressor | **compress pdf online** | `reduce pdf file size`, `compress pdf free`, `make pdf smaller` | **Compress PDF Online — Reduce PDF File Size \| RankNova** | Compress PDF files online with adjustable quality settings. Compare real before-and-after sizes and download your smaller PDF securely. |
+| Background Remover | **remove background online** | `transparent background maker`, `remove image background`, `background remover png` | **Remove Image Background Online — Transparent PNG \| RankNova** | Remove image backgrounds automatically and download a transparent PNG. Fast background removal with secure file handling and clear privacy controls. |
+
+The competitor landscape confirms that these intents map to real utility workflows: Adobe exposes a dedicated QR generator; iLovePDF exposes compression choices; and remove.bg focuses directly on foreground isolation and transparent-output use cases. citeturn406183search1turn406183search3turn406183search5
+
+Do not create dozens of thin pages such as “compress PDF to 100 KB,” “compress PDF to 150 KB,” and so forth merely because competitors do. SmallSEOTools currently operates multiple such target-size pages, but RankNova should differentiate through a stronger single compressor page with genuinely useful explanations, privacy information and reliable processing rather than immediate doorway-page expansion. citeturn406183search36turn406183search37turn406183search47
+
+### Logo concept
+
+Use a compact **four-point nova/spark icon** with one angular segment subtly resembling a tool cursor or transformation symbol. Place it to the left of a clean **RankNova** wordmark. The icon should work independently as a favicon and app avatar.
+
+| Role | Hex |
+|---|---|
+| Primary | `#2563EB` |
+| Navy / text | `#0F172A` |
+| White | `#FFFFFF` |
+| Background | `#F8FAFC` |
+| Accent | `#7C3AED` |
+
+For mockups, create five screens before launch: desktop homepage, mobile homepage, PDF processing state, background-removal before/after state, and owner admin dashboard. Keep actual tool controls visually dominant and keep reserved ad areas visually separated from Generate/Compress/Download actions, because Google prohibits implementations likely to create accidental or misleading ad clicks. citeturn696138search1turn696138search0
+
+## AdSense, privacy, and legal launch checklist
+
+Google's policies specifically prohibit artificial impressions/clicks, click encouragement, deceptive placement, ads that imitate site navigation, and certain placements that interfere with normal site behavior. Ad placements therefore need to be visually independent from RankNova's upload areas and primary actions. citeturn696138search0turn696138search1turn696138search2
+
+Privacy should be implemented as an engineering property rather than only as a footer document. GDPR principles call for lawfulness/transparency, purpose limitation, data minimization, storage limitation, security, and accountability, including privacy by design/default. citeturn832256search0turn832256search1
+
+For a US-facing service, CCPA obligations depend on whether the business falls within the law's coverage thresholds; covered businesses must support rights such as know, delete, correct, opt out of sale/sharing, and—in applicable circumstances—limits on sensitive-data use. citeturn832256search2turn832256search3
+
+COPPA generally becomes relevant when a commercial service is directed to children under 13 and collects personal information, or where a general-audience service has actual knowledge that it is collecting such information from a child. RankNova therefore should not unnecessarily ask visitors for age or date of birth. citeturn832256search4turn832256search5
+
+The DMCA process deserves special care. A US online service provider seeking applicable Section 512 safe-harbor protection may need to designate and register an agent, publish the agent's contact details, and respond appropriately to valid notices; simply placing “DMCA compliant” in the footer does not create that protection. citeturn817648search6turn817648search7
+
+Before launch, prioritize the following:
+
+1. **Real-tool acceptance:** QR PNG/SVG generation, genuine PDF compression, and genuine background removal must all pass real-input tests. Any unconfigured AI provider must produce a clear unavailable state, not a fabricated image.
+
+2. **Upload security:** enforce allowlisted types, signature checks, resource limits, random temporary filenames, processing isolation, deletion and rate limiting. OWASP recommends layered validation because no single file-validation technique is sufficient. citeturn536294search9
+
+3. **Admin lockdown:** use owner-only Firebase authorization, deny-by-default Firestore rules, server-side authorization, emulator tests and least-privilege IAM. citeturn696138search5turn696138search6
+
+4. **Privacy-first defaults:** retain no user files by default, log no content, clearly disclose any server/API processing, and implement real deletion behavior consistent with the published policy. citeturn832256search0
+
+5. **Legal review:** review Privacy Policy, Terms, Acceptable Use, copyright/DMCA procedure, AI-provider/model terms, applicable consumer privacy obligations and local cyber-law obligations with counsel appropriate to the operator's jurisdiction. Export-control requirements can also depend on the exact AI hardware/model/provider and end use; current BIS guidance shows that some advanced-computing/AI activities can trigger EAR restrictions, so avoid broad claims of universal export compliance. citeturn832256search8turn832256search7
+
+6. **Consent:** deploy an appropriate consent system before enabling advertising/optional tracking in jurisdictions that require it; Google has specific certified-CMP requirements for its publisher products in the EEA, UK and Switzerland. citeturn817648search0turn817648search1
+
+7. **Ad layout audit:** keep ads away from upload, Generate, Compress, Remove Background and Download controls; do not reward views, force pre-roll ad viewing, ask for clicks or artificially generate traffic. citeturn696138search0turn696138search1turn696138search2
+
+8. **Content quality:** publish substantive homepage/tool explanations, FAQs, About, Contact and a small number of genuinely helpful articles. Google requires indexable public content for search eligibility, while AdSense prohibits pages created principally to display advertisements. citeturn817648search4turn696138search0
+
+9. **SEO verification:** test rendered titles, descriptions, canonical URLs, crawlable links, 200/404 status handling, robots.txt and sitemap.xml before submitting the sitemap. citeturn817648search3turn817648search5
+
+10. **Cost controls:** configure Cloud Run maximum instances, AI-provider quotas and Cloud Billing alerts. Google notes that ordinary budget alerts notify you but generally do not automatically stop usage. citeturn430749search4
+
+## Launch timeline
+
+The sequence below separates **build completion** from **monetization activation**, which reduces the chance of publishing unfinished processing, privacy or ad behavior.
+
+```mermaid
+timeline
+    title RankNova Production Launch
+    Week 1 : Generate full-stack project in Google AI Studio
+           : Connect GitHub
+           : Lock design system and routes
+    Week 2 : Complete QR Generator
+           : Implement PDF client/server pipeline
+           : Configure background-removal provider adapter
+    Week 3 : Add Firebase Auth and Firestore CMS
+           : Secure uploads and rate limits
+           : Build owner-only admin dashboard
+    Week 4 : Add SSR/SSG landing content
+           : Sitemap, robots, canonicals and metadata
+           : Add Privacy, Terms, DMCA and Acceptable Use drafts
+    Week 5 : Run functional, security and accessibility tests
+           : Test temporary-file deletion
+           : Audit third-party and model licenses
+    Week 6 : Deploy to Cloud Run
+           : Connect custom domain and HTTPS
+           : Configure GA4 and Search Console
+           : Create billing alerts and backups
+    After stable launch : Publish reviewed starter articles
+                        : Monitor tool errors and user behavior
+                        : Validate keyword targets in Keyword Planner
+    Before AdSense activation : Final content and navigation audit
+                              : Configure certified CMP where required
+                              : Review ad placement against policy
+                              : Apply/configure AdSense
+    After approval/configuration : Enable only approved ad slots
+                                 : Monitor invalid traffic
+                                 : Continue compliance and performance reviews
+```
+
+Google AI Studio's present deployment path maps naturally to this workflow because Build mode can produce full-stack apps, synchronize source through GitHub and publish to Cloud Run. Firebase supplies authentication/database infrastructure, while Firestore supports scheduled backups once the relevant billing plan is enabled. citeturn430749search0turn696138search3turn430749search1
+
+The most important launch principle is simple: **RankNova should be useful even with every advertisement disabled.** The three tools should produce genuine outputs, public pages should contain original helpful content, uploaded files should be treated as untrusted and temporary, and advertising should be layered on only after the product itself is stable. That architecture aligns the business goal—organic utility traffic plus later AdSense monetization—with Google's publisher policies rather than making ads the core user experience. citeturn696138search0turn696138search1
