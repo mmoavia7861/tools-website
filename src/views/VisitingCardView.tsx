@@ -22,7 +22,10 @@ import {
   ShieldCheck,
   Wand2,
   RefreshCw,
-  Lightbulb
+  Lightbulb,
+  Undo2,
+  Redo2,
+  AlertCircle
 } from 'lucide-react';
 import { SEOHead } from '../components/SEOHead';
 import { AdSlot } from '../components/AdSlot';
@@ -35,8 +38,13 @@ import {
   DEFAULT_CARD_DATA,
   resolveCardTheme,
   generateCardVCardPayload,
-  createVisitingCardPdf
+  createVisitingCardPdf,
+  CARD_SIZES,
+  CARD_FONT_CSS,
+  getCanvasFont,
+  suggestCardStyle
 } from '../utils/visitingCard';
+import { validateImageSignature, checkImageDimensionSafety } from '../utils/image';
 
 const QUICK_AI_PROMPTS = [
   { label: 'Cyberpunk Web3 Studio', prompt: 'Cyberpunk Web3 Studio with electric cyan and dark synthwave grid' },
@@ -63,8 +71,57 @@ export const VisitingCardView: React.FC = () => {
   const [aiStatusMessage, setAiStatusMessage] = useState<string | null>(null);
 
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const cardPreviewRef = useRef<HTMLDivElement | null>(null);
+  const logoDragActive = useRef(false);
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const [history, setHistory] = useState<{ past: VisitingCardData[]; future: VisitingCardData[] }>({ past: [], future: [] });
+  const previousCardRef = useRef(cardData);
+  const restoringRef = useRef(false);
+
+  // Save bounded undo checkpoints for every card edit, including uploaded logos.
+  useEffect(() => {
+    if (restoringRef.current) {
+      restoringRef.current = false;
+      previousCardRef.current = cardData;
+      return;
+    }
+    if (previousCardRef.current !== cardData) {
+      const snapshot = previousCardRef.current;
+      previousCardRef.current = cardData;
+      setHistory(prev => ({ past: [...prev.past.slice(-19), snapshot], future: [] }));
+    }
+  }, [cardData]);
+
+  useEffect(() => { setLogoPreview(cardData.logoDataUrl || null); }, [cardData.logoDataUrl]);
+
+  const undo = () => {
+    if (history.past.length === 0) return;
+    const restored = history.past[history.past.length - 1];
+    restoringRef.current = true;
+    setHistory(prev => ({ past: prev.past.slice(0, -1), future: [cardData, ...prev.future].slice(0, 20) }));
+    setCardData(restored);
+  };
+
+  const redo = () => {
+    if (history.future.length === 0) return;
+    const restored = history.future[0];
+    restoringRef.current = true;
+    setHistory(prev => ({ past: [...prev.past.slice(-19), cardData], future: prev.future.slice(1) }));
+    setCardData(restored);
+  };
+
+  const moveLogoByPointer = (event: React.PointerEvent<HTMLImageElement>) => {
+    if (!logoDragActive.current || !cardPreviewRef.current) return;
+    const rect = cardPreviewRef.current.getBoundingClientRect();
+    const x = Math.max(8, Math.min(92, (event.clientX - rect.left) / rect.width * 100));
+    const y = Math.max(9, Math.min(91, (event.clientY - rect.top) / rect.height * 100));
+    setCardData(prev => ({ ...prev, logoX: Math.round(x), logoY: Math.round(y) }));
+  };
 
   const activeTheme = resolveCardTheme(cardData);
+  const fontFamily = CARD_FONT_CSS[cardData.font || 'sans'];
+  const fontScale = cardData.fontScale || 1;
+  const cardSize = CARD_SIZES[cardData.size || 'us'];
 
   // Generate QR code whenever URL, vCard, or QR type changes
   useEffect(() => {
@@ -82,18 +139,12 @@ export const VisitingCardView: React.FC = () => {
       }
 
       try {
-        const darkColor =
-          cardData.theme === 'minimal-clean' || (cardData.customPalette?.bgFront && isColorLight(activeTheme.bgFront))
-            ? '#0F172A'
-            : '#FFFFFF';
-
+        // Printable QR must always have a quiet zone and high contrast,
+        // regardless of whether the selected visiting card theme is dark.
         const url = await QRCode.toDataURL(payload, {
-          width: 256,
-          margin: 1,
-          color: {
-            dark: darkColor,
-            light: '#00000000'
-          },
+          width: 320,
+          margin: 4,
+          color: { dark: '#111827', light: '#FFFFFFFF' },
           errorCorrectionLevel: 'M'
         });
 
@@ -124,14 +175,39 @@ export const VisitingCardView: React.FC = () => {
   }
 
   // Handle Logo Upload
-  const handleLogoUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setLogoPreview(result);
-      setCardData((prev) => ({ ...prev, logoDataUrl: result }));
-    };
-    reader.readAsDataURL(file);
+  const handleLogoUpload = async (file: File) => {
+    setEditorError(null);
+    try {
+      if (file.size > 2 * 1024 * 1024) throw new Error('Logo must be 2 MB or smaller.');
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const checked = validateImageSignature(bytes, 2 * 1024 * 1024);
+      if (!checked.valid) throw new Error(checked.error || 'Please select a valid PNG, JPEG or WebP image.');
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        const image = new Image();
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject(new Error('Could not decode logo image.'));
+          image.src = objectUrl;
+        });
+        const safe = checkImageDimensionSafety(image.naturalWidth, image.naturalHeight);
+        if (!safe.safe) throw new Error(safe.error || 'Logo image is too large.');
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          setLogoPreview(result);
+          setCardData(prev => ({ ...prev, logoDataUrl: result }));
+        }
+      };
+      reader.onerror = () => setEditorError('Logo upload failed. Please try a different image.');
+      reader.readAsDataURL(file);
+    } catch (error) {
+      setEditorError(error instanceof Error ? error.message : 'Unable to upload logo.');
+    }
   };
 
   /**
@@ -145,6 +221,9 @@ export const VisitingCardView: React.FC = () => {
     setAiStatusMessage('AI is analyzing business profile and crafting bespoke palette...');
 
     try {
+      if (window.location.hostname.endsWith('.github.io')) {
+        throw new Error('Cloud AI is not configured for this static website.');
+      }
       const response = await fetch('/api/generate-card-ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -182,11 +261,14 @@ export const VisitingCardView: React.FC = () => {
         }));
         setAiStatusMessage(`Generated: ${s.themeName}`);
       } else {
-        setAiStatusMessage('Generated customized modern theme style.');
+        throw new Error(data.error || 'AI style service is unavailable.');
       }
     } catch (err) {
-      console.error('AI Card generation error:', err);
-      setAiStatusMessage('Generated customized modern theme style.');
+      // Honest offline fallback: curated keyword-based palettes, not AI-generated.
+      const suggestion = suggestCardStyle(promptToUse);
+      setCardData(prev => ({ ...prev, ...suggestion, customPalette: null, customAccent: undefined,
+        customBgFront: undefined, customBgBack: undefined, customText: undefined, aiRationale: null }));
+      setAiStatusMessage('Local style suggestion applied. This was not generated by cloud AI.');
     } finally {
       setIsGeneratingAi(false);
     }
