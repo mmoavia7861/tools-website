@@ -8,6 +8,24 @@
 import { PDFDocument } from 'pdf-lib';
 import { buildVCardPayload } from './qr.ts';
 
+export type CardSizeId = 'us' | 'eu';
+export type CardFontId = 'sans' | 'serif' | 'mono';
+
+export const CARD_SIZES = {
+  us: { label: 'US Standard — 3.5 × 2 in', widthPt: 252, heightPt: 144, widthPx: 1050, heightPx: 600 },
+  eu: { label: 'International — 85 × 55 mm', widthPt: 85 * 72 / 25.4, heightPt: 55 * 72 / 25.4, widthPx: Math.round(85 * 300 / 25.4), heightPx: Math.round(55 * 300 / 25.4) }
+} as const;
+
+export const CARD_FONT_CSS: Record<CardFontId, string> = {
+  sans: 'Arial, Helvetica, sans-serif',
+  serif: 'Georgia, Times New Roman, serif',
+  mono: 'Courier New, monospace'
+};
+
+export function getCanvasFont(font: CardFontId): string {
+  return ({ sans: 'Arial, sans-serif', serif: 'Georgia, serif', mono: 'Courier New, monospace' } as const)[font];
+}
+
 export type CardThemeId =
   | 'modern-dark'
   | 'corporate-navy'
@@ -71,6 +89,18 @@ export interface VisitingCardData {
   pattern?: GraphicPatternId;
   customPalette?: Partial<CardThemeDef> | null;
   aiRationale?: string | null;
+  size?: CardSizeId;
+  font?: CardFontId;
+  fontScale?: number;
+  logoScale?: number;
+  logoX?: number;
+  logoY?: number;
+  customAccent?: string;
+  customBgFront?: string;
+  customBgBack?: string;
+  customText?: string;
+  linkedIn?: string;
+  instagram?: string;
 }
 
 export const CARD_THEMES: Record<CardThemeId, CardThemeDef> = {
@@ -256,18 +286,24 @@ export const CARD_HEIGHT_PT = 144;
  * Default sample card information
  */
 export const DEFAULT_CARD_DATA: VisitingCardData = {
-  fullName: 'Muhammad Moaviah',
-  jobTitle: 'Senior Software Engineer & Founder',
-  companyName: 'RankNova Tech',
-  tagline: 'Fast, Secure, and Private Web Tools',
-  phone: '+1 (555) 234-5678',
-  email: 'moaviah760@gmail.com',
-  website: 'https://ranknova.app',
-  address: 'San Francisco, CA 94107',
+  fullName: 'Your Name',
+  jobTitle: 'Your Profession',
+  companyName: 'Your Company',
+  tagline: 'Your Brand. Your Story.',
+  phone: '+1 (555) 123-4567',
+  email: 'hello@example.com',
+  website: 'https://example.com',
+  address: 'Your City, Country',
   theme: 'modern-dark',
   layout: 'modern',
   qrType: 'website',
-  pattern: 'radial-glow'
+  pattern: 'radial-glow',
+  size: 'us',
+  font: 'sans',
+  fontScale: 1,
+  logoScale: 1,
+  logoX: 88,
+  logoY: 16
 };
 
 /**
@@ -275,15 +311,39 @@ export const DEFAULT_CARD_DATA: VisitingCardData = {
  */
 export function resolveCardTheme(card: VisitingCardData): CardThemeDef {
   const base = CARD_THEMES[card.theme] || CARD_THEMES['modern-dark'];
-  if (card.theme === 'custom-ai' && card.customPalette) {
-    return {
-      ...base,
-      ...card.customPalette,
-      id: 'custom-ai',
-      name: card.customPalette.name || 'AI Bespoke Style'
-    };
-  }
-  return base;
+  const theme = card.theme === 'custom-ai' && card.customPalette
+    ? { ...base, ...card.customPalette, id: 'custom-ai' as CardThemeId,
+        name: card.customPalette.name || 'Custom Palette' }
+    : base;
+  const isHex = (value?: string) => Boolean(value && /^#[0-9a-fA-F]{6}$/.test(value));
+  return {
+    ...theme,
+    ...(isHex(card.customAccent) && { accent: card.customAccent!, badgeText: card.customAccent! }),
+    ...(isHex(card.customBgFront) && { bgFront: card.customBgFront! }),
+    ...(isHex(card.customBgBack) && { bgBack: card.customBgBack! }),
+    ...(isHex(card.customText) && { primaryText: card.customText! })
+  };
+}
+
+/**
+ * On-device design suggestions. These do NOT call an AI service.
+ * Return an existing curated template, so the feature works on GitHub Pages.
+ */
+export function suggestCardStyle(prompt: string): Pick<VisitingCardData, 'theme' | 'layout' | 'pattern'> {
+  const p = prompt.toLowerCase().slice(0, 500);
+  if (/luxury|premium|real estate|realty|gold|jewel|executive|law/.test(p))
+    return { theme: 'luxe-gold', layout: 'executive-banner', pattern: 'gold-border' };
+  if (/medical|health|clinic|doctor|dental|hospital/.test(p))
+    return { theme: 'clinical-teal', layout: 'classic', pattern: 'geometric-lines' };
+  if (/nature|organic|eco|garden|green|forest/.test(p))
+    return { theme: 'emerald-nature', layout: 'minimal-zen', pattern: 'minimal-dots' };
+  if (/minimal|architect|simple|scandinavi|zen|neutral/.test(p))
+    return { theme: 'scandinavian-zen', layout: 'minimal-zen', pattern: 'none' };
+  if (/cyber|game|gaming|web3|neon|crypto/.test(p))
+    return { theme: 'cyberpunk-neon', layout: 'neo-brutalist', pattern: 'cyber-grid' };
+  if (/creative|design|artist|coffee|fashion|beauty/.test(p))
+    return { theme: 'sunset-aurora', layout: 'accent-border', pattern: 'radial-glow' };
+  return { theme: 'corporate-navy', layout: 'modern', pattern: 'diagonal-stripe' };
 }
 
 /**
@@ -311,9 +371,11 @@ export function generateCardVCardPayload(card: VisitingCardData): string {
  */
 export async function createVisitingCardPdf(
   frontPngDataUrl: string,
-  backPngDataUrl: string
+  backPngDataUrl: string,
+  size: CardSizeId = 'us'
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
+  const { widthPt, heightPt } = CARD_SIZES[size];
 
   const extractBase64 = (dataUrl: string) => {
     return dataUrl.replace(/^data:image\/[a-z]+;base64,/, '');
@@ -326,21 +388,21 @@ export async function createVisitingCardPdf(
   const backImage = await pdfDoc.embedPng(backBytes);
 
   // Page 1: Front
-  const pageFront = pdfDoc.addPage([CARD_WIDTH_PT, CARD_HEIGHT_PT]);
+  const pageFront = pdfDoc.addPage([widthPt, heightPt]);
   pageFront.drawImage(frontImage, {
     x: 0,
     y: 0,
-    width: CARD_WIDTH_PT,
-    height: CARD_HEIGHT_PT
+    width: widthPt,
+    height: heightPt
   });
 
   // Page 2: Back
-  const pageBack = pdfDoc.addPage([CARD_WIDTH_PT, CARD_HEIGHT_PT]);
+  const pageBack = pdfDoc.addPage([widthPt, heightPt]);
   pageBack.drawImage(backImage, {
     x: 0,
     y: 0,
-    width: CARD_WIDTH_PT,
-    height: CARD_HEIGHT_PT
+    width: widthPt,
+    height: heightPt
   });
 
   return await pdfDoc.save();

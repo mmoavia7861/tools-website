@@ -22,7 +22,10 @@ import {
   ShieldCheck,
   Wand2,
   RefreshCw,
-  Lightbulb
+  Lightbulb,
+  Undo2,
+  Redo2,
+  AlertCircle
 } from 'lucide-react';
 import { SEOHead } from '../components/SEOHead';
 import { AdSlot } from '../components/AdSlot';
@@ -35,8 +38,13 @@ import {
   DEFAULT_CARD_DATA,
   resolveCardTheme,
   generateCardVCardPayload,
-  createVisitingCardPdf
+  createVisitingCardPdf,
+  CARD_SIZES,
+  CARD_FONT_CSS,
+  getCanvasFont,
+  suggestCardStyle
 } from '../utils/visitingCard';
+import { validateImageSignature, checkImageDimensionSafety } from '../utils/image';
 
 const QUICK_AI_PROMPTS = [
   { label: 'Cyberpunk Web3 Studio', prompt: 'Cyberpunk Web3 Studio with electric cyan and dark synthwave grid' },
@@ -63,8 +71,57 @@ export const VisitingCardView: React.FC = () => {
   const [aiStatusMessage, setAiStatusMessage] = useState<string | null>(null);
 
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const cardPreviewRef = useRef<HTMLDivElement | null>(null);
+  const logoDragActive = useRef(false);
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const [history, setHistory] = useState<{ past: VisitingCardData[]; future: VisitingCardData[] }>({ past: [], future: [] });
+  const previousCardRef = useRef(cardData);
+  const restoringRef = useRef(false);
+
+  // Save bounded undo checkpoints for every card edit, including uploaded logos.
+  useEffect(() => {
+    if (restoringRef.current) {
+      restoringRef.current = false;
+      previousCardRef.current = cardData;
+      return;
+    }
+    if (previousCardRef.current !== cardData) {
+      const snapshot = previousCardRef.current;
+      previousCardRef.current = cardData;
+      setHistory(prev => ({ past: [...prev.past.slice(-19), snapshot], future: [] }));
+    }
+  }, [cardData]);
+
+  useEffect(() => { setLogoPreview(cardData.logoDataUrl || null); }, [cardData.logoDataUrl]);
+
+  const undo = () => {
+    if (history.past.length === 0) return;
+    const restored = history.past[history.past.length - 1];
+    restoringRef.current = true;
+    setHistory(prev => ({ past: prev.past.slice(0, -1), future: [cardData, ...prev.future].slice(0, 20) }));
+    setCardData(restored);
+  };
+
+  const redo = () => {
+    if (history.future.length === 0) return;
+    const restored = history.future[0];
+    restoringRef.current = true;
+    setHistory(prev => ({ past: [...prev.past.slice(-19), cardData], future: prev.future.slice(1) }));
+    setCardData(restored);
+  };
+
+  const moveLogoByPointer = (event: React.PointerEvent<HTMLImageElement>) => {
+    if (!logoDragActive.current || !cardPreviewRef.current) return;
+    const rect = cardPreviewRef.current.getBoundingClientRect();
+    const x = Math.max(8, Math.min(92, (event.clientX - rect.left) / rect.width * 100));
+    const y = Math.max(9, Math.min(91, (event.clientY - rect.top) / rect.height * 100));
+    setCardData(prev => ({ ...prev, logoX: Math.round(x), logoY: Math.round(y) }));
+  };
 
   const activeTheme = resolveCardTheme(cardData);
+  const fontFamily = CARD_FONT_CSS[cardData.font || 'sans'];
+  const fontScale = cardData.fontScale || 1;
+  const cardSize = CARD_SIZES[cardData.size || 'us'];
 
   // Generate QR code whenever URL, vCard, or QR type changes
   useEffect(() => {
@@ -82,18 +139,12 @@ export const VisitingCardView: React.FC = () => {
       }
 
       try {
-        const darkColor =
-          cardData.theme === 'minimal-clean' || (cardData.customPalette?.bgFront && isColorLight(activeTheme.bgFront))
-            ? '#0F172A'
-            : '#FFFFFF';
-
+        // Printable QR must always have a quiet zone and high contrast,
+        // regardless of whether the selected visiting card theme is dark.
         const url = await QRCode.toDataURL(payload, {
-          width: 256,
-          margin: 1,
-          color: {
-            dark: darkColor,
-            light: '#00000000'
-          },
+          width: 320,
+          margin: 4,
+          color: { dark: '#111827', light: '#FFFFFFFF' },
           errorCorrectionLevel: 'M'
         });
 
@@ -124,14 +175,39 @@ export const VisitingCardView: React.FC = () => {
   }
 
   // Handle Logo Upload
-  const handleLogoUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setLogoPreview(result);
-      setCardData((prev) => ({ ...prev, logoDataUrl: result }));
-    };
-    reader.readAsDataURL(file);
+  const handleLogoUpload = async (file: File) => {
+    setEditorError(null);
+    try {
+      if (file.size > 2 * 1024 * 1024) throw new Error('Logo must be 2 MB or smaller.');
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const checked = validateImageSignature(bytes, 2 * 1024 * 1024);
+      if (!checked.valid) throw new Error(checked.error || 'Please select a valid PNG, JPEG or WebP image.');
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        const image = new Image();
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject(new Error('Could not decode logo image.'));
+          image.src = objectUrl;
+        });
+        const safe = checkImageDimensionSafety(image.naturalWidth, image.naturalHeight);
+        if (!safe.safe) throw new Error(safe.error || 'Logo image is too large.');
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          setLogoPreview(result);
+          setCardData(prev => ({ ...prev, logoDataUrl: result }));
+        }
+      };
+      reader.onerror = () => setEditorError('Logo upload failed. Please try a different image.');
+      reader.readAsDataURL(file);
+    } catch (error) {
+      setEditorError(error instanceof Error ? error.message : 'Unable to upload logo.');
+    }
   };
 
   /**
@@ -142,9 +218,12 @@ export const VisitingCardView: React.FC = () => {
     if (!promptToUse) return;
 
     setIsGeneratingAi(true);
-    setAiStatusMessage('AI is analyzing business profile and crafting bespoke palette...');
+    setAiStatusMessage('Selecting a palette for your card...');
 
     try {
+      if (window.location.hostname.endsWith('.github.io')) {
+        throw new Error('Cloud AI is not configured for this static website.');
+      }
       const response = await fetch('/api/generate-card-ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -182,11 +261,14 @@ export const VisitingCardView: React.FC = () => {
         }));
         setAiStatusMessage(`Generated: ${s.themeName}`);
       } else {
-        setAiStatusMessage('Generated customized modern theme style.');
+        throw new Error(data.error || 'AI style service is unavailable.');
       }
     } catch (err) {
-      console.error('AI Card generation error:', err);
-      setAiStatusMessage('Generated customized modern theme style.');
+      // Honest offline fallback: curated keyword-based palettes, not AI-generated.
+      const suggestion = suggestCardStyle(promptToUse);
+      setCardData(prev => ({ ...prev, ...suggestion, customPalette: null, customAccent: undefined,
+        customBgFront: undefined, customBgBack: undefined, customText: undefined, aiRationale: null }));
+      setAiStatusMessage('Local style suggestion applied. This was not generated by cloud AI.');
     } finally {
       setIsGeneratingAi(false);
     }
@@ -277,14 +359,18 @@ export const VisitingCardView: React.FC = () => {
   /**
    * Render high-res 300 DPI canvas for export
    */
-  const renderCardToCanvas = async (side: 'front' | 'back'): Promise<string> => {
+  const renderCardToCanvas = async (side: 'front' | 'back', format: 'png' | 'jpeg' = 'png'): Promise<string> => {
     const canvas = document.createElement('canvas');
     const W = 1050;
     const H = 600;
-    canvas.width = W;
-    canvas.height = H;
+    canvas.width = cardSize.widthPx;
+    canvas.height = cardSize.heightPx;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not get canvas context');
+    // Maintain design-coordinate positions at both ISO/US physical sizes.
+    ctx.scale(canvas.width / W, canvas.height / H);
+    const face = getCanvasFont(cardData.font || 'sans');
+    const textScale = cardData.fontScale || 1;
 
     const theme = activeTheme;
 
@@ -320,26 +406,26 @@ export const VisitingCardView: React.FC = () => {
 
       // Brand / Company Name
       ctx.fillStyle = theme.accent;
-      ctx.font = 'bold 26px system-ui, -apple-system, sans-serif';
-      ctx.fillText((cardData.companyName || 'COMPANY NAME').toUpperCase(), startX, 90);
+      ctx.font = `bold ${Math.round(26 * textScale)}px ${face}`;
+      ctx.fillText((cardData.companyName || 'YOUR COMPANY').toUpperCase(), startX, 90, 580);
 
       // Person Name
       ctx.fillStyle = theme.primaryText;
-      ctx.font = 'bold 54px system-ui, -apple-system, sans-serif';
-      ctx.fillText(cardData.fullName || 'Muhammad Moaviah', startX, 165);
+      ctx.font = `bold ${Math.round(54 * textScale)}px ${face}`;
+      ctx.fillText(cardData.fullName || 'Your Name', startX, 165, 700);
 
       // Job Title Badge
       const titleText = cardData.jobTitle || 'Founder & Senior Engineer';
-      ctx.font = '600 24px system-ui, -apple-system, sans-serif';
+      ctx.font = `600 ${Math.round(24 * textScale)}px ${face}`;
       const titleWidth = ctx.measureText(titleText).width;
 
       ctx.fillStyle = theme.badgeBg;
       ctx.beginPath();
-      ctx.roundRect(startX, 185, titleWidth + 28, 42, 8);
+      ctx.roundRect(startX, 185, Math.min(titleWidth + 28, W - startX - 65), 42, 8);
       ctx.fill();
 
       ctx.fillStyle = theme.badgeText;
-      ctx.fillText(titleText, startX + 14, 215);
+      ctx.fillText(titleText, startX + 14, 215, W - startX - 90);
 
       // Horizontal subtle line
       ctx.strokeStyle = theme.secondaryText + '40';
@@ -352,7 +438,7 @@ export const VisitingCardView: React.FC = () => {
       // Contact Info Grid
       const contactStartY = 310;
       const col1X = startX;
-      ctx.font = '500 22px system-ui, -apple-system, sans-serif';
+      ctx.font = `500 ${Math.round(22 * textScale)}px ${face}`;
 
       // Phone
       ctx.fillStyle = theme.accent;
@@ -386,11 +472,11 @@ export const VisitingCardView: React.FC = () => {
           qrImg.onload = r;
           qrImg.onerror = r;
         });
-        const qrSize = 170;
+        const qrSize = 160;
         const qrX = W - qrSize - 70;
         const qrY = 320;
 
-        ctx.fillStyle = isColorLight(theme.bgFront) ? '#E2E8F0' : 'rgba(255,255,255,0.08)';
+        ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
         ctx.roundRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 12);
         ctx.fill();
@@ -398,9 +484,9 @@ export const VisitingCardView: React.FC = () => {
         ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
         ctx.fillStyle = theme.secondaryText;
-        ctx.font = '14px system-ui, sans-serif';
+        ctx.font = `14px ${face}`;
         ctx.textAlign = 'center';
-        ctx.fillText('SCAN FOR VCARD', qrX + qrSize / 2, qrY + qrSize + 24);
+        ctx.fillText(cardData.qrType === 'vcard' ? 'SAVE CONTACT' : 'VISIT WEBSITE', qrX + qrSize / 2, qrY + qrSize + 24);
         ctx.textAlign = 'left';
       }
 
@@ -412,12 +498,17 @@ export const VisitingCardView: React.FC = () => {
           logoImg.onload = r;
           logoImg.onerror = r;
         });
-        const maxLogoH = 80;
-        const maxLogoW = 160;
-        const scale = Math.min(maxLogoW / logoImg.naturalWidth, maxLogoH / logoImg.naturalHeight, 1);
-        const lw = logoImg.naturalWidth * scale;
-        const lh = logoImg.naturalHeight * scale;
-        ctx.drawImage(logoImg, W - lw - 70, 70, lw, lh);
+        if (logoImg.naturalWidth > 0 && logoImg.naturalHeight > 0) {
+          const maxLogoH = 80 * (cardData.logoScale || 1);
+          const maxLogoW = 160 * (cardData.logoScale || 1);
+          const scale = Math.min(maxLogoW / logoImg.naturalWidth, maxLogoH / logoImg.naturalHeight);
+          const lw = logoImg.naturalWidth * scale;
+          const lh = logoImg.naturalHeight * scale;
+          const centerX = W * (cardData.logoX ?? 88) / 100;
+          const centerY = H * (cardData.logoY ?? 16) / 100;
+          ctx.drawImage(logoImg, Math.max(0, Math.min(W - lw, centerX - lw / 2)),
+            Math.max(0, Math.min(H - lh, centerY - lh / 2)), lw, lh);
+        }
       }
     } else {
       // BACK OF CARD: Elegant centered branding
@@ -432,11 +523,13 @@ export const VisitingCardView: React.FC = () => {
           logoImg.onload = r;
           logoImg.onerror = r;
         });
-        const logoSize = 130;
-        const scale = Math.min(logoSize / logoImg.naturalWidth, logoSize / logoImg.naturalHeight, 1);
-        const lw = logoImg.naturalWidth * scale;
-        const lh = logoImg.naturalHeight * scale;
-        ctx.drawImage(logoImg, centerX - lw / 2, centerY - 140, lw, lh);
+        if (logoImg.naturalWidth > 0 && logoImg.naturalHeight > 0) {
+          const logoSize = 130 * (cardData.logoScale || 1);
+          const scale = Math.min(logoSize / logoImg.naturalWidth, logoSize / logoImg.naturalHeight);
+          const lw = logoImg.naturalWidth * scale;
+          const lh = logoImg.naturalHeight * scale;
+          ctx.drawImage(logoImg, centerX - lw / 2, centerY - 140, lw, lh);
+        }
       } else {
         ctx.fillStyle = theme.accent;
         ctx.beginPath();
@@ -444,7 +537,7 @@ export const VisitingCardView: React.FC = () => {
         ctx.fill();
 
         ctx.fillStyle = theme.bgBack;
-        ctx.font = 'bold 36px system-ui, sans-serif';
+        ctx.font = `bold ${Math.round(36 * textScale)}px ${face}`;
         ctx.textAlign = 'center';
         ctx.fillText(cardData.companyName.charAt(0) || 'R', centerX, centerY - 57);
       }
@@ -452,39 +545,45 @@ export const VisitingCardView: React.FC = () => {
       // Company Name
       ctx.textAlign = 'center';
       ctx.fillStyle = theme.primaryText;
-      ctx.font = 'bold 44px system-ui, sans-serif';
-      ctx.fillText(cardData.companyName || 'RANKNOVA', centerX, centerY + 30);
+      ctx.font = `bold ${Math.round(44 * textScale)}px ${face}`;
+      ctx.fillText(cardData.companyName || 'YOUR COMPANY', centerX, centerY + 30, W - 130);
 
       // Tagline
       ctx.fillStyle = theme.secondaryText;
-      ctx.font = '500 22px system-ui, sans-serif';
-      ctx.fillText(cardData.tagline || 'Fast, Secure, and Private Web Tools', centerX, centerY + 75);
+      ctx.font = `500 ${Math.round(22 * textScale)}px ${face}`;
+      ctx.fillText(cardData.tagline || 'Your Brand. Your Story.', centerX, centerY + 75, W - 130);
 
       // Website Footer
       ctx.fillStyle = theme.accent;
-      ctx.font = '600 20px system-ui, sans-serif';
-      ctx.fillText(cardData.website || 'https://ranknova.app', centerX, H - 70);
+      ctx.font = `600 ${Math.round(20 * textScale)}px ${face}`;
+      ctx.fillText(cardData.website || 'https://example.com', centerX, H - 70, W - 140);
+      const socials = [cardData.linkedIn, cardData.instagram].filter(Boolean).join('  •  ');
+      if (socials) {
+        ctx.fillStyle = theme.secondaryText;
+        ctx.font = `500 17px ${face}`;
+        ctx.fillText(socials, centerX, H - 40, W - 150);
+      }
 
       ctx.textAlign = 'left';
     }
 
-    return canvas.toDataURL('image/png');
+    return canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.94 : undefined);
   };
 
-  // Download Front or Back as high-res PNG
-  const handleDownloadPng = async (side: 'front' | 'back') => {
+  const handleDownloadImage = async (side: 'front' | 'back', format: 'png' | 'jpeg') => {
     setIsExporting(true);
+    setEditorError(null);
     try {
-      const dataUrl = await renderCardToCanvas(side);
+      const dataUrl = await renderCardToCanvas(side, format);
       const safeName = (cardData.fullName || 'visiting-card').toLowerCase().replace(/[^a-z0-9]/g, '-');
       const a = document.createElement('a');
       a.href = dataUrl;
-      a.download = `${safeName}-${side}-300dpi.png`;
+      a.download = `${safeName}-${side}-300dpi.${format === 'jpeg' ? 'jpg' : 'png'}`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
     } catch (err) {
-      console.error('PNG export failed:', err);
+      setEditorError(err instanceof Error ? err.message : 'Could not generate image export.');
     } finally {
       setIsExporting(false);
     }
@@ -497,7 +596,7 @@ export const VisitingCardView: React.FC = () => {
       const frontDataUrl = await renderCardToCanvas('front');
       const backDataUrl = await renderCardToCanvas('back');
 
-      const pdfBytes = await createVisitingCardPdf(frontDataUrl, backDataUrl);
+      const pdfBytes = await createVisitingCardPdf(frontDataUrl, backDataUrl, cardData.size || 'us');
       const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
 
@@ -510,7 +609,7 @@ export const VisitingCardView: React.FC = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('PDF export failed:', err);
+      setEditorError(err instanceof Error ? err.message : 'Could not create the PDF.');
     } finally {
       setIsExporting(false);
     }
@@ -519,13 +618,13 @@ export const VisitingCardView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="AI Visiting Card Generator — Free Professional Business Cards | RankNova"
-        description="Create AI-designed business cards and visiting cards in seconds. Custom themes, smart taglines, QR codes, vCards, and print-ready 300 DPI PDF export."
+        title="Free Visiting Card Maker — Business Card Generator with QR Code | RankNova"
+        description="Free visiting card maker online with customizable templates, logo editing, scannable QR codes and 300 DPI JPG, PNG or print-size PDF exports."
         canonicalPath="/visiting-card-generator"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'RankNova AI Visiting Card Maker',
+          name: 'RankNova Visiting Card Maker',
           applicationCategory: 'DesignApplication',
           operatingSystem: 'Any',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
@@ -538,13 +637,13 @@ export const VisitingCardView: React.FC = () => {
           <div className="text-center max-w-3xl mx-auto mb-10">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3.5 py-1 text-xs font-semibold text-blue-700 border border-blue-200/80 mb-3">
               <Sparkles className="h-3.5 w-3.5" />
-              <span>AI Theme Generator • 12+ Design Styles • 300 DPI Print PDF</span>
+              <span>12+ Premium Templates • QR Code • 300 DPI PNG, JPG & PDF</span>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
               Professional Visiting Card Maker
             </h1>
             <p className="mt-3 text-sm sm:text-base text-slate-600">
-              Generate bespoke, print-ready business cards with custom AI design styling. Customize contact info, embed digital vCard QR codes, and export 2-page print PDFs.
+              Design your own professional front-and-back business card. Customize fonts, colors, logo placement and QR codes, then download at the correct print size.
             </p>
           </div>
 
@@ -557,16 +656,16 @@ export const VisitingCardView: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Wand2 className="h-5 w-5 text-indigo-400" />
                     <h2 className="text-sm font-bold uppercase tracking-wider text-white">
-                      AI Smart Card Designer
+                      Smart Style Ideas
                     </h2>
                   </div>
                   <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-                    Gemini 3.8 Powered
+                    On-device fallback
                   </span>
                 </div>
 
                 <p className="text-xs text-slate-300">
-                  Describe your business vibe or aesthetic. AI will automatically craft a harmonized color palette, tailored layout, tagline, and decorative motif.
+                  Describe a business style to try a curated design instantly. When a real AI backend is configured it can also generate a custom palette. Offline suggestions are not AI-generated.
                 </p>
 
                 {/* Prompt input */}
@@ -624,6 +723,9 @@ export const VisitingCardView: React.FC = () => {
                   </div>
                 </div>
 
+                {aiStatusMessage && (
+                  <p role="status" className="rounded-lg bg-indigo-950/60 border border-indigo-500/30 p-2 text-xs text-indigo-100">{aiStatusMessage}</p>
+                )}
                 {/* AI Rationale Notice */}
                 {cardData.aiRationale && (
                   <div className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-xs text-indigo-200">
@@ -644,14 +746,16 @@ export const VisitingCardView: React.FC = () => {
                       Card Details & Contact Info
                     </h2>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setCardData({ ...DEFAULT_CARD_DATA })}
-                    className="text-xs text-slate-500 hover:text-blue-600 flex items-center gap-1"
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                    <span>Reset to Sample</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={undo} disabled={history.past.length === 0}
+                      aria-label="Undo edit" title="Undo last edit" className="rounded-md border border-slate-200 p-1.5 disabled:opacity-40 hover:bg-slate-50"><Undo2 className="h-4 w-4" /></button>
+                    <button type="button" onClick={redo} disabled={history.future.length === 0}
+                      aria-label="Redo edit" title="Redo last edit" className="rounded-md border border-slate-200 p-1.5 disabled:opacity-40 hover:bg-slate-50"><Redo2 className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => { setCardData({ ...DEFAULT_CARD_DATA }); setEditorError(null); }}
+                      className="text-xs text-slate-500 hover:text-blue-600 flex items-center gap-1">
+                      <RotateCcw className="h-3 w-3" /><span>Reset</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -768,6 +872,22 @@ export const VisitingCardView: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="card-linkedin" className="text-xs font-semibold text-slate-700 block mb-1">LinkedIn URL / handle (optional)</label>
+                    <input id="card-linkedin" type="text" maxLength={90} value={cardData.linkedIn || ''}
+                      onChange={e => setCardData({ ...cardData, linkedIn: e.target.value })}
+                      placeholder="linkedin.com/in/your-name" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label htmlFor="card-instagram" className="text-xs font-semibold text-slate-700 block mb-1">Instagram handle (optional)</label>
+                    <input id="card-instagram" type="text" maxLength={60} value={cardData.instagram || ''}
+                      onChange={e => setCardData({ ...cardData, instagram: e.target.value })}
+                      placeholder="@yourbusiness" className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+                  </div>
+                </div>
+
+                {editorError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2"><AlertCircle className="h-4 w-4" />{editorError}</div>}
                 {/* Logo Upload & QR Selection */}
                 <div className="pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -781,12 +901,12 @@ export const VisitingCardView: React.FC = () => {
                         className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-700 hover:bg-slate-100 transition"
                       >
                         <UploadCloud className="h-4 w-4 text-blue-600" />
-                        <span>{logoPreview ? 'Change Logo' : 'Upload PNG/SVG'}</span>
+                        <span>{logoPreview ? 'Change Logo' : 'Upload PNG/JPG/WebP'}</span>
                       </button>
                       <input
                         ref={logoInputRef}
                         type="file"
-                        accept="image/png,image/jpeg,image/svg+xml"
+                        accept="image/png,image/jpeg,image/webp"
                         className="hidden"
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
@@ -852,7 +972,7 @@ export const VisitingCardView: React.FC = () => {
                         <button
                           key={themeKey}
                           type="button"
-                          onClick={() => setCardData({ ...cardData, theme: themeKey })}
+                          onClick={() => setCardData({ ...cardData, theme: themeKey, customAccent: undefined, customBgFront: undefined, customBgBack: undefined, customText: undefined })}
                           className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition ${
                             isSelected
                               ? 'border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/30'
@@ -903,6 +1023,51 @@ export const VisitingCardView: React.FC = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Professional print, typography & logo controls */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 pt-5">
+                  <div>
+                    <label htmlFor="card-size" className="block text-xs font-semibold text-slate-700 mb-1">Print Size</label>
+                    <select id="card-size" value={cardData.size || 'us'} onChange={e => setCardData({ ...cardData, size: e.target.value as 'us' | 'eu' })}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+                      {Object.entries(CARD_SIZES).map(([key, size]) => <option key={key} value={key}>{size.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="card-font" className="block text-xs font-semibold text-slate-700 mb-1">Typography</label>
+                    <select id="card-font" value={cardData.font || 'sans'}
+                      onChange={e => setCardData({ ...cardData, font: e.target.value as 'sans' | 'serif' | 'mono' })}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+                      <option value="sans">Modern Sans (Arial)</option><option value="serif">Elegant Serif (Georgia)</option><option value="mono">Technical Mono (Courier)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="card-font-scale" className="block text-xs font-semibold text-slate-700 mb-1">Text Scale: {Math.round(fontScale * 100)}%</label>
+                    <input id="card-font-scale" type="range" min="0.75" max="1.25" step="0.05" value={fontScale}
+                      onChange={e => setCardData({ ...cardData, fontScale: Number(e.target.value) })} className="w-full accent-blue-600" />
+                  </div>
+                  <div>
+                    <label htmlFor="card-logo-scale" className="block text-xs font-semibold text-slate-700 mb-1">Logo Size: {Math.round((cardData.logoScale || 1) * 100)}%</label>
+                    <input id="card-logo-scale" type="range" min="0.6" max="1.6" step="0.1" value={cardData.logoScale || 1}
+                      onChange={e => setCardData({ ...cardData, logoScale: Number(e.target.value) })} className="w-full accent-blue-600" />
+                    <p className="mt-1 text-[10px] text-slate-500">Drag your uploaded logo in the preview to position it.</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {([
+                    ['customAccent', 'Accent', activeTheme.accent],
+                    ['customBgFront', 'Front BG', activeTheme.bgFront],
+                    ['customBgBack', 'Back BG', activeTheme.bgBack],
+                    ['customText', 'Text', activeTheme.primaryText]
+                  ] as const).map(([key, label, color]) => (
+                    <label key={key} className="text-[11px] font-semibold text-slate-700 flex items-center gap-2">
+                      <input type="color" aria-label={label + ' color'} value={color.match(/^#[0-9a-fA-F]{6}$/) ? color : '#2563eb'}
+                        onChange={e => setCardData({ ...cardData, [key]: e.target.value })}
+                        className="h-9 w-9 rounded-md cursor-pointer" />
+                      {label}
+                    </label>
+                  ))}
                 </div>
 
                 {/* Pattern Motif Selector */}
@@ -969,12 +1134,13 @@ export const VisitingCardView: React.FC = () => {
                   </div>
 
                   <span className="text-[11px] font-mono text-slate-400">
-                    Standard 3.5" × 2" (300 DPI)
+                    {cardData.size === 'eu' ? '85 × 55 mm' : '3.5 × 2 in'} — {cardSize.widthPx} × {cardSize.heightPx} px (300 DPI)
                   </span>
                 </div>
 
                 {/* Interactive Card Canvas Component */}
-                <div className="relative aspect-[7/4] w-full rounded-2xl overflow-hidden shadow-xl border border-slate-300/60 p-6 transition-all duration-300">
+                <div className="relative w-full rounded-2xl overflow-hidden shadow-xl border border-slate-300/60 p-6 transition-all duration-300"
+                  style={{ aspectRatio: cardData.size === 'eu' ? '85 / 55' : '7 / 4', fontFamily }}>
                   {/* Background container */}
                   <div
                     className="absolute inset-0 transition-colors duration-300"
@@ -985,7 +1151,7 @@ export const VisitingCardView: React.FC = () => {
 
                   {/* FRONT SIDE PREVIEW */}
                   {activeSide === 'front' ? (
-                    <div className="relative h-full flex flex-col justify-between text-left select-none">
+                    <div ref={cardPreviewRef} className="relative h-full flex flex-col justify-between text-left select-none">
                       {/* Left accent bar if split */}
                       {cardData.layout === 'split' && (
                         <div
@@ -1023,46 +1189,52 @@ export const VisitingCardView: React.FC = () => {
                         <div>
                           <p
                             className="text-[10px] font-bold tracking-wider uppercase"
-                            style={{ color: activeTheme.accent }}
+                            style={{ color: activeTheme.accent, fontFamily }}
                           >
-                            {cardData.companyName || 'COMPANY NAME'}
+                            {cardData.companyName || 'YOUR COMPANY'}
                           </p>
                           <h3
                             className="text-lg sm:text-xl font-bold tracking-tight mt-0.5"
-                            style={{ color: activeTheme.primaryText }}
+                            style={{ color: activeTheme.primaryText, fontSize: `${20 * fontScale}px`, fontFamily }}
                           >
-                            {cardData.fullName || 'Muhammad Moaviah'}
+                            {cardData.fullName || 'Your Name'}
                           </h3>
                           <span
                             className="inline-block mt-1 px-2 py-0.5 text-[11px] font-semibold rounded"
                             style={{
                               backgroundColor: activeTheme.badgeBg,
-                              color: activeTheme.badgeText
+                              color: activeTheme.badgeText,
+                              fontFamily,
+                              fontSize: `${11 * fontScale}px`
                             }}
                           >
                             {cardData.jobTitle || 'Founder & Engineer'}
                           </span>
                         </div>
 
-                        {/* Logo on card */}
-                        {logoPreview ? (
-                          <img
-                            src={logoPreview}
-                            alt="Logo"
-                            className="h-9 max-w-[90px] object-contain rounded"
-                          />
-                        ) : (
-                          <div
-                            className="h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs"
-                            style={{
-                              backgroundColor: activeTheme.accent,
-                              color: activeTheme.bgFront
-                            }}
-                          >
+                        {!logoPreview && (
+                          <div className="h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs"
+                            style={{ backgroundColor: activeTheme.accent, color: activeTheme.bgFront }}>
                             {cardData.companyName ? cardData.companyName.charAt(0) : 'R'}
                           </div>
                         )}
                       </div>
+
+                      {logoPreview && (
+                        <img src={logoPreview} alt="Drag to reposition company logo"
+                          className="absolute z-10 object-contain rounded cursor-grab active:cursor-grabbing touch-none select-none"
+                          draggable={false}
+                          onPointerDown={e => { logoDragActive.current = true; e.currentTarget.setPointerCapture(e.pointerId); }}
+                          onPointerMove={moveLogoByPointer}
+                          onPointerUp={e => { logoDragActive.current = false; if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
+                          onPointerCancel={() => { logoDragActive.current = false; }}
+                          style={{
+                            width: `${Math.round((cardData.logoScale || 1) * 75)}px`,
+                            height: `${Math.round((cardData.logoScale || 1) * 45)}px`,
+                            left: `${cardData.logoX ?? 88}%`, top: `${cardData.logoY ?? 16}%`,
+                            transform: 'translate(-50%, -50%)'
+                          }} />
+                      )}
 
                       {/* Contact details & QR code row */}
                       <div className="flex items-end justify-between pt-2 border-t border-white/10">
@@ -1077,11 +1249,11 @@ export const VisitingCardView: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-1.5" style={{ color: activeTheme.secondaryText }}>
                             <Globe className="h-3 w-3 shrink-0" style={{ color: activeTheme.accent }} />
-                            <span>{cardData.website || 'https://ranknova.app'}</span>
+                            <span>{cardData.website || 'https://example.com'}</span>
                           </div>
                           <div className="flex items-center gap-1.5" style={{ color: activeTheme.secondaryText }}>
                             <MapPin className="h-3 w-3 shrink-0" style={{ color: activeTheme.accent }} />
-                            <span>{cardData.address || 'San Francisco, CA'}</span>
+                            <span>{cardData.address || 'Your City, Country'}</span>
                           </div>
                         </div>
 
@@ -1089,13 +1261,13 @@ export const VisitingCardView: React.FC = () => {
                         {qrDataUrl && cardData.qrType !== 'none' && (
                           <div className="text-center">
                             <div className="p-1 rounded bg-white/10 backdrop-blur-xs">
-                              <img src={qrDataUrl} alt="QR Code" className="h-14 w-14 rounded" />
+                              <img src={qrDataUrl} alt="QR Code" className="h-14 w-14 rounded bg-white p-0.5" />
                             </div>
                             <span
                               className="text-[8px] font-mono block mt-0.5 uppercase tracking-tighter"
                               style={{ color: activeTheme.secondaryText }}
                             >
-                              Scan vCard
+                              {cardData.qrType === 'vcard' ? 'Save Contact' : 'Visit Website'}
                             </span>
                           </div>
                         )}
@@ -1108,7 +1280,7 @@ export const VisitingCardView: React.FC = () => {
                         <img
                           src={logoPreview}
                           alt="Logo"
-                          className="h-12 max-w-[120px] object-contain mb-1"
+                          className="max-w-[120px] object-contain mb-1" style={{ height: `${48 * (cardData.logoScale || 1)}px` }}
                         />
                       ) : (
                         <div
@@ -1124,16 +1296,16 @@ export const VisitingCardView: React.FC = () => {
 
                       <h3
                         className="text-lg font-extrabold tracking-wider uppercase"
-                        style={{ color: activeTheme.primaryText }}
+                        style={{ color: activeTheme.primaryText, fontFamily, fontSize: `${18 * fontScale}px` }}
                       >
-                        {cardData.companyName || 'RANKNOVA'}
+                        {cardData.companyName || 'YOUR COMPANY'}
                       </h3>
 
                       <p
                         className="text-xs font-medium max-w-xs px-4"
                         style={{ color: activeTheme.secondaryText }}
                       >
-                        {cardData.tagline || 'Fast, Secure, and Private Web Tools'}
+                        {cardData.tagline || 'Your Brand. Your Story.'}
                       </p>
 
                       <p
@@ -1142,6 +1314,11 @@ export const VisitingCardView: React.FC = () => {
                       >
                         {cardData.website || 'https://ranknova.app'}
                       </p>
+                      {(cardData.linkedIn || cardData.instagram) && (
+                        <p className="text-[9px] max-w-[95%] truncate" style={{ color: activeTheme.secondaryText }}>
+                          {[cardData.linkedIn, cardData.instagram].filter(Boolean).join('  •  ')}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1178,7 +1355,7 @@ export const VisitingCardView: React.FC = () => {
                     <button
                       type="button"
                       disabled={isExporting}
-                      onClick={() => handleDownloadPng('front')}
+                      onClick={() => handleDownloadImage('front', 'png')}
                       className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
                     >
                       <Download className="h-3.5 w-3.5 text-blue-600" />
@@ -1187,13 +1364,27 @@ export const VisitingCardView: React.FC = () => {
                     <button
                       type="button"
                       disabled={isExporting}
-                      onClick={() => handleDownloadPng('back')}
+                      onClick={() => handleDownloadImage('back', 'png')}
                       className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
                     >
                       <Download className="h-3.5 w-3.5 text-blue-600" />
                       <span>Back PNG (300 DPI)</span>
                     </button>
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" disabled={isExporting} onClick={() => handleDownloadImage('front', 'jpeg')}
+                      className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                      <Download className="h-3.5 w-3.5 text-blue-600" />Front JPG
+                    </button>
+                    <button type="button" disabled={isExporting} onClick={() => handleDownloadImage('back', 'jpeg')}
+                      className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                      <Download className="h-3.5 w-3.5 text-blue-600" />Back JPG
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    RGB exports at selected physical size and 300 DPI pixel dimensions. PDF contains raster images; CMYK conversion and bleed/crop marks are not included.
+                  </p>
+                  {editorError && <p role="alert" className="text-xs text-red-600">{editorError}</p>}
                 </div>
               </div>
             </div>
@@ -1210,7 +1401,7 @@ export const VisitingCardView: React.FC = () => {
               Commercial Print Specifications & Standards
             </h2>
             <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-              RankNova’s Visiting Card Generator outputs strict commercial printing standards. Files exported in 300 DPI provide pin-sharp typography, vector anti-aliased borders, and ISO-standard layout margins suitable for printing on 350 GSM matte, velvet, or linen cardstock.
+              Export US or international business-card sizes at approximately 300 DPI. PNG/JPG files use RGB pixels, and the PDF embeds raster art at the selected physical page size. Ask your print shop about bleed, safe margins, CMYK profiles and crop marks before professional printing.
             </p>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1240,7 +1431,7 @@ export const VisitingCardView: React.FC = () => {
                   <span>2-Page Multi-Page PDF</span>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Both Front and Back graphics are packaged into an uncompressed, vector-compatible PDF with zero watermarks or third-party branding.
+                  Both card sides are embedded as high-resolution raster images in a PDF with accurate physical dimensions. This export does not include vector text, CMYK conversion or bleed marks.
                 </p>
               </div>
             </div>
