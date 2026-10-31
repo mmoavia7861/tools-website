@@ -1065,6 +1065,39 @@ export const VisitingCardView: React.FC = () => {
                 </div>
               </div>
 
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <QrIcon className="h-4 w-4 text-blue-600" /> QR Code Position & Appearance
+                </div>
+                <p className="text-xs text-slate-500">Drag the QR code in the preview, or use sliders for precision. A white quiet zone is preserved for scanning.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="text-xs font-semibold text-slate-700">QR Size: {cardData.qrSize || 160} units
+                    <input type="range" min="110" max="190" step="10" value={cardData.qrSize || 160}
+                      onChange={e => setCardData({ ...cardData, qrSize: Number(e.target.value) })}
+                      className="block w-full mt-2 accent-blue-600" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-700">QR Color
+                    <select aria-label="QR color" value={cardData.qrColor || '#111827'}
+                      onChange={e => setCardData({ ...cardData, qrColor: e.target.value })}
+                      className="block w-full mt-2 rounded-lg border border-slate-200 bg-white p-2">
+                      <option value="#111827">Dark Charcoal</option>
+                      <option value="#1E3A8A">Navy Blue</option>
+                      <option value="#064E3B">Forest Green</option>
+                      <option value="#581C36">Burgundy</option>
+                    </select>
+                  </label>
+                  <label className="text-xs font-semibold text-slate-700">Horizontal Position: {cardData.qrX ?? 85}%
+                    <input type="range" min="12" max="88" step="1" value={cardData.qrX ?? 85}
+                      onChange={e => setCardData({ ...cardData, qrX: Number(e.target.value) })}
+                      className="block w-full mt-2 accent-blue-600" />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-700">Vertical Position: {cardData.qrY ?? 68}%
+                    <input type="range" min="14" max="88" step="1" value={cardData.qrY ?? 68}
+                      onChange={e => setCardData({ ...cardData, qrY: Number(e.target.value) })}
+                      className="block w-full mt-2 accent-blue-600" />
+                  </label>
+                </div>
+              </div>
               {/* Theme & Layout Selector */}
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
                 <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
@@ -1186,6 +1219,25 @@ export const VisitingCardView: React.FC = () => {
                   ))}
                 </div>
 
+                <div className="border-t border-slate-100 pt-4">                    <label htmlFor="card-orientation" className="block text-xs font-semibold text-slate-700 mb-1">Card Orientation</label>
+                    <select id="card-orientation" value={cardData.orientation || 'landscape'}
+                      onChange={e => {
+                        const orientation = e.target.value as 'landscape' | 'portrait';
+                        setCardData(prev => ({
+                          ...prev, orientation,
+                          logoX: orientation === 'portrait' ? 50 : 88,
+                          logoY: orientation === 'portrait' ? 15 : 16,
+                          nameX: orientation === 'portrait' ? 10 : 7,
+                          nameY: orientation === 'portrait' ? 36 : 27,
+                          qrX: orientation === 'portrait' ? 50 : 85,
+                          qrY: orientation === 'portrait' ? 85 : 68
+                        }));
+                      }}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+                      <option value="landscape">Horizontal (Landscape)</option>
+                      <option value="portrait">Vertical (Portrait)</option>
+                    </select>
+                </div>
                 {/* Pattern Motif Selector */}
                 <div className="pt-2">
                   <label className="text-xs font-semibold text-slate-700 block mb-2">
@@ -1250,13 +1302,13 @@ export const VisitingCardView: React.FC = () => {
                   </div>
 
                   <span className="text-[11px] font-mono text-slate-400">
-                    {cardData.size === 'eu' ? '85 × 55 mm' : '3.5 × 2 in'} — {cardSize.widthPx} × {cardSize.heightPx} px (300 DPI)
+                    {cardData.size === 'eu' ? '85 × 55 mm' : '3.5 × 2 in'} — {isPortrait ? cardSize.heightPx : cardSize.widthPx} × {isPortrait ? cardSize.widthPx : cardSize.heightPx} px (300 DPI)
                   </span>
                 </div>
 
                 {/* Interactive Card Canvas Component */}
                 <div className="relative w-full rounded-2xl overflow-hidden shadow-xl border border-slate-300/60 p-6 transition-all duration-300"
-                  style={{ aspectRatio: cardData.size === 'eu' ? '85 / 55' : '7 / 4', fontFamily }}>
+                  style={{ aspectRatio: isPortrait ? (cardData.size === 'eu' ? '55 / 85' : '4 / 7') : (cardData.size === 'eu' ? '85 / 55' : '7 / 4'), fontFamily }}>
                   {/* Background container */}
                   <div
                     className="absolute inset-0 transition-colors duration-300"
@@ -1301,7 +1353,7 @@ export const VisitingCardView: React.FC = () => {
                       )}
 
                       {/* Header row */}
-                      <div className="flex items-start justify-between">
+                      <div className={isPortrait ? 'absolute left-0 right-0 top-[22%] flex items-start justify-between' : 'flex items-start justify-between'}>
                         <div>
                           <p
                             className="text-[10px] font-bold tracking-wider uppercase"
@@ -1309,12 +1361,7 @@ export const VisitingCardView: React.FC = () => {
                           >
                             {cardData.companyName || 'YOUR COMPANY'}
                           </p>
-                          <h3
-                            className="text-lg sm:text-xl font-bold tracking-tight mt-0.5"
-                            style={{ color: activeTheme.primaryText, fontSize: `${20 * fontScale}px`, fontFamily }}
-                          >
-                            {cardData.fullName || 'Your Name'}
-                          </h3>
+                          <div className="h-5 sm:h-6" aria-hidden="true" />
                           <span
                             className="inline-block mt-1 px-2 py-0.5 text-[11px] font-semibold rounded"
                             style={{
@@ -1352,8 +1399,37 @@ export const VisitingCardView: React.FC = () => {
                           }} />
                       )}
 
+                      <h3 className="absolute z-10 font-bold tracking-tight cursor-grab active:cursor-grabbing touch-none select-none"
+                        title="Drag your name to reposition it" aria-label="Drag the name to a new position"
+                        onPointerDown={e => { nameDragActive.current = true; e.currentTarget.setPointerCapture(e.pointerId); }}
+                        onPointerMove={moveNameByPointer}
+                        onPointerUp={e => { nameDragActive.current = false; if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
+                        onPointerCancel={() => { nameDragActive.current = false; }}
+                        style={{ color: activeTheme.primaryText, fontFamily, fontSize: `${(isPortrait ? 19 : 20) * fontScale}px`,
+                          left: `${cardData.nameX ?? 7}%`, top: `${cardData.nameY ?? 27}%`, transform: 'translateY(-50%)' }}>
+                        {cardData.fullName || 'Your Name'}
+                      </h3>
+                      {qrDataUrl && cardData.qrType !== 'none' && (
+                        <div className="absolute z-10 text-center" style={{
+                          width: `${(cardData.qrSize || 160) / (isPortrait ? 600 : 1050) * 100}%`,
+                          left: `${cardData.qrX ?? 85}%`, top: `${cardData.qrY ?? 68}%`,
+                          transform: 'translate(-50%, -50%)'
+                        }}>
+                          <img src={qrDataUrl} alt="Drag QR code to reposition"
+                            draggable={false}
+                            onPointerDown={e => { qrDragActive.current = true; e.currentTarget.setPointerCapture(e.pointerId); }}
+                            onPointerMove={moveQrByPointer}
+                            onPointerUp={e => { qrDragActive.current = false; if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
+                            onPointerCancel={() => { qrDragActive.current = false; }}
+                            className="w-full aspect-square bg-white p-1 rounded cursor-grab active:cursor-grabbing touch-none select-none"
+                          />
+                          <span className="block text-[8px] mt-1" style={{ color: activeTheme.secondaryText }}>
+                            {cardData.qrType === 'vcard' ? 'SAVE CONTACT' : 'VISIT WEBSITE'}
+                          </span>
+                        </div>
+                      )}
                       {/* Contact details & QR code row */}
-                      <div className="flex items-end justify-between pt-2 border-t border-white/10">
+                      <div className={isPortrait ? 'absolute top-[53%] left-0 right-0 pt-2 border-t border-white/10' : 'flex items-end justify-between pt-2 border-t border-white/10'}>
                         <div className="space-y-1 text-[11px] leading-tight">
                           <div className="flex items-center gap-1.5" style={{ color: activeTheme.secondaryText }}>
                             <Phone className="h-3 w-3 shrink-0" style={{ color: activeTheme.accent }} />
@@ -1373,20 +1449,7 @@ export const VisitingCardView: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Embedded QR code thumbnail */}
-                        {qrDataUrl && cardData.qrType !== 'none' && (
-                          <div className="text-center">
-                            <div className="p-1 rounded bg-white/10 backdrop-blur-xs">
-                              <img src={qrDataUrl} alt="QR Code" className="h-14 w-14 rounded bg-white p-0.5" />
-                            </div>
-                            <span
-                              className="text-[8px] font-mono block mt-0.5 uppercase tracking-tighter"
-                              style={{ color: activeTheme.secondaryText }}
-                            >
-                              {cardData.qrType === 'vcard' ? 'Save Contact' : 'Visit Website'}
-                            </span>
-                          </div>
-                        )}
+
                       </div>
                     </div>
                   ) : (
