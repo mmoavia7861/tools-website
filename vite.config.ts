@@ -5,6 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // GitHub Pages project sites are published under /<repository>/, not /.
+    base: process.env.GITHUB_PAGES === 'true' ? '/tools-website/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

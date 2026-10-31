@@ -1,0 +1,74 @@
+name: Deploy tools-website to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: tools-website-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Ensure Pages publishes compiled output from GitHub Actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BUILD_TYPE=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type // "unknown"')
+          echo "GitHub Pages source: ${BUILD_TYPE}"
+          if [ "$BUILD_TYPE" = "legacy" ]; then
+            echo "Switching GitHub Pages from raw branch to GitHub Actions..."
+            if ! gh api --method PUT "repos/${GITHUB_REPOSITORY}/pages" -f build_type=workflow; then
+              echo "::error::Select Settings > Pages > Build and deployment > Source > GitHub Actions, then rerun this workflow."
+              exit 1
+            fi
+            BUILD_TYPE=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type // "unknown"')
+          fi
+          test "$BUILD_TYPE" = "workflow" || { echo "::error::GitHub Pages source must be GitHub Actions"; exit 1; }
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build production Vite application for project URL
+        env:
+          GITHUB_PAGES: 'true'
+        run: npm run build
+      - name: Verify compiled assets and SPA fallback
+        run: |
+          test -f dist/index.html
+          test -d dist/assets
+          grep -q '/tools-website/assets/' dist/index.html
+          if grep -q 'src/main.tsx' dist/index.html; then
+            echo "::error::Source index.html is being published instead of the Vite build."
+            exit 1
+          fi
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload production frontend
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
