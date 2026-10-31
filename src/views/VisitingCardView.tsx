@@ -385,10 +385,10 @@ export const VisitingCardView: React.FC = () => {
    */
   const renderCardToCanvas = async (side: 'front' | 'back', format: 'png' | 'jpeg' = 'png'): Promise<string> => {
     const canvas = document.createElement('canvas');
-    const W = 1050;
-    const H = 600;
-    canvas.width = cardSize.widthPx;
-    canvas.height = cardSize.heightPx;
+    const W = isPortrait ? 600 : 1050;
+    const H = isPortrait ? 1050 : 600;
+    canvas.width = isPortrait ? cardSize.heightPx : cardSize.widthPx;
+    canvas.height = isPortrait ? cardSize.widthPx : cardSize.heightPx;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not get canvas context');
     // Maintain design-coordinate positions at both ISO/US physical sizes.
@@ -404,6 +404,97 @@ export const VisitingCardView: React.FC = () => {
 
     // Decorative graphics & patterns
     drawPattern(ctx, cardData.pattern || theme.pattern, theme, W, H);
+
+    if (isPortrait) {
+      // Portrait composition uses a real vertical design rather than rotating
+      // an existing horizontal image onto portrait paper.
+      ctx.textAlign = 'left';
+      if (side === 'front') {
+        ctx.fillStyle = theme.accent;
+        ctx.fillRect(0, 0, W, 14);
+        ctx.font = `bold ${Math.round(29 * textScale)}px ${face}`;
+        ctx.fillText((cardData.companyName || 'YOUR COMPANY').toUpperCase(), 50, 280, W - 100);
+        ctx.fillStyle = theme.primaryText;
+        ctx.font = `bold ${Math.round(45 * textScale)}px ${face}`;
+        ctx.fillText(cardData.fullName || 'Your Name',
+          W * (cardData.nameX ?? 10) / 100, H * (cardData.nameY ?? 36) / 100, W - 90);
+        ctx.fillStyle = theme.accent;
+        ctx.font = `500 ${Math.round(22 * textScale)}px ${face}`;
+        ctx.fillText(cardData.jobTitle || 'Your Profession', 50, 465, W - 100);
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(50, 505); ctx.lineTo(W - 50, 505); ctx.stroke();
+        const detailLines = [
+          ['TEL', cardData.phone],
+          ['EML', cardData.email],
+          ['WEB', cardData.website],
+          ['LOC', cardData.address]
+        ];
+        detailLines.forEach(([label, value], idx) => {
+          if (!value) return;
+          const y = 570 + idx * 55;
+          ctx.fillStyle = theme.accent;
+          ctx.font = `600 18px ${face}`;
+          ctx.fillText(label, 50, y, 55);
+          ctx.fillStyle = theme.secondaryText;
+          ctx.font = `500 ${Math.round(19 * textScale)}px ${face}`;
+          ctx.fillText(value, 110, y, W - 145);
+        });
+        if (qrDataUrl && cardData.qrType !== 'none') {
+          const qrImg = new Image();
+          qrImg.src = qrDataUrl;
+          await new Promise(resolve => { qrImg.onload = resolve; qrImg.onerror = resolve; });
+          if (qrImg.naturalWidth > 0) {
+            const qrSize = cardData.qrSize || 160;
+            const x = Math.max(0, Math.min(W - qrSize, W * (cardData.qrX ?? 50) / 100 - qrSize / 2));
+            const y = Math.max(0, Math.min(H - qrSize - 22, H * (cardData.qrY ?? 85) / 100 - qrSize / 2));
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(x - 5, y - 5, qrSize + 10, qrSize + 10);
+            ctx.drawImage(qrImg, x, y, qrSize, qrSize);
+            ctx.font = `14px ${face}`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = theme.secondaryText;
+            ctx.fillText(cardData.qrType === 'vcard' ? 'SAVE CONTACT' : 'VISIT WEBSITE', x + qrSize / 2, y + qrSize + 22);
+            ctx.textAlign = 'left';
+          }
+        }
+      } else {
+        ctx.textAlign = 'center';
+        ctx.font = `bold ${Math.round(49 * textScale)}px ${face}`;
+        ctx.fillStyle = theme.primaryText;
+        ctx.fillText(cardData.companyName || 'YOUR COMPANY', W / 2, 555, W - 90);
+        ctx.fillStyle = theme.secondaryText;
+        ctx.font = `500 ${Math.round(26 * textScale)}px ${face}`;
+        ctx.fillText(cardData.tagline || 'Your Brand. Your Story.', W / 2, 620, W - 90);
+        ctx.fillStyle = theme.accent;
+        ctx.font = `500 21px ${face}`;
+        ctx.fillText(cardData.website || 'https://example.com', W / 2, 725, W - 90);
+        const social = [cardData.linkedIn, cardData.instagram].filter(Boolean).join('  •  ');
+        if (social) {
+          ctx.fillStyle = theme.secondaryText;
+          ctx.font = `500 17px ${face}`;
+          ctx.fillText(social, W / 2, 770, W - 90);
+        }
+        ctx.textAlign = 'left';
+      }
+      if (logoPreview) {
+        const image = new Image();
+        image.src = logoPreview;
+        await new Promise(resolve => { image.onload = resolve; image.onerror = resolve; });
+        if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+          const maxWidth = 150 * (cardData.logoScale || 1);
+          const maxHeight = 105 * (cardData.logoScale || 1);
+          const ratio = Math.min(maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+          const w = ratio * image.naturalWidth;
+          const h = ratio * image.naturalHeight;
+          const centerX = side === 'front' ? W * (cardData.logoX ?? 50) / 100 : W / 2;
+          const centerY = side === 'front' ? H * (cardData.logoY ?? 15) / 100 : 340;
+          ctx.drawImage(image, Math.max(0, Math.min(W - w, centerX - w / 2)),
+            Math.max(0, Math.min(H - h, centerY - h / 2)), w, h);
+        }
+      }
+      return canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.94 : undefined);
+    }
 
     if (side === 'front') {
       // Layout variations
@@ -436,7 +527,8 @@ export const VisitingCardView: React.FC = () => {
       // Person Name
       ctx.fillStyle = theme.primaryText;
       ctx.font = `bold ${Math.round(54 * textScale)}px ${face}`;
-      ctx.fillText(cardData.fullName || 'Your Name', startX, 165, 700);
+      ctx.fillText(cardData.fullName || 'Your Name',
+        W * (cardData.nameX ?? 7) / 100, H * (cardData.nameY ?? 27) / 100, 700);
 
       // Job Title Badge
       const titleText = cardData.jobTitle || 'Founder & Senior Engineer';
@@ -496,9 +588,9 @@ export const VisitingCardView: React.FC = () => {
           qrImg.onload = r;
           qrImg.onerror = r;
         });
-        const qrSize = 160;
-        const qrX = W - qrSize - 70;
-        const qrY = 320;
+        const qrSize = cardData.qrSize || 160;
+        const qrX = Math.max(0, Math.min(W - qrSize, W * (cardData.qrX ?? 85) / 100 - qrSize / 2));
+        const qrY = Math.max(0, Math.min(H - qrSize - 26, H * (cardData.qrY ?? 68) / 100 - qrSize / 2));
 
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
