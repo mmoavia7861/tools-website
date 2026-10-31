@@ -359,14 +359,18 @@ export const VisitingCardView: React.FC = () => {
   /**
    * Render high-res 300 DPI canvas for export
    */
-  const renderCardToCanvas = async (side: 'front' | 'back'): Promise<string> => {
+  const renderCardToCanvas = async (side: 'front' | 'back', format: 'png' | 'jpeg' = 'png'): Promise<string> => {
     const canvas = document.createElement('canvas');
     const W = 1050;
     const H = 600;
-    canvas.width = W;
-    canvas.height = H;
+    canvas.width = cardSize.widthPx;
+    canvas.height = cardSize.heightPx;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not get canvas context');
+    // Maintain design-coordinate positions at both ISO/US physical sizes.
+    ctx.scale(canvas.width / W, canvas.height / H);
+    const face = getCanvasFont(cardData.font || 'sans');
+    const textScale = cardData.fontScale || 1;
 
     const theme = activeTheme;
 
@@ -402,26 +406,26 @@ export const VisitingCardView: React.FC = () => {
 
       // Brand / Company Name
       ctx.fillStyle = theme.accent;
-      ctx.font = 'bold 26px system-ui, -apple-system, sans-serif';
-      ctx.fillText((cardData.companyName || 'COMPANY NAME').toUpperCase(), startX, 90);
+      ctx.font = `bold ${Math.round(26 * textScale)}px ${face}`;
+      ctx.fillText((cardData.companyName || 'YOUR COMPANY').toUpperCase(), startX, 90, 580);
 
       // Person Name
       ctx.fillStyle = theme.primaryText;
-      ctx.font = 'bold 54px system-ui, -apple-system, sans-serif';
-      ctx.fillText(cardData.fullName || 'Muhammad Moaviah', startX, 165);
+      ctx.font = `bold ${Math.round(54 * textScale)}px ${face}`;
+      ctx.fillText(cardData.fullName || 'Your Name', startX, 165, 700);
 
       // Job Title Badge
       const titleText = cardData.jobTitle || 'Founder & Senior Engineer';
-      ctx.font = '600 24px system-ui, -apple-system, sans-serif';
+      ctx.font = `600 ${Math.round(24 * textScale)}px ${face}`;
       const titleWidth = ctx.measureText(titleText).width;
 
       ctx.fillStyle = theme.badgeBg;
       ctx.beginPath();
-      ctx.roundRect(startX, 185, titleWidth + 28, 42, 8);
+      ctx.roundRect(startX, 185, Math.min(titleWidth + 28, W - startX - 65), 42, 8);
       ctx.fill();
 
       ctx.fillStyle = theme.badgeText;
-      ctx.fillText(titleText, startX + 14, 215);
+      ctx.fillText(titleText, startX + 14, 215, W - startX - 90);
 
       // Horizontal subtle line
       ctx.strokeStyle = theme.secondaryText + '40';
@@ -434,7 +438,7 @@ export const VisitingCardView: React.FC = () => {
       // Contact Info Grid
       const contactStartY = 310;
       const col1X = startX;
-      ctx.font = '500 22px system-ui, -apple-system, sans-serif';
+      ctx.font = `500 ${Math.round(22 * textScale)}px ${face}`;
 
       // Phone
       ctx.fillStyle = theme.accent;
@@ -468,11 +472,11 @@ export const VisitingCardView: React.FC = () => {
           qrImg.onload = r;
           qrImg.onerror = r;
         });
-        const qrSize = 170;
+        const qrSize = 160;
         const qrX = W - qrSize - 70;
         const qrY = 320;
 
-        ctx.fillStyle = isColorLight(theme.bgFront) ? '#E2E8F0' : 'rgba(255,255,255,0.08)';
+        ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
         ctx.roundRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 12);
         ctx.fill();
@@ -480,9 +484,9 @@ export const VisitingCardView: React.FC = () => {
         ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
         ctx.fillStyle = theme.secondaryText;
-        ctx.font = '14px system-ui, sans-serif';
+        ctx.font = `14px ${face}`;
         ctx.textAlign = 'center';
-        ctx.fillText('SCAN FOR VCARD', qrX + qrSize / 2, qrY + qrSize + 24);
+        ctx.fillText(cardData.qrType === 'vcard' ? 'SAVE CONTACT' : 'VISIT WEBSITE', qrX + qrSize / 2, qrY + qrSize + 24);
         ctx.textAlign = 'left';
       }
 
@@ -494,12 +498,17 @@ export const VisitingCardView: React.FC = () => {
           logoImg.onload = r;
           logoImg.onerror = r;
         });
-        const maxLogoH = 80;
-        const maxLogoW = 160;
-        const scale = Math.min(maxLogoW / logoImg.naturalWidth, maxLogoH / logoImg.naturalHeight, 1);
-        const lw = logoImg.naturalWidth * scale;
-        const lh = logoImg.naturalHeight * scale;
-        ctx.drawImage(logoImg, W - lw - 70, 70, lw, lh);
+        if (logoImg.naturalWidth > 0 && logoImg.naturalHeight > 0) {
+          const maxLogoH = 80 * (cardData.logoScale || 1);
+          const maxLogoW = 160 * (cardData.logoScale || 1);
+          const scale = Math.min(maxLogoW / logoImg.naturalWidth, maxLogoH / logoImg.naturalHeight);
+          const lw = logoImg.naturalWidth * scale;
+          const lh = logoImg.naturalHeight * scale;
+          const centerX = W * (cardData.logoX ?? 88) / 100;
+          const centerY = H * (cardData.logoY ?? 16) / 100;
+          ctx.drawImage(logoImg, Math.max(0, Math.min(W - lw, centerX - lw / 2)),
+            Math.max(0, Math.min(H - lh, centerY - lh / 2)), lw, lh);
+        }
       }
     } else {
       // BACK OF CARD: Elegant centered branding
@@ -514,11 +523,13 @@ export const VisitingCardView: React.FC = () => {
           logoImg.onload = r;
           logoImg.onerror = r;
         });
-        const logoSize = 130;
-        const scale = Math.min(logoSize / logoImg.naturalWidth, logoSize / logoImg.naturalHeight, 1);
-        const lw = logoImg.naturalWidth * scale;
-        const lh = logoImg.naturalHeight * scale;
-        ctx.drawImage(logoImg, centerX - lw / 2, centerY - 140, lw, lh);
+        if (logoImg.naturalWidth > 0 && logoImg.naturalHeight > 0) {
+          const logoSize = 130 * (cardData.logoScale || 1);
+          const scale = Math.min(logoSize / logoImg.naturalWidth, logoSize / logoImg.naturalHeight);
+          const lw = logoImg.naturalWidth * scale;
+          const lh = logoImg.naturalHeight * scale;
+          ctx.drawImage(logoImg, centerX - lw / 2, centerY - 140, lw, lh);
+        }
       } else {
         ctx.fillStyle = theme.accent;
         ctx.beginPath();
@@ -526,7 +537,7 @@ export const VisitingCardView: React.FC = () => {
         ctx.fill();
 
         ctx.fillStyle = theme.bgBack;
-        ctx.font = 'bold 36px system-ui, sans-serif';
+        ctx.font = `bold ${Math.round(36 * textScale)}px ${face}`;
         ctx.textAlign = 'center';
         ctx.fillText(cardData.companyName.charAt(0) || 'R', centerX, centerY - 57);
       }
@@ -534,39 +545,45 @@ export const VisitingCardView: React.FC = () => {
       // Company Name
       ctx.textAlign = 'center';
       ctx.fillStyle = theme.primaryText;
-      ctx.font = 'bold 44px system-ui, sans-serif';
-      ctx.fillText(cardData.companyName || 'RANKNOVA', centerX, centerY + 30);
+      ctx.font = `bold ${Math.round(44 * textScale)}px ${face}`;
+      ctx.fillText(cardData.companyName || 'YOUR COMPANY', centerX, centerY + 30, W - 130);
 
       // Tagline
       ctx.fillStyle = theme.secondaryText;
-      ctx.font = '500 22px system-ui, sans-serif';
-      ctx.fillText(cardData.tagline || 'Fast, Secure, and Private Web Tools', centerX, centerY + 75);
+      ctx.font = `500 ${Math.round(22 * textScale)}px ${face}`;
+      ctx.fillText(cardData.tagline || 'Your Brand. Your Story.', centerX, centerY + 75, W - 130);
 
       // Website Footer
       ctx.fillStyle = theme.accent;
-      ctx.font = '600 20px system-ui, sans-serif';
-      ctx.fillText(cardData.website || 'https://ranknova.app', centerX, H - 70);
+      ctx.font = `600 ${Math.round(20 * textScale)}px ${face}`;
+      ctx.fillText(cardData.website || 'https://example.com', centerX, H - 70, W - 140);
+      const socials = [cardData.linkedIn, cardData.instagram].filter(Boolean).join('  •  ');
+      if (socials) {
+        ctx.fillStyle = theme.secondaryText;
+        ctx.font = `500 17px ${face}`;
+        ctx.fillText(socials, centerX, H - 40, W - 150);
+      }
 
       ctx.textAlign = 'left';
     }
 
-    return canvas.toDataURL('image/png');
+    return canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.94 : undefined);
   };
 
-  // Download Front or Back as high-res PNG
-  const handleDownloadPng = async (side: 'front' | 'back') => {
+  const handleDownloadImage = async (side: 'front' | 'back', format: 'png' | 'jpeg') => {
     setIsExporting(true);
+    setEditorError(null);
     try {
-      const dataUrl = await renderCardToCanvas(side);
+      const dataUrl = await renderCardToCanvas(side, format);
       const safeName = (cardData.fullName || 'visiting-card').toLowerCase().replace(/[^a-z0-9]/g, '-');
       const a = document.createElement('a');
       a.href = dataUrl;
-      a.download = `${safeName}-${side}-300dpi.png`;
+      a.download = `${safeName}-${side}-300dpi.${format === 'jpeg' ? 'jpg' : 'png'}`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
     } catch (err) {
-      console.error('PNG export failed:', err);
+      setEditorError(err instanceof Error ? err.message : 'Could not generate image export.');
     } finally {
       setIsExporting(false);
     }
@@ -579,7 +596,7 @@ export const VisitingCardView: React.FC = () => {
       const frontDataUrl = await renderCardToCanvas('front');
       const backDataUrl = await renderCardToCanvas('back');
 
-      const pdfBytes = await createVisitingCardPdf(frontDataUrl, backDataUrl);
+      const pdfBytes = await createVisitingCardPdf(frontDataUrl, backDataUrl, cardData.size || 'us');
       const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
 
@@ -592,7 +609,7 @@ export const VisitingCardView: React.FC = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('PDF export failed:', err);
+      setEditorError(err instanceof Error ? err.message : 'Could not create the PDF.');
     } finally {
       setIsExporting(false);
     }
