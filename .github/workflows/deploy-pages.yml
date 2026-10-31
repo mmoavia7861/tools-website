@@ -1,73 +1,103 @@
-name: Deploy tools-website to GitHub Pages
+name: Publish tools-website to GitHub Pages
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'index.html'
+      - '404.html'
+      - 'assets/**'
+      - '.nojekyll'
+      - 'robots.txt'
+      - 'sitemap.xml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
 concurrency:
-  group: tools-website-pages
-  cancel-in-progress: true
+  group: tools-website-publish
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      pages_mode: ${{ steps.pages.outputs.mode }}
     steps:
-      - name: Checkout source
+      - name: Checkout code
         uses: actions/checkout@v4
-      - name: Ensure Pages publishes compiled output from GitHub Actions
+      - name: Detect existing Pages publication mode
+        id: pages
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          BUILD_TYPE=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type // "unknown"')
-          echo "GitHub Pages source: ${BUILD_TYPE}"
-          if [ "$BUILD_TYPE" = "legacy" ]; then
-            echo "Switching GitHub Pages from raw branch to GitHub Actions..."
-            if ! gh api --method PUT "repos/${GITHUB_REPOSITORY}/pages" -f build_type=workflow; then
-              echo "::error::Select Settings > Pages > Build and deployment > Source > GitHub Actions, then rerun this workflow."
-              exit 1
-            fi
-            BUILD_TYPE=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type // "unknown"')
+          MODE=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type // "legacy"')
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "Pages mode: $MODE"
+          if [ "$MODE" != "legacy" ] && [ "$MODE" != "workflow" ]; then
+            echo "::error::Unexpected Pages mode: $MODE"
+            exit 1
           fi
-          test "$BUILD_TYPE" = "workflow" || { echo "::error::GitHub Pages source must be GitHub Actions"; exit 1; }
-      - name: Set up Node.js
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build production Vite application for project URL
+      - name: Build real React site for /tools-website/
         env:
           GITHUB_PAGES: 'true'
-        run: npm run build
-      - name: Verify compiled assets and SPA fallback
         run: |
-          test -f dist/index.html
+          cp index.source.html index.html
+          npm run build
           test -d dist/assets
           grep -q '/tools-website/assets/' dist/index.html
           if grep -q 'src/main.tsx' dist/index.html; then
-            echo "::error::Source index.html is being published instead of the Vite build."
+            echo "::error::Vite generated HTML still references uncompiled TSX"
             exit 1
           fi
+      - name: Prepare SPA fallback
+        run: |
           cp dist/index.html dist/404.html
           touch dist/.nojekyll
-      - name: Configure GitHub Pages
+      - name: Publish into existing Pages main/root without changing Settings
+        if: steps.pages.outputs.mode == 'legacy'
+        run: |
+          cp dist/index.html index.html
+          cp dist/404.html 404.html
+          rm -rf assets
+          cp -R dist/assets assets
+          cp dist/robots.txt robots.txt
+          cp dist/sitemap.xml sitemap.xml
+          touch .nojekyll
+          git add index.html 404.html assets robots.txt sitemap.xml .nojekyll
+          if git diff --cached --quiet; then
+            echo 'Production build already present at main/root.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'chore(pages): publish compiled React assets to existing branch site'
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+      - name: Configure GitHub Pages Action publishing
+        if: steps.pages.outputs.mode == 'workflow'
         uses: actions/configure-pages@v5
-      - name: Upload production frontend
+      - name: Upload compiled artifact for GitHub Actions publishing
+        if: steps.pages.outputs.mode == 'workflow'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
-  deploy:
+
+  deploy_from_actions:
+    if: needs.build.outputs.pages_mode == 'workflow'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     needs: build
+    runs-on: ubuntu-latest
     steps:
       - name: Deploy
         id: deployment
