@@ -73,6 +73,8 @@ export const VisitingCardView: React.FC = () => {
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const cardPreviewRef = useRef<HTMLDivElement | null>(null);
   const logoDragActive = useRef(false);
+  const qrDragActive = useRef(false);
+  const nameDragActive = useRef(false);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [history, setHistory] = useState<{ past: VisitingCardData[]; future: VisitingCardData[] }>({ past: [], future: [] });
   const previousCardRef = useRef(cardData);
@@ -118,6 +120,27 @@ export const VisitingCardView: React.FC = () => {
     setCardData(prev => ({ ...prev, logoX: Math.round(x), logoY: Math.round(y) }));
   };
 
+  const moveQrByPointer = (event: React.PointerEvent<HTMLImageElement>) => {
+    if (!qrDragActive.current || !cardPreviewRef.current) return;
+    const rect = cardPreviewRef.current.getBoundingClientRect();
+    setCardData(prev => ({
+      ...prev,
+      qrX: Math.round(Math.max(12, Math.min(88, (event.clientX - rect.left) / rect.width * 100))),
+      qrY: Math.round(Math.max(14, Math.min(88, (event.clientY - rect.top) / rect.height * 100)))
+    }));
+  };
+
+  const moveNameByPointer = (event: React.PointerEvent<HTMLHeadingElement>) => {
+    if (!nameDragActive.current || !cardPreviewRef.current) return;
+    const rect = cardPreviewRef.current.getBoundingClientRect();
+    setCardData(prev => ({
+      ...prev,
+      nameX: Math.round(Math.max(5, Math.min(70, (event.clientX - rect.left) / rect.width * 100))),
+      nameY: Math.round(Math.max(12, Math.min(82, (event.clientY - rect.top) / rect.height * 100)))
+    }));
+  };
+
+  const isPortrait = cardData.orientation === 'portrait';
   const activeTheme = resolveCardTheme(cardData);
   const fontFamily = CARD_FONT_CSS[cardData.font || 'sans'];
   const fontScale = cardData.fontScale || 1;
@@ -144,7 +167,7 @@ export const VisitingCardView: React.FC = () => {
         const url = await QRCode.toDataURL(payload, {
           width: 320,
           margin: 4,
-          color: { dark: '#111827', light: '#FFFFFFFF' },
+          color: { dark: /^#[0-9a-fA-F]{6}$/.test(cardData.qrColor || '') ? cardData.qrColor : '#111827', light: '#FFFFFFFF' },
           errorCorrectionLevel: 'M'
         });
 
@@ -160,7 +183,8 @@ export const VisitingCardView: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [cardData, activeTheme]);
+  }, [cardData.qrType, cardData.website, cardData.fullName, cardData.companyName,
+    cardData.phone, cardData.email, cardData.jobTitle, cardData.address, cardData.qrColor]);
 
   // Helper to determine if a hex color is light
   function isColorLight(hex: string): boolean {
