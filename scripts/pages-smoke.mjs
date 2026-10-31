@@ -81,6 +81,23 @@ try {
     await page.waitForSelector('#root header', { timeout: 25000 });
     assert.ok((await page.title()).includes(expectedTitle.split(' ')[0]), 'Missing title for ' + slug);
   }
+  // Real Visiting Card Maker interactions and an actual client-side download.
+  const cardResponse = await page.goto(rootUrl + 'visiting-card-generator/', { waitUntil: 'domcontentloaded', timeout: 25000 });
+  assert.equal(cardResponse?.status(), 200, 'Visiting card deep link must be indexable');
+  await page.getByRole('heading', { name: 'Professional Visiting Card Maker' }).waitFor();
+  await page.locator('#card-size').selectOption('eu');
+  await page.locator('#card-font').selectOption('serif');
+  assert.ok((await page.locator('#root').innerText()).includes('85 × 55 mm'), 'International business card size did not render');
+  const imageDownload = page.waitForEvent('download', { timeout: 15000 });
+  await page.getByRole('button', { name: /Front JPG/i }).click();
+  const jpg = await imageDownload;
+  assert.match(jpg.suggestedFilename(), /\.jpg$/i, 'Front JPG button did not download a JPEG');
+  const pdfDownload = page.waitForEvent('download', { timeout: 25000 });
+  await page.getByRole('button', { name: /Download 2-Page Print PDF/i }).click();
+  const pdf = await pdfDownload;
+  assert.match(pdf.suggestedFilename(), /\.pdf$/i, '2-page PDF button did not download a PDF');
+  assert.equal(runtimeErrors.length, 0, 'Browser errors after card exports: ' + JSON.stringify(runtimeErrors));
+
   const sitemapResponse = await page.goto(rootUrl + 'sitemap.xml');
   assert.equal(sitemapResponse?.status(), 200);
   const sitemap = await sitemapResponse?.text();
