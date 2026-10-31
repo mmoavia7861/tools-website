@@ -23,7 +23,9 @@ jobs:
       - name: Build GitHub Pages production assets
         env:
           GITHUB_PAGES: 'true'
-        run: npm run build
+        run: |
+          cp index.source.html index.html
+          npm run build
       - name: Prepare indexable pages and sitemap
         run: node scripts/prepare-pages-seo.mjs
       - name: Create GitHub Pages SPA fallback
