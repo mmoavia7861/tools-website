@@ -59,7 +59,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ navigate }) => {
                   <span>Zero Permanent File Storage</span>
                 </div>
                 <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-                  We never persist your uploaded files in databases or public storage buckets. Any temporary memory buffers are cleared immediately.
+                  The current application is designed not to save uploaded files to public storage. Cloud processing providers may have their own logging and retention policies.
                 </p>
               </div>
 
@@ -115,7 +115,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ navigate }) => {
                     <td className="px-4 py-3 font-semibold text-slate-900">AI Background Remover</td>
                     <td className="px-4 py-3 text-slate-600">PNG, JPG, WebP</td>
                     <td className="px-4 py-3 text-slate-600">15 MB (4096px max)</td>
-                    <td className="px-4 py-3 text-emerald-600 font-medium">Memory buffer purged in finally block</td>
+                    <td className="px-4 py-3 text-emerald-600 font-medium">Browser processing; check cloud option</td>
                   </tr>
                 </tbody>
               </table>
