@@ -96,6 +96,11 @@ export interface VisitingCardData {
   logoX?: number;
   logoY?: number;
   customAccent?: string;
+  customBgFront?: string;
+  customBgBack?: string;
+  customText?: string;
+  linkedIn?: string;
+  instagram?: string;
 }
 
 export const CARD_THEMES: Record<CardThemeId, CardThemeDef> = {
@@ -310,10 +315,35 @@ export function resolveCardTheme(card: VisitingCardData): CardThemeDef {
     ? { ...base, ...card.customPalette, id: 'custom-ai' as CardThemeId,
         name: card.customPalette.name || 'Custom Palette' }
     : base;
-  if (card.customAccent && /^#[0-9a-fA-F]{6}$/.test(card.customAccent)) {
-    return { ...theme, accent: card.customAccent, badgeText: card.customAccent };
-  }
-  return theme;
+  const isHex = (value?: string) => Boolean(value && /^#[0-9a-fA-F]{6}$/.test(value));
+  return {
+    ...theme,
+    ...(isHex(card.customAccent) && { accent: card.customAccent!, badgeText: card.customAccent! }),
+    ...(isHex(card.customBgFront) && { bgFront: card.customBgFront! }),
+    ...(isHex(card.customBgBack) && { bgBack: card.customBgBack! }),
+    ...(isHex(card.customText) && { primaryText: card.customText! })
+  };
+}
+
+/**
+ * On-device design suggestions. These do NOT call an AI service.
+ * Return an existing curated template, so the feature works on GitHub Pages.
+ */
+export function suggestCardStyle(prompt: string): Pick<VisitingCardData, 'theme' | 'layout' | 'pattern'> {
+  const p = prompt.toLowerCase().slice(0, 500);
+  if (/luxury|premium|real estate|realty|gold|jewel|executive|law/.test(p))
+    return { theme: 'luxe-gold', layout: 'executive-banner', pattern: 'gold-border' };
+  if (/medical|health|clinic|doctor|dental|hospital/.test(p))
+    return { theme: 'clinical-teal', layout: 'classic', pattern: 'geometric-lines' };
+  if (/nature|organic|eco|garden|green|forest/.test(p))
+    return { theme: 'emerald-nature', layout: 'minimal-zen', pattern: 'minimal-dots' };
+  if (/minimal|architect|simple|scandinavi|zen|neutral/.test(p))
+    return { theme: 'scandinavian-zen', layout: 'minimal-zen', pattern: 'none' };
+  if (/cyber|game|gaming|web3|neon|crypto/.test(p))
+    return { theme: 'cyberpunk-neon', layout: 'neo-brutalist', pattern: 'cyber-grid' };
+  if (/creative|design|artist|coffee|fashion|beauty/.test(p))
+    return { theme: 'sunset-aurora', layout: 'accent-border', pattern: 'radial-glow' };
+  return { theme: 'corporate-navy', layout: 'modern', pattern: 'diagonal-stripe' };
 }
 
 /**
