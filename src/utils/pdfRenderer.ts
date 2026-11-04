@@ -29,8 +29,7 @@ export async function renderPdfPageToDataUrl(
   try {
     const loadingTask = pdfjsLib.getDocument({
       data: pdfBytes.slice(),
-      useSystemFonts: true,
-      isEvalSupported: false
+      useSystemFonts: true
     });
 
     const pdfDoc = await loadingTask.promise;
