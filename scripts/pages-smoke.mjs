@@ -84,14 +84,22 @@ try {
   // Real Visiting Card Maker interactions and an actual client-side download.
   const cardResponse = await page.goto(rootUrl + 'visiting-card-generator/', { waitUntil: 'domcontentloaded', timeout: 25000 });
   assert.equal(cardResponse?.status(), 200, 'Visiting card deep link must be indexable');
-  await page.getByRole('heading', { name: 'Professional Visiting Card Maker' }).waitFor();
-  await page.locator('#card-size').selectOption('eu');
-  await page.locator('#card-font').selectOption('serif');
-  await page.locator('#card-orientation').selectOption('portrait');
-  await page.getByLabel('QR color').selectOption('#1E3A8A');
+  // Current Visiting Card Maker uses tabbed controls instead of legacy input IDs.
+  await page.getByRole('heading', { name: 'Modern Visiting Card Generator' }).waitFor();
+  const selectAfterLabel = (label) => page.locator('label')
+    .filter({ hasText: label }).locator('xpath=following-sibling::select[1]');
+
+  await page.getByRole('button', { name: 'Print & Layout', exact: true }).click();
+  await selectAfterLabel('Standard Size').selectOption('eu');
+  await selectAfterLabel('Typography Family').selectOption('serif');
+  await selectAfterLabel('Orientation').selectOption('portrait');
   assert.ok((await page.locator('#root').innerText()).includes('650 × 1004'), 'Portrait layout must change canvas pixel dimensions');
-  await page.getByRole('img', { name: 'Drag QR code to reposition' }).waitFor({ timeout: 8000 });
   assert.ok((await page.locator('#root').innerText()).includes('85 × 55 mm'), 'International business card size did not render');
+
+  await page.getByRole('button', { name: 'QR Code', exact: true }).click();
+  await selectAfterLabel('QR Foreground Color').selectOption('#1E3A8A');
+  assert.equal(await selectAfterLabel('QR Foreground Color').inputValue(), '#1E3A8A',
+    'QR foreground color selection did not apply');
   const imageDownload = page.waitForEvent('download', { timeout: 15000 });
   await page.getByRole('button', { name: /Front JPG/i }).click();
   const jpg = await imageDownload;
