@@ -23,6 +23,7 @@ import { ContactView } from './views/ContactView';
 import { LegalView, type LegalDocType } from './views/LegalView';
 import { PDFEditorView } from './views/PDFEditorView';
 import { VisitingCardView } from './views/VisitingCardView';
+import { VideoCompressorView } from './views/VideoCompressorView';
 import { AdminView } from './views/AdminView';
 import { NotFoundView } from './views/NotFoundView';
 import { testConnection } from './services/firebase';
@@ -95,6 +96,10 @@ export default function App() {
 
     if (path === '/visiting-card-generator' || path === '/visiting-card') {
       return <VisitingCardView />;
+    }
+
+    if (path === '/compress-video' || path === '/video-compressor') {
+      return <VideoCompressorView />;
     }
 
     if (path === '/blog') {

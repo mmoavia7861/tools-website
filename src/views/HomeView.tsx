@@ -11,7 +11,8 @@ import {
   ChevronDown,
   EyeOff,
   Cpu,
-  CreditCard
+  CreditCard,
+  Video
 } from 'lucide-react';
 import { SEOHead } from '../components/SEOHead';
 import { AdSlot } from '../components/AdSlot';
@@ -231,24 +232,24 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
               </div>
             </div>
 
-            {/* Tool 4: PDF Editor & Organizer */}
+            {/* Tool 4: PDF Editor & Signer */}
             <div className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition duration-200">
               <div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600 mb-4">
                   <FileText className="h-5 w-5" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">PDF Editor & Organizer</h3>
+                <h3 className="text-lg font-bold text-slate-900">PDF Editor & Signer</h3>
                 <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Open any existing PDF to rotate individual pages, reorder or duplicate slides, remove pages, and stamp custom watermarks or pagination.
+                  Open any PDF to rearrange or rotate pages, add custom words and text boxes, and insert drawn or typed calligraphy signatures directly on documents.
                 </p>
                 <ul className="mt-4 space-y-1.5 text-xs text-slate-500">
                   <li className="flex items-center gap-1.5">
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Visual page cards & rotation</span>
+                    <span>Add words, fonts & highlights</span>
                   </li>
                   <li className="flex items-center gap-1.5">
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Watermark & page numbering</span>
+                    <span>Draw, type, or upload signatures</span>
                   </li>
                 </ul>
               </div>
@@ -264,7 +265,40 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
               </div>
             </div>
 
-            {/* Tool 5: AI Background Remover */}
+            {/* Tool 5: Video Compressor */}
+            <div className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition duration-200">
+              <div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 text-rose-600 mb-4">
+                  <Video className="h-5 w-5" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">Video Compressor</h3>
+                <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Shrink MP4, WebM, and MOV video file sizes for Discord, WhatsApp, or email attachments. Tune bitrate and downscale resolution with on-device hardware acceleration.
+                </p>
+                <ul className="mt-4 space-y-1.5 text-xs text-slate-500">
+                  <li className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>Presets for Discord (under 25MB) &amp; WhatsApp</span>
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>100% on-device private encoding</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="mt-6 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => navigate('/compress-video')}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 transition"
+                >
+                  <span>Launch Video Compressor</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Tool 6: AI Background Remover */}
             <div className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition duration-200">
               <div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-50 text-purple-600 mb-4">
@@ -297,7 +331,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
               </div>
             </div>
 
-            {/* Tool 6: Visiting Card Maker */}
+            {/* Tool 7: Visiting Card Maker */}
             <div className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition duration-200">
               <div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600 mb-4">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, QrCode, FileText, Sparkles, CreditCard, Lock, ArrowRight } from 'lucide-react';
+import { Menu, X, QrCode, FileText, Sparkles, CreditCard, Video, Lock, ArrowRight } from 'lucide-react';
 
 interface NavbarProps {
   currentPath: string;
@@ -11,13 +11,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
 
   const navItems = [
     { label: 'QR Generator', path: '/qr-code-generator', icon: QrCode },
-    { label: 'PDF Tools', path: '/compress-pdf', icon: FileText },
     { label: 'PDF Editor', path: '/edit-pdf', icon: FileText },
+    { label: 'Video Compressor', path: '/compress-video', icon: Video },
+    { label: 'PDF Tools', path: '/compress-pdf', icon: FileText },
     { label: 'BG Remover', path: '/background-remover', icon: Sparkles },
     { label: 'Visiting Card', path: '/visiting-card-generator', icon: CreditCard },
     { label: 'Blog', path: '/blog' },
     { label: 'About', path: '/about' },
-    { label: 'Contact', path: '/contact' },
   ];
 
   const handleNav = (path: string) => {

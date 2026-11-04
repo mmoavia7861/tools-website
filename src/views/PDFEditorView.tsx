@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PDFDocument } from 'pdf-lib';
 import {
   FileText,
@@ -16,16 +16,27 @@ import {
   Sliders,
   Hash,
   Stamp,
-  Layers,
-  Sparkles
+  Sparkles,
+  Type,
+  PenTool,
+  Move,
+  Maximize2,
+  Plus,
+  Calendar,
+  Check
 } from 'lucide-react';
 import { SEOHead } from '../components/SEOHead';
 import { AdSlot } from '../components/AdSlot';
 import { formatBytes, validatePdfBytes } from '../utils/pdf';
+import { editExistingPdf, type PageEditState } from '../utils/pdfEditor';
 import {
-  editExistingPdf,
-  type PageEditState
-} from '../utils/pdfEditor';
+  type NormalizedElement,
+  createDefaultTextElement,
+  createSignatureElement,
+  reorderArray
+} from '../utils/pdfEditorUtils';
+import { renderPdfPageToDataUrl } from '../utils/pdfRenderer';
+import { SignatureModal } from '../components/SignatureModal';
 
 interface PageDisplayItem {
   id: string;
@@ -33,12 +44,21 @@ interface PageDisplayItem {
   rotation: number;
   width: number;
   height: number;
+  thumbnailUrl?: string;
 }
 
 export const PDFEditorView: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [sourcePdfBytes, setSourcePdfBytes] = useState<Uint8Array | null>(null);
   const [pages, setPages] = useState<PageDisplayItem[]>([]);
+  const [activePageIndex, setActivePageIndex] = useState<number>(0);
+
+  // Annotations (Words, Signatures, Stamps) per page
+  const [annotations, setAnnotations] = useState<NormalizedElement[]>([]);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+
+  // Signature modal state
+  const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
 
   // Document-level options
   const [addPageNumbers, setAddPageNumbers] = useState(false);
@@ -47,16 +67,41 @@ export const PDFEditorView: React.FC = () => {
   const [watermarkOpacity, setWatermarkOpacity] = useState(0.2);
   const [outputFileName, setOutputFileName] = useState('ranknova-edited-document');
 
-  // Processing states
+  // Processing & Export
   const [isProcessing, setIsProcessing] = useState(false);
   const [editedPdfBytes, setEditedPdfBytes] = useState<Uint8Array | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Active page preview canvas / container ref for drag drop
+  const pageContainerRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Dragging state for elements
+  const [isDraggingElement, setIsDraggingElement] = useState(false);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Load and render page thumbnails when file or rotation changes
+  const renderThumbnails = async (bytes: Uint8Array, pageItems: PageDisplayItem[]) => {
+    const updated = [...pageItems];
+    for (let i = 0; i < updated.length; i++) {
+      try {
+        const url = await renderPdfPageToDataUrl(bytes, updated[i].originalIndex, {
+          scale: 0.8,
+          rotation: updated[i].rotation
+        });
+        updated[i].thumbnailUrl = url;
+      } catch (e) {
+        console.warn('Thumbnail render issue', e);
+      }
+    }
+    setPages(updated);
+  };
 
   const handleFileSelect = async (file: File) => {
     setErrorMessage(null);
     setEditedPdfBytes(null);
+    setAnnotations([]);
+    setSelectedElementId(null);
 
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       setErrorMessage('Please select a valid PDF file with a .pdf extension.');
@@ -96,7 +141,11 @@ export const PDFEditorView: React.FC = () => {
       setSelectedFile(file);
       setSourcePdfBytes(buffer);
       setPages(pageItems);
+      setActivePageIndex(0);
       setOutputFileName(file.name.replace(/\.pdf$/i, '-edited'));
+
+      // Asynchronously render thumbnails
+      renderThumbnails(buffer, pageItems);
     } catch {
       setErrorMessage('Could not decode or parse the selected PDF file.');
     }
@@ -109,46 +158,69 @@ export const PDFEditorView: React.FC = () => {
     }
   };
 
+  // Rotate Page
   const rotatePage = (index: number) => {
-    setPages((prev) =>
-      prev.map((p, i) => (i === index ? { ...p, rotation: (p.rotation + 90) % 360 } : p))
+    const updated = pages.map((p, i) =>
+      i === index ? { ...p, rotation: (p.rotation + 90) % 360 } : p
     );
+    setPages(updated);
     setEditedPdfBytes(null);
+    if (sourcePdfBytes) {
+      renderThumbnails(sourcePdfBytes, updated);
+    }
   };
 
   const rotateAllPages = () => {
-    setPages((prev) =>
-      prev.map((p) => ({ ...p, rotation: (p.rotation + 90) % 360 }))
-    );
+    const updated = pages.map((p) => ({ ...p, rotation: (p.rotation + 90) % 360 }));
+    setPages(updated);
     setEditedPdfBytes(null);
+    if (sourcePdfBytes) {
+      renderThumbnails(sourcePdfBytes, updated);
+    }
   };
 
   const resetAllRotations = () => {
-    setPages((prev) =>
-      prev.map((p) => ({ ...p, rotation: 0 }))
-    );
-    setEditedPdfBytes(null);
-  };
-
-  const movePage = (index: number, direction: 'left' | 'right') => {
-    const targetIndex = direction === 'left' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= pages.length) return;
-
-    const updated = [...pages];
-    const [moved] = updated.splice(index, 1);
-    updated.splice(targetIndex, 0, moved);
+    const updated = pages.map((p) => ({ ...p, rotation: 0 }));
     setPages(updated);
     setEditedPdfBytes(null);
+    if (sourcePdfBytes) {
+      renderThumbnails(sourcePdfBytes, updated);
+    }
   };
 
+  // Reorder Pages
+  const movePage = (fromIndex: number, direction: 'left' | 'right') => {
+    const toIndex = direction === 'left' ? fromIndex - 1 : fromIndex + 1;
+    if (toIndex < 0 || toIndex >= pages.length) return;
+
+    const updated = reorderArray(pages, fromIndex, toIndex);
+    setPages(updated);
+    setActivePageIndex(toIndex);
+    setEditedPdfBytes(null);
+
+    // Update annotation page references to follow the moved page
+    setAnnotations((prev) =>
+      prev.map((ann) => {
+        if (ann.pageIndex === fromIndex) {
+          return { ...ann, pageIndex: toIndex };
+        } else if (ann.pageIndex === toIndex) {
+          return { ...ann, pageIndex: fromIndex };
+        }
+        return ann;
+      })
+    );
+  };
+
+  // Duplicate Page
   const duplicatePage = (index: number) => {
     const target = pages[index];
     const duplicated: PageDisplayItem = {
-      id: `page-dup-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: `page-dup-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       originalIndex: target.originalIndex,
       rotation: target.rotation,
       width: target.width,
-      height: target.height
+      height: target.height,
+      thumbnailUrl: target.thumbnailUrl
     };
     const updated = [...pages];
     updated.splice(index + 1, 0, duplicated);
@@ -156,6 +228,7 @@ export const PDFEditorView: React.FC = () => {
     setEditedPdfBytes(null);
   };
 
+  // Delete Page
   const deletePage = (index: number) => {
     if (pages.length <= 1) {
       setErrorMessage('A PDF document must have at least one page.');
@@ -163,9 +236,133 @@ export const PDFEditorView: React.FC = () => {
     }
     const updated = pages.filter((_, i) => i !== index);
     setPages(updated);
+    // Remove annotations for deleted page and shift higher indices
+    setAnnotations((prev) =>
+      prev
+        .filter((ann) => ann.pageIndex !== index)
+        .map((ann) => (ann.pageIndex > index ? { ...ann, pageIndex: ann.pageIndex - 1 } : ann))
+    );
+    if (activePageIndex >= updated.length) {
+      setActivePageIndex(updated.length - 1);
+    }
     setEditedPdfBytes(null);
   };
 
+  // ----------------------------------------------------
+  // ANNOTATION TOOLS (Text, Signature, Stamps)
+  // ----------------------------------------------------
+  const handleAddText = () => {
+    const newText = createDefaultTextElement(activePageIndex, 'Type text here...', 0.3, 0.4);
+    setAnnotations((prev) => [...prev, newText]);
+    setSelectedElementId(newText.id);
+    setEditedPdfBytes(null);
+  };
+
+  const handleApplySignature = (imageDataUrl: string) => {
+    const newSig = createSignatureElement(activePageIndex, imageDataUrl, 0.4, 0.65, 0.32, 0.12);
+    setAnnotations((prev) => [...prev, newSig]);
+    setSelectedElementId(newSig.id);
+    setEditedPdfBytes(null);
+  };
+
+  const handleAddStamp = (type: 'APPROVED' | 'CONFIDENTIAL' | 'REJECTED' | 'DATE') => {
+    let text: string = type;
+    let color = '#15803D'; // Green
+    let bg = '#DCFCE7';
+
+    if (type === 'CONFIDENTIAL') {
+      color = '#B45309'; // Amber
+      bg = '#FEF3C7';
+    } else if (type === 'REJECTED') {
+      color = '#B91C1C'; // Red
+      bg = '#FEE2E2';
+    } else if (type === 'DATE') {
+      text = new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+      color = '#1D4ED8';
+      bg = '#DBEAFE';
+    }
+
+    const newStamp: NormalizedElement = {
+      id: `stamp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      type: 'text',
+      pageIndex: activePageIndex,
+      x: 0.35,
+      y: 0.2,
+      width: 0.3,
+      height: 0.06,
+      text,
+      fontSize: 18,
+      fontFamily: 'HelveticaBold',
+      color,
+      backgroundColor: bg
+    };
+
+    setAnnotations((prev) => [...prev, newStamp]);
+    setSelectedElementId(newStamp.id);
+    setEditedPdfBytes(null);
+  };
+
+  const updateSelectedElement = (updates: Partial<NormalizedElement>) => {
+    if (!selectedElementId) return;
+    setAnnotations((prev) =>
+      prev.map((ann) => (ann.id === selectedElementId ? { ...ann, ...updates } : ann))
+    );
+    setEditedPdfBytes(null);
+  };
+
+  const deleteSelectedElement = () => {
+    if (!selectedElementId) return;
+    setAnnotations((prev) => prev.filter((ann) => ann.id !== selectedElementId));
+    setSelectedElementId(null);
+    setEditedPdfBytes(null);
+  };
+
+  // Dragging logic for elements on page overlay
+  const handleElementMouseDown = (
+    e: React.MouseEvent,
+    element: NormalizedElement
+  ) => {
+    e.stopPropagation();
+    setSelectedElementId(element.id);
+    setIsDraggingElement(true);
+
+    if (pageContainerRef.current) {
+      const rect = pageContainerRef.current.getBoundingClientRect();
+      const clickXNorm = (e.clientX - rect.left) / rect.width;
+      const clickYNorm = (e.clientY - rect.top) / rect.height;
+      setDragOffset({
+        x: clickXNorm - element.x,
+        y: clickYNorm - element.y
+      });
+    }
+  };
+
+  const handleContainerMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingElement || !selectedElementId || !pageContainerRef.current) return;
+
+    const rect = pageContainerRef.current.getBoundingClientRect();
+    const currXNorm = (e.clientX - rect.left) / rect.width;
+    const currYNorm = (e.clientY - rect.top) / rect.height;
+
+    let newX = currXNorm - dragOffset.x;
+    let newY = currYNorm - dragOffset.y;
+
+    // Clamp within 0 and 1
+    newX = Math.max(0, Math.min(0.85, newX));
+    newY = Math.max(0, Math.min(0.9, newY));
+
+    updateSelectedElement({ x: newX, y: newY });
+  };
+
+  const handleContainerMouseUp = () => {
+    setIsDraggingElement(false);
+  };
+
+  // Export PDF
   const handleExportEditedPdf = async () => {
     if (!sourcePdfBytes || pages.length === 0) return;
 
@@ -181,6 +378,7 @@ export const PDFEditorView: React.FC = () => {
 
       const resultBytes = await editExistingPdf(sourcePdfBytes, {
         pageStates,
+        annotations,
         watermarkText,
         watermarkOpacity,
         addPageNumbers,
@@ -213,16 +411,22 @@ export const PDFEditorView: React.FC = () => {
     setSelectedFile(null);
     setSourcePdfBytes(null);
     setPages([]);
+    setAnnotations([]);
+    setSelectedElementId(null);
     setEditedPdfBytes(null);
     setErrorMessage(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const activePage = pages[activePageIndex];
+  const activePageAnnotations = annotations.filter((ann) => ann.pageIndex === activePageIndex);
+  const selectedElement = annotations.find((ann) => ann.id === selectedElementId);
+
   return (
     <>
       <SEOHead
-        title="Free PDF Editor Online — Edit, Rotate, Reorder & Annotate PDFs | RankNova"
-        description="Edit PDF files online for free. Rotate pages, reorder pages, delete unwanted pages, add text watermarks, and stamp page numbers with 100% on-device privacy."
+        title="Free PDF Editor Online — Edit Pages, Add Words & Signatures | RankNova"
+        description="Edit PDF files online for free. Rearrange pages, rotate pages, add words, text boxes, and digital signatures directly on your documents with 100% on-device privacy."
         canonicalPath="/edit-pdf"
         jsonLd={{
           '@context': 'https://schema.org',
@@ -234,20 +438,20 @@ export const PDFEditorView: React.FC = () => {
         }}
       />
 
-      <div className="py-10 bg-[#F8FAFC]">
+      <div className="py-8 bg-[#F8FAFC]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {/* Header */}
-          <div className="text-center max-w-2xl mx-auto mb-10">
+          <div className="text-center max-w-2xl mx-auto mb-8">
             <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 border border-blue-200/80 mb-3">
               <FileText className="h-3.5 w-3.5" />
-              <span>Full Page Management • 100% On-Device Privacy</span>
+              <span>Full Page Management • Add Words &amp; Signatures • 100% On-Device Privacy</span>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-              Free PDF Editor
+              Free PDF Editor &amp; Signer
             </h1>
-            <p className="mt-3 text-sm sm:text-base text-slate-600">
-              Rotate pages, arrange page sequences, delete unnecessary pages, stamp watermarks, and insert page numbers.
-              Processed entirely on your device without server uploads.
+            <p className="mt-2 text-sm sm:text-base text-slate-600">
+              Edit PDF pages, rotate, reorder, add words, stamp calligraphy signatures, and place stamps.
+              Processed entirely on your device with zero cloud uploads.
             </p>
           </div>
 
@@ -278,7 +482,7 @@ export const PDFEditorView: React.FC = () => {
                   Select or drag &amp; drop your PDF to edit
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Standard PDF files up to 35 MB supported. Client-side processing.
+                  Supports standard PDF documents up to 35 MB. Client-side privacy guaranteed.
                 </p>
               </div>
 
@@ -290,41 +494,94 @@ export const PDFEditorView: React.FC = () => {
               )}
             </div>
           ) : (
-            /* Editor Workspace */
-            <div className="space-y-8">
+            /* Editor Studio Workspace */
+            <div className="space-y-6">
               {/* Top Document Summary & Global Toolbar */}
-              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shrink-0">
-                    <FileText className="h-6 w-6" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shrink-0">
+                    <FileText className="h-5 w-5" />
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-900 truncate max-w-xs sm:max-w-md">
                       {selectedFile.name}
                     </p>
                     <p className="text-xs text-slate-500">
-                      Original Size: {formatBytes(selectedFile.size)} • {pages.length} Pages
+                      {pages.length} Pages • Editing Page {activePageIndex + 1} of {pages.length}
                     </p>
                   </div>
                 </div>
 
+                {/* Primary Tools on Current Page */}
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={rotateAllPages}
-                    className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    onClick={handleAddText}
+                    className="flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200 px-3.5 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs"
                   >
-                    <RotateCw className="h-3.5 w-3.5 text-blue-600" />
-                    <span>Rotate All 90°</span>
+                    <Type className="h-4 w-4 text-blue-600" />
+                    <span>Add Words / Text</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={resetAllRotations}
-                    className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    onClick={() => setIsSignatureModalOpen(true)}
+                    className="flex items-center gap-1.5 rounded-xl bg-purple-50 border border-purple-200 px-3.5 py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 transition shadow-2xs"
                   >
-                    <RotateCcw className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Reset Rotations</span>
+                    <PenTool className="h-4 w-4 text-purple-600" />
+                    <span>Add Signature</span>
+                  </button>
+
+                  <div className="relative group">
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      <Stamp className="h-3.5 w-3.5 text-slate-600" />
+                      <span>Add Stamp</span>
+                    </button>
+                    <div className="absolute right-0 top-full mt-1 hidden group-hover:flex flex-col bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 z-30 w-44">
+                      <button
+                        type="button"
+                        onClick={() => handleAddStamp('APPROVED')}
+                        className="px-3 py-1.5 text-xs text-left font-semibold text-emerald-700 hover:bg-emerald-50 rounded-lg flex items-center justify-between"
+                      >
+                        <span>APPROVED</span>
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddStamp('CONFIDENTIAL')}
+                        className="px-3 py-1.5 text-xs text-left font-semibold text-amber-700 hover:bg-amber-50 rounded-lg"
+                      >
+                        CONFIDENTIAL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddStamp('REJECTED')}
+                        className="px-3 py-1.5 text-xs text-left font-semibold text-red-700 hover:bg-red-50 rounded-lg"
+                      >
+                        REJECTED
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddStamp('DATE')}
+                        className="px-3 py-1.5 text-xs text-left font-semibold text-blue-700 hover:bg-blue-50 rounded-lg flex items-center justify-between"
+                      >
+                        <span>Today&apos;s Date</span>
+                        <Calendar className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => rotatePage(activePageIndex)}
+                    className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    title="Rotate Current Page 90°"
+                  >
+                    <RotateCw className="h-3.5 w-3.5 text-blue-600" />
+                    <span>Rotate Page</span>
                   </button>
 
                   <button
@@ -332,127 +589,319 @@ export const PDFEditorView: React.FC = () => {
                     onClick={handleReset}
                     className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
                   >
-                    Open Another PDF
+                    Close PDF
                   </button>
                 </div>
               </div>
 
-              {/* Main Editing Grid: Left Pages (8 Cols) vs Right Settings (4 Cols) */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                {/* Left 8 Cols: Visual Page Cards */}
+              {/* Main Two-Column Layout: Left Thumbnails + Focused Interactive Page, Right Inspector & Export */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Center / Left 8 Cols */}
                 <div className="lg:col-span-8 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider text-xs">
-                      Pages in Document ({pages.length})
-                    </h2>
-                    <span className="text-xs text-slate-400">
-                      Drag or use arrows to rearrange sequence
-                    </span>
-                  </div>
+                  {/* Selected Element Floating Inspector */}
+                  {selectedElement && (
+                    <div className="bg-white rounded-xl border border-blue-200 shadow-sm p-3 flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1">
+                          {selectedElement.type === 'text' ? (
+                            <>
+                              <Type className="h-3.5 w-3.5 text-blue-600" />
+                              <span>Edit Words:</span>
+                            </>
+                          ) : (
+                            <>
+                              <PenTool className="h-3.5 w-3.5 text-purple-600" />
+                              <span>Signature:</span>
+                            </>
+                          )}
+                        </span>
 
-                  {errorMessage && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700 flex items-start gap-2.5">
-                      <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
-                      <span>{errorMessage}</span>
+                        {selectedElement.type === 'text' && (
+                          <input
+                            type="text"
+                            value={selectedElement.text || ''}
+                            onChange={(e) => updateSelectedElement({ text: e.target.value })}
+                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-900 w-44 sm:w-56 focus:outline-blue-500"
+                            placeholder="Type words..."
+                          />
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {selectedElement.type === 'text' && (
+                          <>
+                            {/* Font size */}
+                            <select
+                              value={selectedElement.fontSize || 16}
+                              onChange={(e) => updateSelectedElement({ fontSize: parseInt(e.target.value) })}
+                              className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700"
+                            >
+                              {[12, 14, 16, 18, 22, 28, 36, 48].map((s) => (
+                                <option key={s} value={s}>
+                                  {s}pt
+                                </option>
+                              ))}
+                            </select>
+
+                            {/* Color */}
+                            <input
+                              type="color"
+                              value={selectedElement.color || '#0F172A'}
+                              onChange={(e) => updateSelectedElement({ color: e.target.value })}
+                              className="h-7 w-7 rounded border border-slate-200 cursor-pointer p-0.5"
+                              title="Text Color"
+                            />
+
+                            {/* Highlight */}
+                            <select
+                              value={selectedElement.backgroundColor || 'transparent'}
+                              onChange={(e) => updateSelectedElement({ backgroundColor: e.target.value })}
+                              className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700"
+                              title="Background Highlight"
+                            >
+                              <option value="transparent">No Highlight</option>
+                              <option value="#FEF08A">Yellow</option>
+                              <option value="#DBEAFE">Blue</option>
+                              <option value="#DCFCE7">Green</option>
+                              <option value="#FFFFFF">White</option>
+                            </select>
+                          </>
+                        )}
+
+                        {selectedElement.type === 'signature' && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500">Size:</span>
+                            <input
+                              type="range"
+                              min={0.15}
+                              max={0.6}
+                              step={0.02}
+                              value={selectedElement.width}
+                              onChange={(e) => {
+                                const newW = parseFloat(e.target.value);
+                                updateSelectedElement({
+                                  width: newW,
+                                  height: newW * 0.4
+                                });
+                              }}
+                              className="w-24 accent-purple-600"
+                            />
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={deleteSelectedElement}
+                          className="p-1 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 transition"
+                          title="Delete Element"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
 
-                  {/* Grid of Pages */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {pages.map((p, idx) => (
+                  {/* Focused Page Interactive Viewport */}
+                  <div
+                    ref={pageContainerRef}
+                    onMouseMove={handleContainerMouseMove}
+                    onMouseUp={handleContainerMouseUp}
+                    onClick={() => setSelectedElementId(null)}
+                    className="relative w-full rounded-2xl border-2 border-slate-300 bg-slate-100 shadow-inner min-h-[520px] flex items-center justify-center p-4 overflow-hidden select-none"
+                  >
+                    {activePage && (
                       <div
-                        key={p.id}
-                        className="group relative flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-2xs hover:shadow-md hover:border-blue-400 transition"
+                        className="relative bg-white shadow-xl rounded-lg transition-transform duration-200 overflow-hidden"
+                        style={{
+                          width: '100%',
+                          maxWidth: '560px',
+                          aspectRatio: `${activePage.width} / ${activePage.height}`,
+                          transform: `rotate(${activePage.rotation}deg)`
+                        }}
                       >
-                        {/* Page Header */}
-                        <div className="flex items-center justify-between text-xs text-slate-500 pb-2 border-b border-slate-100">
-                          <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
-                            Page {idx + 1}
-                          </span>
-                          {p.rotation > 0 && (
-                            <span className="text-[10px] font-mono text-blue-600 font-semibold">
-                              {p.rotation}°
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Page Canvas / Visual Placeholder */}
-                        <div className="my-3 h-36 rounded-lg bg-slate-50 border border-slate-200/80 flex flex-col items-center justify-center p-2 text-center transition-transform duration-200 relative overflow-hidden">
-                          <div
-                            className="w-20 h-28 border border-slate-300 rounded shadow-2xs bg-white flex flex-col items-center justify-center p-1.5 transition-transform duration-200"
-                            style={{ transform: `rotate(${p.rotation}deg)` }}
-                          >
-                            <FileText className="h-6 w-6 text-slate-300 mb-1" />
-                            <div className="w-full h-1 bg-slate-200 rounded mb-1" />
-                            <div className="w-3/4 h-1 bg-slate-200 rounded mb-1" />
-                            <div className="w-1/2 h-1 bg-slate-200 rounded" />
+                        {/* Rendered Background of PDF Page */}
+                        {activePage.thumbnailUrl ? (
+                          <img
+                            src={activePage.thumbnailUrl}
+                            alt={`Page ${activePageIndex + 1}`}
+                            className="w-full h-full object-contain pointer-events-none"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-white">
+                            <FileText className="h-16 w-16 text-slate-300 mb-2" />
+                            <p className="text-sm font-semibold text-slate-600">
+                              Page {activePageIndex + 1}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              {activePage.width} × {activePage.height} pts
+                            </p>
                           </div>
-                          <span className="text-[10px] text-slate-400 mt-2 font-mono">
-                            Orig. #{p.originalIndex + 1} ({p.width}x{p.height})
-                          </span>
-                        </div>
+                        )}
 
-                        {/* Page Action Controls */}
-                        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              disabled={idx === 0}
-                              onClick={() => movePage(idx, 'left')}
-                              className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20"
-                              title="Move Left"
+                        {/* Interactive Annotations Overlay on Page */}
+                        {activePageAnnotations.map((element) => {
+                          const isSelected = selectedElementId === element.id;
+                          return (
+                            <div
+                              key={element.id}
+                              onMouseDown={(e) => handleElementMouseDown(e, element)}
+                              className={`absolute cursor-move transition-shadow rounded-sm ${
+                                isSelected
+                                  ? 'ring-2 ring-blue-500 ring-offset-1 shadow-md'
+                                  : 'hover:ring-1 hover:ring-blue-400'
+                              }`}
+                              style={{
+                                left: `${element.x * 100}%`,
+                                top: `${element.y * 100}%`,
+                                width: `${element.width * 100}%`,
+                                minHeight: '24px'
+                              }}
                             >
-                              <ArrowLeft className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              disabled={idx === pages.length - 1}
-                              onClick={() => movePage(idx, 'right')}
-                              className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20"
-                              title="Move Right"
-                            >
-                              <ArrowRight className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
+                              {element.type === 'text' && (
+                                <div
+                                  className="px-2 py-0.5 rounded font-sans leading-tight whitespace-pre-wrap select-none"
+                                  style={{
+                                    fontSize: `${element.fontSize || 16}px`,
+                                    color: element.color || '#000000',
+                                    backgroundColor: element.backgroundColor || 'transparent',
+                                    fontFamily:
+                                      element.fontFamily === 'TimesRoman'
+                                        ? 'Georgia, serif'
+                                        : element.fontFamily === 'Courier'
+                                        ? 'monospace'
+                                        : 'sans-serif',
+                                    fontWeight: element.fontFamily === 'HelveticaBold' ? 'bold' : 'normal'
+                                  }}
+                                >
+                                  {element.text || 'Text'}
+                                </div>
+                              )}
 
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => rotatePage(idx)}
-                              className="p-1 rounded text-blue-600 hover:bg-blue-50"
-                              title="Rotate Page 90°"
-                            >
-                              <RotateCw className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => duplicatePage(idx)}
-                              className="p-1 rounded text-slate-500 hover:bg-slate-100"
-                              title="Duplicate Page"
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deletePage(idx)}
-                              className="p-1 rounded text-red-500 hover:bg-red-50"
-                              title="Delete Page"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
+                              {element.type === 'signature' && element.imageDataUrl && (
+                                <img
+                                  src={element.imageDataUrl}
+                                  alt="Signature"
+                                  className="w-full h-auto object-contain pointer-events-none select-none drop-shadow-2xs"
+                                />
+                              )}
+
+                              {isSelected && (
+                                <div className="absolute -top-3 -right-3 flex items-center gap-1 bg-white border border-slate-200 rounded-full shadow-xs px-1.5 py-0.5 text-[10px] text-slate-500 font-semibold pointer-events-none">
+                                  <Move className="h-2.5 w-2.5 text-blue-600" />
+                                  <span>Drag to position</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
+                    )}
+                  </div>
+
+                  {/* Horizontal Thumbnail Page Navigator Strip */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>Document Pages ({pages.length})</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        Click to select page • Use arrows to reorder
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
+                      {pages.map((p, idx) => {
+                        const isActive = idx === activePageIndex;
+                        return (
+                          <div
+                            key={p.id}
+                            className={`flex-shrink-0 w-28 rounded-xl border-2 p-1.5 transition text-center flex flex-col justify-between ${
+                              isActive
+                                ? 'border-blue-600 bg-blue-50/40 shadow-xs'
+                                : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setActivePageIndex(idx)}
+                              className="w-full h-28 rounded bg-white border border-slate-200 flex items-center justify-center overflow-hidden mb-1.5 relative group"
+                            >
+                              {p.thumbnailUrl ? (
+                                <img
+                                  src={p.thumbnailUrl}
+                                  alt={`Page ${idx + 1}`}
+                                  className="w-full h-full object-contain"
+                                />
+                              ) : (
+                                <FileText className="h-8 w-8 text-slate-300" />
+                              )}
+                              <span className="absolute bottom-1 right-1 bg-slate-900/80 text-white text-[10px] px-1.5 py-0.2 rounded font-mono">
+                                p.{idx + 1}
+                              </span>
+                            </button>
+
+                            {/* Page Controls */}
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-[10px]">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => movePage(idx, 'left')}
+                                className="p-0.5 rounded text-slate-500 hover:text-slate-800 disabled:opacity-20"
+                                title="Move Earlier"
+                              >
+                                <ArrowLeft className="h-3 w-3" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => rotatePage(idx)}
+                                className="p-0.5 rounded text-blue-600 hover:bg-blue-100"
+                                title="Rotate 90°"
+                              >
+                                <RotateCw className="h-3 w-3" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => duplicatePage(idx)}
+                                className="p-0.5 rounded text-slate-600 hover:bg-slate-200"
+                                title="Duplicate"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => deletePage(idx)}
+                                className="p-0.5 rounded text-red-500 hover:bg-red-50"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={idx === pages.length - 1}
+                                onClick={() => movePage(idx, 'right')}
+                                className="p-0.5 rounded text-slate-500 hover:text-slate-800 disabled:opacity-20"
+                                title="Move Later"
+                              >
+                                <ArrowRight className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
-                {/* Right 4 Cols: PDF Global Stamping & Export */}
-                <div className="lg:col-span-4 space-y-6">
-                  <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 space-y-5">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                {/* Right 4 Cols: Document Annotations & Final Export */}
+                <div className="lg:col-span-4 space-y-5">
+                  <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                       <Sliders className="h-4 w-4 text-blue-600" />
-                      <span>Document Annotations</span>
+                      <span>Document Options</span>
                     </h3>
 
                     {/* Page Numbers */}
@@ -497,7 +946,7 @@ export const PDFEditorView: React.FC = () => {
                     <div className="pt-2 border-t border-slate-100 space-y-2">
                       <label htmlFor="edit-watermark" className="block text-xs font-semibold text-slate-800 flex items-center gap-1.5">
                         <Stamp className="h-3.5 w-3.5 text-purple-600" />
-                        <span>Stamp Text Watermark</span>
+                        <span>Document Watermark</span>
                       </label>
                       <input
                         id="edit-watermark"
@@ -529,7 +978,32 @@ export const PDFEditorView: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Filename */}
+                    {/* Global Page Sequence Operations */}
+                    <div className="pt-2 border-t border-slate-100 space-y-2">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Batch Page Controls
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={rotateAllPages}
+                          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center gap-1"
+                        >
+                          <RotateCw className="h-3 w-3 text-blue-600" />
+                          <span>Rotate All 90°</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetAllRotations}
+                          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition flex items-center justify-center gap-1"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          <span>Reset Rotations</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Output Filename */}
                     <div>
                       <label htmlFor="edit-fname" className="block text-xs font-medium text-slate-700 mb-1">
                         Export Filename
@@ -558,22 +1032,22 @@ export const PDFEditorView: React.FC = () => {
                       {isProcessing ? (
                         <>
                           <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Compiling Edited PDF...</span>
+                          <span>Baking Text &amp; Signatures into PDF...</span>
                         </>
                       ) : (
                         <>
                           <Sparkles className="h-4 w-4" />
-                          <span>Apply Edits &amp; Export PDF ({pages.length} Pages)</span>
+                          <span>Save &amp; Export PDF ({pages.length} Pages)</span>
                         </>
                       )}
                     </button>
 
                     {/* Download Ready Box */}
                     {editedPdfBytes && (
-                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-3">
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-3 animate-in fade-in">
                         <div className="flex items-center gap-2 text-emerald-800 text-xs font-bold">
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                          <span>Edited PDF Ready for Download</span>
+                          <span>Edited PDF Ready for Download!</span>
                         </div>
                         <p className="text-xs text-emerald-700">
                           Export Size: <strong>{formatBytes(editedPdfBytes.byteLength)}</strong>
@@ -594,9 +1068,9 @@ export const PDFEditorView: React.FC = () => {
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-xs text-emerald-900 flex items-start gap-3">
                     <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold">Pure Client-Side PDF Editing</p>
+                      <p className="font-semibold">Private On-Device PDF Processing</p>
                       <p className="mt-0.5 text-emerald-800">
-                        Page copying, rotation, and text stamping occur entirely in your browser&apos;s memory. Your original document is never uploaded to any cloud server.
+                        Words, calligraphy signatures, page rotations, and stamps are rendered directly in browser memory. No confidential document data is ever stored on external servers.
                       </p>
                     </div>
                   </div>
@@ -605,48 +1079,55 @@ export const PDFEditorView: React.FC = () => {
             </div>
           )}
 
-          {/* Reserved Ad */}
+          {/* Reserved Compliant Ad */}
           <div className="mt-12">
             <AdSlot slotId="pdf-editor-bottom" format="horizontal" />
           </div>
 
-          {/* Educational SEO Guide */}
+          {/* Educational Guide */}
           <div className="mt-16 bg-white rounded-2xl border border-slate-200/90 p-8 sm:p-12 space-y-8">
             <div>
               <h2 className="text-2xl font-bold text-slate-900">
-                How to Edit and Rearrange PDF Pages Online
+                How to Edit PDF Pages, Add Words, and Sign Documents
               </h2>
               <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-                RankNova gives you total control over multi-page PDF documents without installing heavy desktop software.
-                Whether you need to rotate scanned pages, delete accidental duplicates, or reorder chapters, you can make surgical edits directly in your browser.
+                RankNova gives you desktop-grade PDF editing without pricey subscription software.
+                Rearrange pages, rotate upside-down scans, add words or dates, and sign contracts with 100% on-device privacy.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100">
               <div>
-                <h3 className="font-semibold text-slate-900 text-sm">Rotate Any Page 90°</h3>
+                <h3 className="font-semibold text-slate-900 text-sm">Add Words &amp; Annotations</h3>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                  Fix landscape pages trapped in portrait orientation with single-click 90-degree rotations, keeping your document presentation clean.
+                  Place custom text anywhere on any page. Adjust font family, font size, text color, and background highlight with drag-and-drop ease.
                 </p>
               </div>
 
               <div>
-                <h3 className="font-semibold text-slate-900 text-sm">Delete and Duplicate</h3>
+                <h3 className="font-semibold text-slate-900 text-sm">Draw or Type Signatures</h3>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                  Remove blank pages, delete disclaimers, or clone important pages with zero quality loss.
+                  Sign electronically using your mouse or finger, choose from elegant cursive handwriting styles, or upload your own signature image.
                 </p>
               </div>
 
               <div>
-                <h3 className="font-semibold text-slate-900 text-sm">Stamp Watermarks &amp; Pagination</h3>
+                <h3 className="font-semibold text-slate-900 text-sm">Reorder &amp; Rotate Pages</h3>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                  Add custom diagonal watermarks for security or stamp page numbers automatically in the footer without disturbing original page vectors.
+                  Reorganize pages using intuitive sequence controls, delete unneeded sheets, and rotate individual slides without losing vector quality.
                 </p>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Signature Studio Modal */}
+      <SignatureModal
+        isOpen={isSignatureModalOpen}
+        onClose={() => setIsSignatureModalOpen(false)}
+        onApplySignature={handleApplySignature}
+      />
     </>
   );
 };
