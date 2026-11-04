@@ -22,6 +22,7 @@ on:
       - 'edit-pdf/**'
       - 'background-remover/**'
       - 'visiting-card-generator/**'
+      - 'compress-video/**'
       - 'blog/**'
   workflow_dispatch:
 

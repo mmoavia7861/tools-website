@@ -1,6 +1,6 @@
 {
   "name": "RankNova",
-  "description": "Free Online Tools — Fast, Secure, Private. QR Code Generator, PDF Compressor, and AI Background Remover.",
+  "description": "Free online tools for creating QR codes, compressing PDFs, converting images to PDF, editing PDFs, compressing videos, generating visiting cards and removing image backgrounds.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
