@@ -4,12 +4,12 @@
  */
 
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// Configure worker using CDN fallback so it runs without complex bundler worker chunk setup
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || '4.10.38'}/pdf.worker.min.mjs`;
-}
+// Serve the worker from our own Vite build. Using exactly the same package
+// version as the PDF.js API prevents mismatched-worker errors and avoids
+// downloading executable code from a third-party CDN.
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 interface RenderPageOptions {
   scale?: number;
@@ -56,30 +56,17 @@ export async function renderPdfPageToDataUrl(
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const renderContext = {
+      canvas,
       canvasContext: ctx,
-      viewport: viewport
+      viewport
     };
 
     await page.render(renderContext).promise;
     return canvas.toDataURL('image/png');
   } catch (err) {
-    console.warn(`Could not render PDF page ${pageIndex} via pdfjs:`, err);
-    // Graceful fallback: render a clean vector placeholder sheet
-    const canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 800;
-    const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, 600, 800);
-    ctx.fillStyle = '#E2E8F0';
-    ctx.fillRect(40, 40, 520, 30);
-    ctx.fillRect(40, 90, 400, 20);
-    ctx.fillRect(40, 130, 480, 20);
-    ctx.fillRect(40, 170, 320, 20);
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = 'bold 24px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(`Page ${pageIndex + 1}`, 300, 400);
-    return canvas.toDataURL('image/png');
+    console.error(`Could not render PDF page ${pageIndex}:`, err);
+    // Do not display a fabricated page image. Callers can report the error
+    // and preserve the original PDF bytes for download.
+    throw new Error('PDF page preview failed. Please check the document and try again.');
   }
 }

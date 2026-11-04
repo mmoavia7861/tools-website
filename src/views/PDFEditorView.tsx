@@ -92,6 +92,7 @@ export const PDFEditorView: React.FC = () => {
         updated[i].thumbnailUrl = url;
       } catch (e) {
         console.warn('Thumbnail render issue', e);
+        setErrorMessage('Some PDF page previews could not be rendered. Your original PDF has not been modified.');
       }
     }
     setPages(updated);
