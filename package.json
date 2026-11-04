@@ -24,12 +24,11 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^6.5.438",
+    "pdfjs-dist": "6.4.299",
     "qrcode": "^1.5.4",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "vite": "^8.3.0",
-    "pdfjs-dist": "6.4.299"
+    "vite": "^8.3.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
