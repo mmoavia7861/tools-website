@@ -13,7 +13,7 @@ service cloud.firestore {
     }
 
     function isOwnerEmail() {
-      return isSignedIn() && request.auth.token.email == 'moaviah760@gmail.com';
+      return isSignedIn() && request.auth.token.email == 'moaviah760@gmail.com' && request.auth.token.email_verified == true;
     }
 
     function isAdmin() {
