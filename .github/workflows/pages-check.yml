@@ -42,7 +42,7 @@ jobs:
         with:
           node-version: '24'
       - name: Install
-        run: npm install --no-audit --no-fund
+        run: npm install --legacy-peer-deps --no-audit --no-fund
       - name: Check TypeScript
         run: npm run lint
       - name: Run all tool unit tests
@@ -57,9 +57,7 @@ jobs:
         run: node scripts/prepare-pages-seo.mjs
       - name: Create GitHub Pages SPA fallback
         run: cp dist/index.html dist/404.html
-      - name: Install browser smoke-test dependencies
-        run: |
-          npm install --no-save --legacy-peer-deps playwright@1.58.2 --no-audit --no-fund
-          npx playwright install --with-deps chromium
+      - name: Install Chromium for browser smoke tests
+        run: npx playwright install --with-deps chromium
       - name: Verify homepage and working tools routing in browser
         run: node scripts/pages-smoke.mjs
