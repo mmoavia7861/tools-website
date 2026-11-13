@@ -59,7 +59,7 @@ jobs:
         run: cp dist/index.html dist/404.html
       - name: Install browser smoke-test dependencies
         run: |
-          npm install --no-save playwright@1.58.2 --no-audit --no-fund
+          npm install --no-save --legacy-peer-deps playwright@1.58.2 --no-audit --no-fund
           npx playwright install --with-deps chromium
       - name: Verify homepage and working tools routing in browser
         run: node scripts/pages-smoke.mjs
