@@ -26,6 +26,8 @@ export const PDFCompressorView: React.FC = () => {
   const [fileBuffer, setFileBuffer] = useState<Uint8Array | null>(null);
   const [preset, setPreset] = useState<CompressionPreset>('balanced');
   const [processingMode, setProcessingMode] = useState<'on-device' | 'server'>('on-device');
+  // GitHub Pages hosts static files and cannot serve /api/compress-pdf.
+  const serverAvailable = !window.location.hostname.endsWith('github.io');
 
   // Execution states
   const [isProcessing, setIsProcessing] = useState(false);
@@ -332,11 +334,12 @@ export const PDFCompressorView: React.FC = () => {
                         type="radio"
                         name="procMode"
                         checked={processingMode === 'server'}
+                        disabled={!serverAvailable}
                         onChange={() => setProcessingMode('server')}
                         className="text-blue-600 focus:ring-blue-500"
                       />
                       <Server className="h-4 w-4 text-indigo-600" />
-                      <span>Secure Server Worker (Isolated memory, immediate deletion)</span>
+                      <span>{serverAvailable ? 'Secure Server Worker (Isolated memory, immediate deletion)' : 'Server processing unavailable on GitHub Pages — use private on-device mode'}</span>
                     </label>
                   </div>
                 </div>
