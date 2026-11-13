@@ -120,6 +120,30 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
         </div>
       </section>
 
+      {/* All available tools: visible even when the visitor does not use the menu. */}
+      <section aria-labelledby="all-tools-heading" className="bg-white border-b border-slate-200 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 id="all-tools-heading" className="text-2xl font-bold text-slate-900 mb-2">Browse all online tools</h2>
+          <p className="text-sm text-slate-600 mb-5">Choose a tool to open its dedicated page. Features depend on your browser and device.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {[
+              { title: 'Compress PDF', path: '/compress-pdf' },
+              { title: 'AI Background Remover', path: '/background-remover' },
+              { title: 'Image to PDF', path: '/image-to-pdf' },
+              { title: 'Edit PDF', path: '/edit-pdf' },
+              { title: 'QR Code Generator', path: '/qr-code-generator' },
+              { title: 'Visiting Card Maker', path: '/visiting-card-generator' },
+              { title: 'Video Compressor', path: '/compress-video' }
+            ].map(tool => (
+              <button key={tool.path} type="button" onClick={() => navigate(tool.path)}
+                className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left text-sm font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+                {tool.title} <span aria-hidden="true">→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Main Tools Section - EXACTLY THREE TOOLS */}
       <section className="py-16 md:py-20 bg-[#F8FAFC]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
