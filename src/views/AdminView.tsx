@@ -91,7 +91,7 @@ export const AdminView: React.FC = () => {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err: unknown) {
-      console.error('Google Sign-in failed:', err);
+      console.error('Google Sign-in was unsuccessful.');
     }
   };
 
@@ -120,7 +120,7 @@ export const AdminView: React.FC = () => {
     }
   };
 
-  const isOwner = currentUser && (currentUser.email === OWNER_EMAIL);
+  const isOwner = currentUser && currentUser.emailVerified === true && (currentUser.email?.toLowerCase() === OWNER_EMAIL.toLowerCase());
 
   if (authLoading) {
     return (
@@ -149,8 +149,7 @@ export const AdminView: React.FC = () => {
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">RankNova Admin Portal</h1>
                 <p className="mt-2 text-xs text-slate-500">
-                  Protected portal for authorized operators. Authorized owner email: <br />
-                  <strong className="text-slate-800">{OWNER_EMAIL}</strong>
+                  Protected portal for authorized operators. Sign in with an authorized, verified Google account.
                 </p>
               </div>
 
