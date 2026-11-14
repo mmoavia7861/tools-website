@@ -1,0 +1,43 @@
+# Repair the Bun lockfile to exactly match package.json, so Cloudflare's
+# frozen Bun install remains reproducible. Triggered only by adding this
+# workflow or a manual workflow dispatch.
+name: Sync Bun lockfile for Cloudflare
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sync-bun-lock.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-bun-lock
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Install Bun 1.4.4
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - name: Regenerate dependency lockfile
+        run: bun install
+      - name: Verify reproducible Cloudflare install
+        run: bun install --frozen-lockfile
+      - name: Commit synchronized lockfile
+        run: |
+          git add bun.lock
+          if git diff --cached --quiet; then
+            echo 'bun.lock already synchronized.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'fix(cloudflare): sync bun.lock with package.json'
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
