@@ -23,6 +23,7 @@ import { ContactView } from './views/ContactView';
 import { LegalView, type LegalDocType } from './views/LegalView';
 import { PDFEditorView } from './views/PDFEditorView';
 import { VisitingCardView } from './views/VisitingCardView';
+import { DocumentConverterView } from './views/DocumentConverterView';
 import { VideoCompressorView } from './views/VideoCompressorView';
 import { AdminView } from './views/AdminView';
 import { NotFoundView } from './views/NotFoundView';
@@ -97,6 +98,9 @@ export default function App() {
     if (path === '/visiting-card-generator' || path === '/visiting-card') {
       return <VisitingCardView />;
     }
+
+    if (path === '/pdf-to-word') return <DocumentConverterView mode="pdf-to-word" />;
+    if (path === '/word-to-pdf') return <DocumentConverterView mode="word-to-pdf" />;
 
     if (path === '/compress-video' || path === '/video-compressor') {
       return <VideoCompressorView />;
