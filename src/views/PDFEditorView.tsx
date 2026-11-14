@@ -59,6 +59,8 @@ export const PDFEditorView: React.FC = () => {
 
   // Signature modal state
   const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
+  const [isStampMenuOpen, setIsStampMenuOpen] = useState(false);
+  const thumbnailRequestRef = useRef(0);
 
   // Document-level options
   const [addPageNumbers, setAddPageNumbers] = useState(false);
@@ -82,7 +84,8 @@ export const PDFEditorView: React.FC = () => {
 
   // Load and render page thumbnails when file or rotation changes
   const renderThumbnails = async (bytes: Uint8Array, pageItems: PageDisplayItem[]) => {
-    const updated = [...pageItems];
+    const requestId = ++thumbnailRequestRef.current;
+    const updated = pageItems.map(p => ({ ...p }));
     for (let i = 0; i < updated.length; i++) {
       try {
         const url = await renderPdfPageToDataUrl(bytes, updated[i].originalIndex, {
@@ -95,10 +98,16 @@ export const PDFEditorView: React.FC = () => {
         setErrorMessage('Some PDF page previews could not be rendered. Your original PDF has not been modified.');
       }
     }
-    setPages(updated);
+    if (requestId === thumbnailRequestRef.current) {
+      setPages(current => current.map(p => updated.find(item => item.id === p.id) || p));
+    }
   };
 
   const handleFileSelect = async (file: File) => {
+    ++thumbnailRequestRef.current;
+    setSelectedFile(null);
+    setSourcePdfBytes(null);
+    setPages([]);
     setErrorMessage(null);
     setEditedPdfBytes(null);
     setAnnotations([]);
@@ -225,6 +234,10 @@ export const PDFEditorView: React.FC = () => {
     };
     const updated = [...pages];
     updated.splice(index + 1, 0, duplicated);
+    setAnnotations(prev => prev.flatMap(ann => {
+      if (ann.pageIndex === index) return [ann, { ...ann, id: ann.id + '-copy-' + duplicated.id, pageIndex: index + 1 }];
+      return [{ ...ann, pageIndex: ann.pageIndex > index ? ann.pageIndex + 1 : ann.pageIndex }];
+    }));
     setPages(updated);
     setEditedPdfBytes(null);
   };
@@ -243,9 +256,7 @@ export const PDFEditorView: React.FC = () => {
         .filter((ann) => ann.pageIndex !== index)
         .map((ann) => (ann.pageIndex > index ? { ...ann, pageIndex: ann.pageIndex - 1 } : ann))
     );
-    if (activePageIndex >= updated.length) {
-      setActivePageIndex(updated.length - 1);
-    }
+    setActivePageIndex(current => current > index ? current - 1 : Math.min(current, updated.length - 1));
     setEditedPdfBytes(null);
   };
 
@@ -302,6 +313,7 @@ export const PDFEditorView: React.FC = () => {
       backgroundColor: bg
     };
 
+    setIsStampMenuOpen(false);
     setAnnotations((prev) => [...prev, newStamp]);
     setSelectedElementId(newStamp.id);
     setEditedPdfBytes(null);
@@ -405,10 +417,12 @@ export const PDFEditorView: React.FC = () => {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 30000);
   };
 
   const handleReset = () => {
+    ++thumbnailRequestRef.current;
+    setIsStampMenuOpen(false);
     setSelectedFile(null);
     setSourcePdfBytes(null);
     setPages([]);
@@ -536,12 +550,15 @@ export const PDFEditorView: React.FC = () => {
                   <div className="relative group">
                     <button
                       type="button"
+                      aria-expanded={isStampMenuOpen}
+                      aria-haspopup="menu"
+                      onClick={() => setIsStampMenuOpen(open => !open)}
                       className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                     >
                       <Stamp className="h-3.5 w-3.5 text-slate-600" />
                       <span>Add Stamp</span>
                     </button>
-                    <div className="absolute right-0 top-full mt-1 hidden group-hover:flex flex-col bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 z-30 w-44">
+                    <div className={`absolute right-0 top-full mt-1 ${isStampMenuOpen ? "flex" : "hidden"} flex-col bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 z-30 w-44`}>
                       <button
                         type="button"
                         onClick={() => handleAddStamp('APPROVED')}
