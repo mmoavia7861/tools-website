@@ -1,0 +1,16 @@
+name = "ranknova-card-ai"
+main = "src/index.mjs"
+compatibility_date = "2026-11-14"
+workers_dev = true
+
+[vars]
+APP_ORIGIN = "https://mmoavia7861.github.io"
+GEMINI_MODEL = "gemini-2.5-flash"
+
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "18472"
+
+[ratelimits.simple]
+limit = 8
+period = 60
