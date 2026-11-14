@@ -595,6 +595,11 @@ export const PDFEditorView: React.FC = () => {
           ) : (
             /* Editor Studio Workspace */
             <div className="space-y-6">
+              {errorMessage && (
+                <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">
+                  {errorMessage}
+                </div>
+              )}
               {/* Top Document Summary & Global Toolbar */}
               <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
