@@ -1,1 +1,108 @@
 @import "tailwindcss";
+
+/* ToolCresta pointer ambience: visual-only and safe above interactive tools. */
+.tc-pointer-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: hidden;
+  pointer-events: none !important;
+  user-select: none;
+}
+
+.tc-pointer-glow,
+.tc-pointer-ring,
+.tc-pointer-dot {
+  position: absolute;
+  left: var(--tc-x, -240px);
+  top: var(--tc-y, -240px);
+  border-radius: 9999px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.tc-pointer-glow {
+  width: 176px;
+  height: 176px;
+  background: radial-gradient(circle, rgba(37, 99, 235, .16) 0%, rgba(56, 189, 248, .08) 37%, transparent 70%);
+  filter: blur(6px);
+  transition: left 145ms ease-out, top 145ms ease-out, opacity 180ms ease-out;
+}
+
+.tc-pointer-ring {
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid rgba(37, 99, 235, .56);
+  background: rgba(219, 234, 254, .1);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, .045), 0 0 18px rgba(59, 130, 246, .12);
+  transition: left 75ms ease-out, top 75ms ease-out, opacity 180ms ease-out;
+}
+
+.tc-pointer-dot {
+  width: 5px;
+  height: 5px;
+  background: #2563eb;
+  box-shadow: 0 0 10px rgba(37, 99, 235, .6);
+  transition: opacity 180ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tc-pointer-layer[data-pointer-active="true"] .tc-pointer-glow { opacity: 1; }
+  .tc-pointer-layer[data-pointer-active="true"] .tc-pointer-ring { opacity: .85; }
+  .tc-pointer-layer[data-pointer-active="true"] .tc-pointer-dot { opacity: .85; }
+}
+
+.tc-pointer-ripple {
+  position: absolute;
+  width: 108px;
+  height: 108px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(37, 99, 235, .52);
+  background: radial-gradient(circle, rgba(147, 197, 253, .16), rgba(59, 130, 246, .055) 48%, transparent 72%);
+  box-shadow: 0 0 0 6px rgba(59, 130, 246, .05);
+  transform: translate(-50%, -50%) scale(.18);
+  animation: tc-pointer-burst 680ms cubic-bezier(.18, .75, .28, 1) forwards;
+  pointer-events: none;
+}
+
+.tc-pointer-ripple[data-input="mouse"] {
+  width: 74px;
+  height: 74px;
+}
+
+@keyframes tc-pointer-burst {
+  0% { opacity: .9; transform: translate(-50%, -50%) scale(.18); }
+  65% { opacity: .48; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
+}
+
+/* Phones have no hover cursor: keep a subtle animated glow and show tap ripples. */
+.tc-mobile-orb { display: none; }
+
+@media (hover: none), (pointer: coarse) {
+  .tc-pointer-glow, .tc-pointer-ring, .tc-pointer-dot { display: none; }
+  .tc-mobile-orb {
+    display: block;
+    position: absolute;
+    width: 170px;
+    height: 170px;
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgba(37, 99, 235, .20), rgba(56, 189, 248, .09) 42%, transparent 72%);
+    filter: blur(9px);
+    opacity: .68;
+    pointer-events: none;
+    animation: tc-mobile-float 9s ease-in-out infinite alternate;
+  }
+  .tc-mobile-orb--left { left: -100px; top: 20%; }
+  .tc-mobile-orb--right { right: -100px; bottom: 13%; animation-delay: -4s; }
+}
+
+@keyframes tc-mobile-float {
+  from { transform: translate3d(0, -14px, 0) scale(.94); }
+  to { transform: translate3d(24px, 28px, 0) scale(1.12); }
+}
+
+@media (prefers-reduced-motion: reduce), (forced-colors: active), print {
+  .tc-pointer-layer { display: none !important; }
+}

@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { CookieBanner } from './components/CookieBanner';
+import { PointerEffects } from './components/PointerEffects';
 import { HomeView } from './views/HomeView';
 import { QRGeneratorView } from './views/QRGeneratorView';
 import { PDFCompressorView } from './views/PDFCompressorView';
@@ -159,6 +160,7 @@ export default function App() {
       </main>
       <Footer navigate={navigate} />
       <CookieBanner />
+      <PointerEffects />
     </div>
   );
 }
