@@ -3,6 +3,7 @@ import { SEOHead } from '../components/SEOHead';
 
 type Mode = 'pdf-to-word' | 'word-to-pdf';
 const MAX_BYTES = 10 * 1024 * 1024;
+const API_URL = (import.meta.env.VITE_CONVERTER_API_URL || '').replace(/\\/$/, '');
 
 async function convertLocally(file: File, mode: Mode): Promise<Blob> {
   const bytes = await file.arrayBuffer();
@@ -86,7 +87,20 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
     if (!file || busy) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      const blob = await convertLocally(file, mode);
+      let blob: Blob;
+      if (API_URL) {
+        const form = new FormData();
+        form.append('file', file);
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 90000);
+        try {
+          const response = await fetch(API_URL + '/api/convert/' + mode, { method: 'POST', body: form, signal: controller.signal });
+          if (!response.ok) throw new Error(response.status === 429 ? 'Too many requests. Please retry in one minute.' : 'Server conversion failed. Please try a different document.');
+          blob = await response.blob();
+        } finally { window.clearTimeout(timer); }
+      } else {
+        blob = await convertLocally(file, mode);
+      }
       if (!blob.size) throw new Error('Conversion produced an empty file.');
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -94,14 +108,14 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
       link.download = file.name.replace(/\.[^.]+$/, '') + outputExt;
       document.body.appendChild(link); link.click(); link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 30000);
-      setNotice('Basic conversion completed. Review formatting in the downloaded file.');
+      setNotice(API_URL ? 'Server conversion completed. Review the downloaded document.' : 'Basic browser conversion completed. Review formatting in the downloaded file.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Conversion failed. Please try another document.');
     } finally { setBusy(false); }
   };
 
   return <section className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
-    <SEOHead title={title + ' | RankNova'} description={toWord ? 'Free browser-based PDF text to editable DOCX conversion. Scanned PDFs and complex formatting are not supported.' : 'Free browser-based Word DOCX text to PDF conversion. Basic text only; complex formatting and non-Latin scripts are not supported.'} canonicalPath={'/' + mode} />
+    <SEOHead title={title + ' | RankNova'} description={toWord ? 'Convert PDF text to editable DOCX using browser processing or an optional conversion server. Scanned PDFs and complex formatting are not supported.' : 'Convert Word DOCX to PDF using browser processing or an optional conversion server. Basic text only; complex formatting and non-Latin scripts are not supported.'} canonicalPath={'/' + mode} />
     <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
     <p className="mt-3 text-slate-600">{toWord ? 'Extract selectable text from PDFs into editable DOCX. Scanned PDFs, images, tables and precise layouts are not preserved.' : 'Convert basic DOCX text into PDF. Images, tables, styles and complex layouts are not preserved. Some non-Latin scripts are unsupported.'}</p>
     <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -114,7 +128,7 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
         }
         setFile(selected);
       }} />
-      <p className="mt-3 text-xs text-slate-500">Files stay in your browser and are not uploaded to RankNova. Basic text conversion only; inspect the result before using it.</p>
+      <p className="mt-3 text-xs text-slate-500">{API_URL ? 'Server conversion is enabled. Your document is uploaded for processing and temporary files are deleted after conversion. Do not upload confidential documents.' : 'Browser-only basic text conversion: files are not uploaded. Complex formatting is not preserved.'}</p>
       <button type="button" disabled={!file || busy} onClick={convert} className="mt-5 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Converting…' : 'Convert and download'}</button>
       {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="mt-3 text-sm text-emerald-700">{notice}</p>}
