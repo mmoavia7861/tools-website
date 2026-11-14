@@ -6,7 +6,7 @@ const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','
 let log='';
 server.stdout.on('data',chunk=>{log+=String(chunk);});
 server.stderr.on('data',chunk=>{log+=String(chunk);});
-const base='http://127.0.0.1:4179/RankNova/';
+const base='http://127.0.0.1:4179' + (process.env.PAGES_BASE_PATH || '/RankNova/');
 let browser;
 try {
   let ready=false;
@@ -25,7 +25,7 @@ try {
   await desktop.getByLabel('Ask about cards or PDF tools').fill('PDF ko Word mein convert karo');
   await desktop.getByRole('button',{name:'Ask Guide'}).click();
   await desktop.getByRole('button',{name:'PDF to Word kholein'}).click();
-  assert.ok(desktop.url().includes('/RankNova/pdf-to-word/'),'Desktop assistant tool navigation failed');
+  assert.ok(desktop.url().includes((process.env.PAGES_BASE_PATH || '/RankNova/') + 'pdf-to-word/'),'Desktop assistant tool navigation failed');
 
   const mobileContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
   const mobile=await mobileContext.newPage();
@@ -33,7 +33,7 @@ try {
   await mobile.getByRole('button',{name:'Open ToolCresta assistant'}).click();
   await mobile.getByRole('button',{name:'Wedding card design ideas'}).click();
   await mobile.getByRole('button',{name:'Wedding card banayein'}).click();
-  assert.ok(mobile.url().includes('/RankNova/wedding-card-maker/'),'Mobile assistant card navigation failed');
+  assert.ok(mobile.url().includes((process.env.PAGES_BASE_PATH || '/RankNova/') + 'wedding-card-maker/'),'Mobile assistant card navigation failed');
   const prompt=await mobile.locator('#ai-card-prompt').inputValue();
   assert.match(prompt,/Couple: \[both names\]/,'Guide prompt did not reach card maker');
   assert.equal(await mobile.getByRole('button',{name:'Open ToolCresta assistant'}).count(),1);

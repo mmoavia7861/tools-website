@@ -7,8 +7,12 @@
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const origin = 'https://mmoavia7861.github.io';
-const base = '/tools-website/';
+// The publishing workflow sets these only after the Pages custom domain is configured.
+const origin = process.env.TOOLCRESTA_SITE_ORIGIN || 'https://mmoavia7861.github.io';
+const base = process.env.TOOLCRESTA_PAGES_BASE || '/tools-website/';
+if (!/^https:\/\/[a-z0-9.-]+$/i.test(origin) || !/^\/(?:[a-zA-Z0-9-]+\/)?$/.test(base)) {
+  throw new Error('Invalid Pages origin or base path.');
+}
 const root = 'dist';
 const homeHtml = readFileSync(join(root, 'index.html'), 'utf8');
 const routes = [
@@ -78,5 +82,5 @@ const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
   routes.map(([route]) => '  <url><loc>' + escapeText(absoluteUrl(route)) + '</loc></url>').join('\n') +
   '\n</urlset>\n';
 writeFileSync(join(root, 'sitemap.xml'), xml);
-writeFileSync(join(root, 'robots.txt'), 'User-agent: *\nAllow: /tools-website/\nDisallow: /tools-website/admin/\n\nSitemap: ' + origin + base + 'sitemap.xml\n');
+writeFileSync(join(root, 'robots.txt'), 'User-agent: *\nAllow: ' + base + '\nDisallow: ' + base + 'admin/\n\nSitemap: ' + origin + base + 'sitemap.xml\n');
 console.log('Prepared', routes.length, 'crawlable route entrypoints, sitemap.xml and robots.txt for GitHub Pages.');

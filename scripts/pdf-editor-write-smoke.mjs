@@ -1,6 +1,6 @@
 /**
  * End-to-end PDF Writer smoke test for the static GitHub Pages build.
- * Run from the repository root after building /RankNova/ for preview.
+ * Run from the repository root after building the selected Pages base path.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 import { PDFDocument } from 'pdf-lib';
 import { chromium } from 'playwright';
 
-const url = 'http://127.0.0.1:4173/RankNova/edit-pdf/';
+const url = 'http://127.0.0.1:4173' + (process.env.PAGES_BASE_PATH || '/RankNova/') + 'edit-pdf/';
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
   stdio: ['ignore', 'pipe', 'pipe']
 });

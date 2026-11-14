@@ -8,7 +8,7 @@ const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'previe
 let log = '';
 server.stdout.on('data', chunk => { log += String(chunk); });
 server.stderr.on('data', chunk => { log += String(chunk); });
-const base = 'http://127.0.0.1:4178/RankNova/';
+const base = 'http://127.0.0.1:4178' + (process.env.PAGES_BASE_PATH || '/RankNova/');
 let browser;
 try {
   let ready = false;
@@ -32,7 +32,7 @@ try {
   await desktop.mouse.click(320, 260);
   assert.ok(await desktop.locator('.tc-pointer-ripple').count(), 'Desktop click burst missing');
   await desktop.getByRole('button', { name: 'Free Tools', exact: true }).click();
-  assert.ok(desktop.url().includes('/RankNova/qr-code-generator/'), 'Cursor overlay blocked desktop navigation');
+  assert.ok(desktop.url().includes((process.env.PAGES_BASE_PATH || '/RankNova/') + 'qr-code-generator/'), 'Cursor overlay blocked desktop navigation');
 
   const mobileContext = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -46,7 +46,7 @@ try {
   assert.ok(await mobile.locator('.tc-pointer-ripple').count(), 'Mobile tap ripple missing');
   await mobile.getByRole('button', { name: 'Toggle navigation menu' }).click();
   await mobile.getByRole('button', { name: 'QR Generator' }).click();
-  assert.ok(mobile.url().includes('/RankNova/qr-code-generator/'), 'Pointer overlay blocked mobile navigation');
+  assert.ok(mobile.url().includes((process.env.PAGES_BASE_PATH || '/RankNova/') + 'qr-code-generator/'), 'Pointer overlay blocked mobile navigation');
   await mobile.emulateMedia({ reducedMotion: 'reduce' });
   assert.equal(await mobile.locator('.tc-pointer-layer').evaluate(el => getComputedStyle(el).display), 'none', 'Reduced-motion setting not respected');
   await mobileContext.close();

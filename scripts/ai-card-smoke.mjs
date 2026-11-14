@@ -10,7 +10,7 @@ const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'previe
 let logs = '';
 server.stdout.on('data', data=>{logs+=String(data)});
 server.stderr.on('data', data=>{logs+=String(data)});
-const base='http://127.0.0.1:4174/RankNova/';
+const base='http://127.0.0.1:4174' + (process.env.PAGES_BASE_PATH || '/RankNova/');
 let browser;
 try {
   let ok=false;
