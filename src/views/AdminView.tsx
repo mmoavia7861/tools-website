@@ -55,12 +55,6 @@ export const AdminView: React.FC = () => {
   const [publisherId, setPublisherId] = useState('ca-pub-XXXXXXXXXXXXXXXX');
   const [adSavedNotice, setAdSavedNotice] = useState(false);
 
-  // Gemini Intelligence tester
-  const [geminiTask, setGeminiTask] = useState<'deep_audit' | 'search_grounded' | 'fast_assist'>('deep_audit');
-  const [geminiPrompt, setGeminiPrompt] = useState('Analyze the security and privacy implications of client-side vs server-side PDF processing.');
-  const [geminiResult, setGeminiResult] = useState<any>(null);
-  const [geminiLoading, setGeminiLoading] = useState(false);
-
   // Contact messages
   const [messages, setMessages] = useState<any[]>([]);
 
@@ -110,27 +104,6 @@ export const AdminView: React.FC = () => {
 
   const handleLogout = async () => {
     await signOut(auth);
-  };
-
-  const handleTestGemini = async () => {
-    setGeminiLoading(true);
-    setGeminiResult(null);
-    try {
-      const res = await fetch('/api/gemini/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          task: geminiTask,
-          prompt: geminiPrompt
-        })
-      });
-      const data = await res.json();
-      setGeminiResult(data);
-    } catch (err: unknown) {
-      setGeminiResult({ error: err instanceof Error ? err.message : 'Execution failed' });
-    } finally {
-      setGeminiLoading(false);
-    }
   };
 
   const isOwner = currentUser && currentUser.emailVerified === true && (currentUser.email?.toLowerCase() === OWNER_EMAIL.toLowerCase());
@@ -310,7 +283,7 @@ export const AdminView: React.FC = () => {
               }`}
             >
               <Brain className="h-4 w-4" />
-              <span>Gemini Intelligence</span>
+              <span>AI Assistant Setup</span>
             </button>
           </div>
 
@@ -488,96 +461,49 @@ export const AdminView: React.FC = () => {
             </div>
           )}
 
-          {/* TAB 4: GEMINI INTELLIGENCE */}
+          {/* TAB 4: ASSISTANT & OPTIONAL GEMINI */}
           {activeTab === 'ai' && (
-            <div className="rounded-2xl bg-white border border-slate-200 p-6 space-y-6">
+            <div className="rounded-2xl bg-white border border-slate-200 p-6 space-y-5">
               <div>
-                <h2 className="text-base font-bold text-slate-900">Gemini AI Multi-Tier Intelligence Console</h2>
-                <p className="text-xs text-slate-500">
-                  Execute server-side intelligence tasks complying with model guidelines: Argon High Thinking, Flash Search Grounding, and Flash-lite.
+                <h2 className="text-base font-bold text-slate-900">ToolCresta Assistant & Gemini Setup</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Visitors can use the floating Ask ToolCresta guide on every page for card design suggestions
+                  and PDF tool instructions. The local guide works in the browser without a paid AI service.
                 </p>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setGeminiTask('deep_audit')}
-                  className={`p-3.5 rounded-xl border text-left transition ${
-                    geminiTask === 'deep_audit' ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-600' : 'border-slate-200'
-                  }`}
-                >
-                  <span className="block text-xs font-bold text-purple-900">gemini-4-argon</span>
-                  <span className="block text-[11px] text-slate-500 mt-0.5">High Thinking Mode</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setGeminiTask('search_grounded')}
-                  className={`p-3.5 rounded-xl border text-left transition ${
-                    geminiTask === 'search_grounded' ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600' : 'border-slate-200'
-                  }`}
-                >
-                  <span className="block text-xs font-bold text-blue-900">gemini-3.8-flash</span>
-                  <span className="block text-[11px] text-slate-500 mt-0.5">Search Grounding</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setGeminiTask('fast_assist')}
-                  className={`p-3.5 rounded-xl border text-left transition ${
-                    geminiTask === 'fast_assist' ? 'border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600' : 'border-slate-200'
-                  }`}
-                >
-                  <span className="block text-xs font-bold text-emerald-900">gemini-3.1-flash-lite</span>
-                  <span className="block text-[11px] text-slate-500 mt-0.5">Instant Latency</span>
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                <label htmlFor="gemini-prompt" className="block text-xs font-semibold text-slate-700">
-                  Task Prompt
-                </label>
-                <textarea
-                  id="gemini-prompt"
-                  rows={3}
-                  value={geminiPrompt}
-                  onChange={(e) => setGeminiPrompt(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 p-3 text-xs text-slate-900"
-                />
-
-                <button
-                  type="button"
-                  onClick={handleTestGemini}
-                  disabled={geminiLoading}
-                  className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-                >
-                  {geminiLoading ? (
-                    <>
-                      <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Executing with Gemini...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-3.5 w-3.5" />
-                      <span>Execute Intelligence Task</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {geminiResult && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-xs">
-                  <div className="flex items-center justify-between font-bold text-slate-800">
-                    <span>Model: {geminiResult.modelUsed || 'Execution Result'}</span>
-                    {geminiResult.sources?.length > 0 && (
-                      <span className="text-blue-600">{geminiResult.sources.length} Grounding Sources</span>
-                    )}
-                  </div>
-                  <div className="bg-white p-3 rounded-lg border border-slate-200 text-slate-700 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto">
-                    {geminiResult.response || geminiResult.error}
-                  </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="text-xs font-bold text-emerald-800">Local guide</p>
+                  <p className="mt-1 text-sm font-semibold text-emerald-900">Available without an API key</p>
+                  <p className="mt-1 text-xs text-emerald-700">Suggestions, safe tool navigation and editable card prompts.</p>
                 </div>
-              )}
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                  <p className="text-xs font-bold text-indigo-800">Gemini AI</p>
+                  <p className="mt-1 text-sm font-semibold text-indigo-900">
+                    {import.meta.env.VITE_AI_CARD_API_URL && import.meta.env.VITE_TURNSTILE_SITE_KEY
+                      ? 'Frontend settings present — verify Worker health'
+                      : 'Backend setup required'}
+                  </p>
+                  <p className="mt-1 text-xs text-indigo-700">Real AI answers need a secured Cloudflare Worker, Turnstile and a private Gemini key.</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200 p-4 text-sm text-slate-700">
+                <p className="font-semibold text-slate-900">Activate optional Gemini suggestions</p>
+                <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-xs">
+                  <li>Add the required Cloudflare, Gemini and Turnstile values as encrypted GitHub Actions Secrets.</li>
+                  <li>Deploy the card AI Worker and verify its /health endpoint.</li>
+                  <li>Set the Worker URL and public Turnstile site key as GitHub Actions Variables, then redeploy the frontend.</li>
+                </ol>
+                <div className="mt-4 flex flex-wrap gap-3 text-xs font-semibold">
+                  <a href="https://github.com/mmoavia7861/RankNova/settings/secrets/actions" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Actions Secrets</a>
+                  <a href="https://github.com/mmoavia7861/RankNova/actions/workflows/deploy-card-ai.yml" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Deploy AI Worker</a>
+                  <a href="https://github.com/mmoavia7861/RankNova/settings/variables/actions" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Frontend Variables</a>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500">
+                GitHub Pages is static hosting. The old /api/gemini/analyze tester cannot run on this site,
+                so this panel shows the actual activation steps instead of a non-functional test button.
+              </p>
             </div>
           )}
         </div>
