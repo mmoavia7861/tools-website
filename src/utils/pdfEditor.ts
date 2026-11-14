@@ -176,7 +176,8 @@ export async function editExistingPdf(
             });
           }
         } catch (imgErr) {
-          console.warn('Could not embed signature image on page', i, imgErr);
+          console.error('Could not embed signature image on page', i, imgErr);
+          throw new Error('Signature could not be embedded. Please recreate the signature and try again.');
         }
       }
     }
