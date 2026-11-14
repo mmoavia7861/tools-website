@@ -62,6 +62,15 @@ for (const [route, title, description, introduction] of routes) {
     writeFileSync(join(dir, 'index.html'), html);
   }
 }
+// The private admin route needs a real 200 entrypoint on GitHub Pages.
+// It is deliberately omitted from the public sitemap and navigation.
+const adminHtml = homeHtml
+  .replace(/<title>[\s\S]*?<\/title>/i, '<title>ToolCresta Admin Sign-in</title>')
+  .replace('<div id="root"></div>', '<div id="root"><main><h1>ToolCresta Admin Portal</h1><p>Authorized Google account sign-in required.</p></main></div>')
+  .replace('</head>', '<meta name="robots" content="noindex, nofollow" />\n  </head>');
+mkdirSync(join(root, 'admin'), { recursive: true });
+writeFileSync(join(root, 'admin', 'index.html'), adminHtml);
+
 copyFileSync(join(root, 'index.html'), join(root, '404.html'));
 
 const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
