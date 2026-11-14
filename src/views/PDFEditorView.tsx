@@ -51,6 +51,9 @@ export const PDFEditorView: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [sourcePdfBytes, setSourcePdfBytes] = useState<Uint8Array | null>(null);
   const [pages, setPages] = useState<PageDisplayItem[]>([]);
+  const [focusedPreview, setFocusedPreview] = useState<string | null>(null);
+  const [focusedLoading, setFocusedLoading] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(100);
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
 
   // Annotations (Words, Signatures, Stamps) per page
@@ -76,6 +79,7 @@ export const PDFEditorView: React.FC = () => {
 
   // Active page preview canvas / container ref for drag drop
   const pageContainerRef = useRef<HTMLDivElement | null>(null);
+  const pageSurfaceRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Dragging state for elements
@@ -87,9 +91,10 @@ export const PDFEditorView: React.FC = () => {
     const requestId = ++thumbnailRequestRef.current;
     const updated = pageItems.map(p => ({ ...p }));
     for (let i = 0; i < updated.length; i++) {
+      if (requestId !== thumbnailRequestRef.current) return;
       try {
         const url = await renderPdfPageToDataUrl(bytes, updated[i].originalIndex, {
-          scale: 0.8,
+          scale: 0.32,
           rotation: updated[i].rotation
         });
         updated[i].thumbnailUrl = url;
@@ -103,6 +108,27 @@ export const PDFEditorView: React.FC = () => {
     }
   };
 
+  // The focused page needs its own full-resolution render, not an enlarged thumbnail.
+  useEffect(() => {
+    const page = pages[activePageIndex];
+    let cancelled = false;
+    setFocusedPreview(null);
+    if (!sourcePdfBytes || !page) { setFocusedLoading(false); return; }
+    setFocusedLoading(true);
+    const targetScale = Math.min(2.5, Math.sqrt(9000000 / (page.width * page.height)));
+    renderPdfPageToDataUrl(sourcePdfBytes, page.originalIndex, {
+      scale: targetScale,
+      rotation: page.rotation
+    }).then(url => {
+      if (!cancelled) setFocusedPreview(url);
+    }).catch(() => {
+      if (!cancelled) setErrorMessage('Full-resolution PDF preview could not be rendered. The original PDF has not been changed.');
+    }).finally(() => {
+      if (!cancelled) setFocusedLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [sourcePdfBytes, activePageIndex, pages[activePageIndex]?.id, pages[activePageIndex]?.rotation]);
+
   const handleFileSelect = async (file: File) => {
     ++thumbnailRequestRef.current;
     setSelectedFile(null);
@@ -111,6 +137,7 @@ export const PDFEditorView: React.FC = () => {
     setErrorMessage(null);
     setEditedPdfBytes(null);
     setAnnotations([]);
+    setFocusedPreview(null);
     setSelectedElementId(null);
 
     if (!file.name.toLowerCase().endsWith('.pdf')) {
@@ -343,8 +370,8 @@ export const PDFEditorView: React.FC = () => {
     setSelectedElementId(element.id);
     setIsDraggingElement(true);
 
-    if (pageContainerRef.current) {
-      const rect = pageContainerRef.current.getBoundingClientRect();
+    if (pageSurfaceRef.current) {
+      const rect = pageSurfaceRef.current.getBoundingClientRect();
       const clickXNorm = (e.clientX - rect.left) / rect.width;
       const clickYNorm = (e.clientY - rect.top) / rect.height;
       setDragOffset({
@@ -355,9 +382,9 @@ export const PDFEditorView: React.FC = () => {
   };
 
   const handleContainerMouseMove = (e: React.MouseEvent) => {
-    if (!isDraggingElement || !selectedElementId || !pageContainerRef.current) return;
+    if (!isDraggingElement || !selectedElementId || !pageSurfaceRef.current) return;
 
-    const rect = pageContainerRef.current.getBoundingClientRect();
+    const rect = pageSurfaceRef.current.getBoundingClientRect();
     const currXNorm = (e.clientX - rect.left) / rect.width;
     const currYNorm = (e.clientY - rect.top) / rect.height;
 
@@ -719,29 +746,40 @@ export const PDFEditorView: React.FC = () => {
                     </div>
                   )}
 
+                  <div className="flex items-center justify-between rounded-xl bg-white border border-slate-200 p-3 gap-3">
+                    <span className="text-xs font-semibold text-slate-700">Sharp PDF preview</span>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => setPreviewZoom(v => Math.max(60, v - 20))} className="rounded border px-2 py-1 text-xs" aria-label="Zoom out">−</button>
+                      <span className="text-xs tabular-nums">{previewZoom}%</span>
+                      <button type="button" onClick={() => setPreviewZoom(v => Math.min(160, v + 20))} className="rounded border px-2 py-1 text-xs" aria-label="Zoom in">+</button>
+                    </div>
+                  </div>
                   {/* Focused Page Interactive Viewport */}
                   <div
                     ref={pageContainerRef}
                     onMouseMove={handleContainerMouseMove}
                     onMouseUp={handleContainerMouseUp}
+                    onMouseLeave={handleContainerMouseUp}
                     onClick={() => setSelectedElementId(null)}
-                    className="relative w-full rounded-2xl border-2 border-slate-300 bg-slate-100 shadow-inner min-h-[520px] flex items-center justify-center p-4 overflow-hidden select-none"
+                    className="relative w-full rounded-2xl border-2 border-slate-300 bg-slate-100 shadow-inner min-h-[520px] flex items-center justify-center p-4 overflow-auto select-none"
                   >
                     {activePage && (
                       <div
-                        className="relative bg-white shadow-xl rounded-lg transition-transform duration-200 overflow-hidden"
+                        ref={pageSurfaceRef}
+                        className="relative bg-white shadow-xl rounded-lg overflow-hidden"
                         style={{
                           width: '100%',
-                          maxWidth: '560px',
-                          aspectRatio: `${activePage.width} / ${activePage.height}`,
-                          transform: `rotate(${activePage.rotation}deg)`
+                          maxWidth: `${Math.round(560 * previewZoom / 100)}px`,
+                          aspectRatio: activePage.rotation % 180 === 0
+                            ? `${activePage.width} / ${activePage.height}`
+                            : `${activePage.height} / ${activePage.width}`
                         }}
                       >
                         {/* Rendered Background of PDF Page */}
-                        {activePage.thumbnailUrl ? (
+                        {focusedPreview ? (
                           <img
-                            src={activePage.thumbnailUrl}
-                            alt={`Page ${activePageIndex + 1}`}
+                            src={focusedPreview}
+                            alt={`High-resolution preview of page ${activePageIndex + 1}`}
                             className="w-full h-full object-contain pointer-events-none"
                           />
                         ) : (
