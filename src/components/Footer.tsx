@@ -96,6 +96,17 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
                   Visiting Card Maker
                 </a>
               </li>
+              {[
+                { label: 'AI Card Generator', slug: 'ai-card-generator' },
+                { label: 'Wedding Card Maker', slug: 'wedding-card-maker' },
+                { label: 'Birthday Card Maker', slug: 'birthday-card-maker' }
+              ].map(tool => (
+                <li key={tool.slug}>
+                  <a href={import.meta.env.BASE_URL + tool.slug + '/'}
+                    onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/' + tool.slug); } }}
+                    className="text-slate-600 hover:text-blue-600 transition">{tool.label}</a>
+                </li>
+              ))}
             </ul>
           </div>
 
