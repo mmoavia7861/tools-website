@@ -1,0 +1,41 @@
+# RankNova card AI gateway (Cloudflare Workers)
+
+This is a **separate optional Gemini backend** for /ai-card-generator/, /wedding-card-maker/, /birthday-card-maker/.
+The React pages work for free in **local template mode** even without a backend. GitHub Pages cannot run server-side Gemini calls.
+
+## Safety and limitations
+- Never commit or place a Gemini API key in Vite, React, HTML, GitHub Pages, or screenshots.
+- The Worker validates a Turnstile response server-side, validates the exact browser Origin, limits calls (approximate per Cloudflare location), caps prompt length and only returns allowlisted card data.
+- Turnstile is not a globally strict quota, and Cloudflare's rate limiting is approximate per location. Gemini quotas are separate. Watch usage, set account caps and review logs. No key or secrets are saved by the frontend.
+- A free Worker and an available Gemini free-tier model are **not guaranteed indefinitely**. Never promise unlimited generation.
+- The worker has not been deployed until you run the Cloudflare commands with an account you control.
+
+## 1. Cloudflare free setup
+1. Create/login to Cloudflare, go to Workers & Pages. Use the free Workers plan; do not switch to paid.
+2. Install Node.js >=22 locally. Clone this repository.
+3. In this folder, run `npx wrangler login` then `npx wrangler deploy`.
+4. In Cloudflare Turnstile dashboard create a managed widget for hostname `mmoavia7861.github.io`. Record PUBLIC sitekey and SECRET private key. Cloudflare Turnstile has free and paid plans.
+5. In this folder set secrets using terminal prompts:
+   ```sh
+   npx wrangler secret put GEMINI_API_KEY
+   npx wrangler secret put TURNSTILE_SECRET
+   ```
+   For Gemini key get your own from Google AI Studio; enable an available model (change `GEMINI_MODEL` in wrangler.toml as needed). **Never paste a key in ChatGPT or GitHub.**
+
+## 2. Connect GitHub Pages
+Cloudflare deploy returns https://ranknova-card-ai.<account>.workers.dev — use your **actual** URL, not this placeholder.
+In the **RankNova deployment repository** (mmoavia7861/RankNova), set Repository Settings -> Secrets and variables -> Actions -> Variables:
+- `RANKNOVA_CARD_API_URL` = the exact Worker HTTPS origin (without /api/cards/generate)
+- `RANKNOVA_TURNSTILE_SITE_KEY` = Turnstile PUBLIC sitekey
+
+Do NOT put the Gemini API key or Turnstile secret in GitHub Actions variables. These belong only in Cloudflare Worker secrets.
+The RankNova deploy workflow maps variables to `VITE_AI_CARD_API_URL` and `VITE_TURNSTILE_SITE_KEY` during build.
+
+## 3. Verify
+- Browse `https://<actual-worker-host>/health` (should show `{"status":"ok","aiConfigured":true}` after secrets and rate limiter binding installed).
+- Re-run the RankNova GitHub Pages workflow.
+- In the new AI Card Generator UI, pass Turnstile, enter details and click **Generate with Gemini**.
+- On API errors, the form displays a real error. **Create Free Template** continues to function locally. This is not an AI fallback.
+
+## Development tests
+Run from repository root: `node --test card-ai-worker/worker.test.mjs`.
