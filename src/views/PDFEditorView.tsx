@@ -41,6 +41,7 @@ import { SignatureModal } from '../components/SignatureModal';
 interface PageDisplayItem {
   id: string;
   originalIndex: number;
+  originalRotation: number;
   rotation: number;
   width: number;
   height: number;
@@ -98,7 +99,7 @@ export const PDFEditorView: React.FC = () => {
       try {
         const url = await renderPdfPageToDataUrl(bytes, updated[i].originalIndex, {
           scale: 0.32,
-          rotation: updated[i].rotation
+          rotation: (updated[i].originalRotation + updated[i].rotation) % 360
         });
         updated[i].thumbnailUrl = url;
       } catch (e) {
@@ -121,7 +122,7 @@ export const PDFEditorView: React.FC = () => {
     const targetScale = Math.min(2.5, Math.sqrt(9000000 / (page.width * page.height)));
     renderPdfPageToDataUrl(sourcePdfBytes, page.originalIndex, {
       scale: targetScale,
-      rotation: page.rotation
+      rotation: (page.originalRotation + page.rotation) % 360
     }).then(url => {
       if (!cancelled) setFocusedPreview(url);
     }).catch(() => {
@@ -137,7 +138,7 @@ export const PDFEditorView: React.FC = () => {
     const page = pages[activePageIndex];
     let cancelled = false;
     setTextHits([]);
-    if (!replaceMode || !sourcePdfBytes || !page || page.rotation !== 0) return;
+    if (!replaceMode || !sourcePdfBytes || !page || (page.originalRotation + page.rotation) % 360 !== 0) return;
     getPdfPageTextHits(sourcePdfBytes, page.originalIndex).then(hits => {
       if (!cancelled) setTextHits(hits);
     }).catch(() => {
@@ -186,6 +187,7 @@ export const PDFEditorView: React.FC = () => {
         pageItems.push({
           id: `page-${i}-${Date.now()}`,
           originalIndex: i,
+          originalRotation: page.getRotation().angle,
           rotation: 0,
           width: Math.round(width),
           height: Math.round(height)
@@ -271,6 +273,7 @@ export const PDFEditorView: React.FC = () => {
     const duplicated: PageDisplayItem = {
       id: `page-dup-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       originalIndex: target.originalIndex,
+      originalRotation: target.originalRotation,
       rotation: target.rotation,
       width: target.width,
       height: target.height,
@@ -323,7 +326,7 @@ export const PDFEditorView: React.FC = () => {
 
   const visuallyReplaceText = (hit: PdfTextHit) => {
     const page = pages[activePageIndex];
-    if (!page || page.rotation !== 0) return;
+    if (!page || (page.originalRotation + page.rotation) % 360 !== 0) return;
     const cover: NormalizedElement = {
       id: `cover-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       type: 'whiteout', pageIndex: activePageIndex,
@@ -748,7 +751,7 @@ export const PDFEditorView: React.FC = () => {
                 <button type="button" onClick={() => addMarkup('rectangle')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold">Rectangle</button>
                 <button type="button" onClick={() => addMarkup('whiteout')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold">Cover Text (Visual)</button>
                 <button type="button" onClick={() => setReplaceMode(value => !value)} aria-pressed={replaceMode} className={replaceMode ? "rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white" : "rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700"}>Select Text to Replace (Visual)</button>
-                {replaceMode && <p role="status" className="basis-full text-xs font-semibold text-blue-700">{pages[activePageIndex]?.rotation !== 0 ? 'Reset page rotation before selecting existing text.' : textHits.length ? 'Select one of the outlined text fragments on the page.' : 'No selectable text detected yet. Scanned PDFs need OCR.'}</p>}
+                {replaceMode && <p role="status" className="basis-full text-xs font-semibold text-blue-700">{(pages[activePageIndex]?.originalRotation + pages[activePageIndex]?.rotation) % 360 !== 0 ? 'Reset page rotation before selecting existing text.' : textHits.length ? 'Select one of the outlined text fragments on the page.' : 'No selectable text detected yet. Scanned PDFs need OCR.'}</p>}
                 <p className="basis-full text-[11px] text-slate-500">To visually replace words: add a white cover over the old text, then choose Add Words / Text. This is not secure redaction: original underlying PDF content may remain extractable.</p>
               </div>
 
@@ -881,7 +884,7 @@ export const PDFEditorView: React.FC = () => {
                         style={{
                           width: '100%',
                           maxWidth: `${Math.round(560 * previewZoom / 100)}px`,
-                          aspectRatio: activePage.rotation % 180 === 0
+                          aspectRatio: (activePage.originalRotation + activePage.rotation) % 180 === 0
                             ? `${activePage.width} / ${activePage.height}`
                             : `${activePage.height} / ${activePage.width}`
                         }}
@@ -905,7 +908,7 @@ export const PDFEditorView: React.FC = () => {
                           </div>
                         )}
 
-                        {replaceMode && activePage.rotation === 0 && textHits.map((hit, index) => (
+                        {replaceMode && (activePage.originalRotation + activePage.rotation) % 360 === 0 && textHits.map((hit, index) => (
                           <button key={index} type="button"
                             onClick={event => { event.stopPropagation(); visuallyReplaceText(hit); }}
                             title={'Visually replace: ' + hit.text.slice(0, 80)}
