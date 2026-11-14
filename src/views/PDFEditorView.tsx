@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFTextField } from 'pdf-lib';
 import {
   FileText,
   UploadCloud,
@@ -38,6 +38,11 @@ import {
 import { renderPdfPageToDataUrl, getPdfPageTextHits, type PdfTextHit } from '../utils/pdfRenderer';
 import { SignatureModal } from '../components/SignatureModal';
 
+interface NativeTextField {
+  name: string;
+  originalValue: string;
+}
+
 interface PageDisplayItem {
   id: string;
   originalIndex: number;
@@ -57,6 +62,10 @@ export const PDFEditorView: React.FC = () => {
   const [previewZoom, setPreviewZoom] = useState(100);
   const [replaceMode, setReplaceMode] = useState(false);
   const [textHits, setTextHits] = useState<PdfTextHit[]>([]);
+  const [nativeTextFields, setNativeTextFields] = useState<NativeTextField[]>([]);
+  const [nativeFieldChanges, setNativeFieldChanges] = useState<Record<string, string>>({});
+  const [inlineEditingId, setInlineEditingId] = useState<string | null>(null);
+  const inlineEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
 
   // Annotations (Words, Signatures, Stamps) per page
@@ -157,6 +166,10 @@ export const PDFEditorView: React.FC = () => {
     setAnnotations([]);
     setFocusedPreview(null);
     setSelectedElementId(null);
+    setInlineEditingId(null);
+    setReplaceMode(false);
+    setNativeTextFields([]);
+    setNativeFieldChanges({});
 
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       setErrorMessage('Please select a valid PDF file with a .pdf extension.');
@@ -177,6 +190,12 @@ export const PDFEditorView: React.FC = () => {
         setErrorMessage('Password-protected or encrypted PDFs cannot be edited without credentials.');
         return;
       }
+
+      const formTextFields = doc.getForm().getFields()
+        .filter((field): field is PDFTextField => field instanceof PDFTextField)
+        .slice(0, 80)
+        .map(field => ({ name: field.getName(), originalValue: field.getText() || '' }));
+      setNativeTextFields(formTextFields);
 
       const pageCount = doc.getPageCount();
       const pageItems: PageDisplayItem[] = [];
@@ -340,6 +359,7 @@ export const PDFEditorView: React.FC = () => {
     editable.fontFamily = 'Helvetica';
     setAnnotations(prev => [...prev, cover, editable]);
     setSelectedElementId(editable.id);
+    setInlineEditingId(editable.id);
     setReplaceMode(false);
     setEditedPdfBytes(null);
   };
@@ -453,6 +473,7 @@ export const PDFEditorView: React.FC = () => {
     if (!selectedElementId) return;
     setAnnotations((prev) => prev.filter((ann) => ann.id !== selectedElementId));
     setSelectedElementId(null);
+    setInlineEditingId(null);
     setEditedPdfBytes(null);
   };
 
@@ -518,7 +539,8 @@ export const PDFEditorView: React.FC = () => {
         watermarkText,
         watermarkOpacity,
         addPageNumbers,
-        pageNumberPosition
+        pageNumberPosition,
+        textFieldUpdates: nativeFieldChanges
       });
 
       setEditedPdfBytes(resultBytes);
@@ -546,6 +568,10 @@ export const PDFEditorView: React.FC = () => {
   const handleReset = () => {
     ++thumbnailRequestRef.current;
     setIsStampMenuOpen(false);
+    setNativeTextFields([]);
+    setNativeFieldChanges({});
+    setReplaceMode(false);
+    setInlineEditingId(null);
     setSelectedFile(null);
     setSourcePdfBytes(null);
     setPages([]);
@@ -555,6 +581,13 @@ export const PDFEditorView: React.FC = () => {
     setErrorMessage(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
+  useEffect(() => {
+    if (inlineEditingId) {
+      inlineEditorRef.current?.focus();
+      inlineEditorRef.current?.select();
+    }
+  }, [inlineEditingId]);
 
   const activePage = pages[activePageIndex];
   const activePageAnnotations = annotations.filter((ann) => ann.pageIndex === activePageIndex);
