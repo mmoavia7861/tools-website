@@ -78,7 +78,10 @@ function capture(prompt: string, names: string[]): string {
   for (const name of names) {
     const regex = new RegExp('(?:^|[\\n.;])\\s*' + name + '\\s*[:=]\\s*([^\\n;]+)', 'i');
     const match = prompt.match(regex);
-    if (match) return clean(match[1], 110).replace(/\.$/, '');
+    if (match) {
+      const raw = match[1].split(/\.\s*(?=(?:name|full name|title|job|designation|role|company|business|organization|phone|mobile|whatsapp|contact|email|website|web|date|time|venue|location|address|rsvp|message|tagline|details|subtitle|heading)\s*[:=])/i)[0];
+      return clean(raw, 110).replace(/\.$/, '');
+    }
   }
   return '';
 }
