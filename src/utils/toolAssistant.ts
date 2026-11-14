@@ -39,7 +39,7 @@ export function makeCardPrompt(kind: CardKind, details = ''): string {
     birthday: 'Create a colorful birthday invitation with a playful design. Name: [celebrant]. Age: [age]. Date: [date]. Time: [time]. Venue: [venue]. RSVP: [contact].'
   };
   const cleaned = details.trim().replace(/[\u0000-\u001F\u007F]/g, ' ').slice(0, 480);
-  const generic = /^(visiting card|wedding card|birthday card|birthday invitation|wedding invitation|.*kaise banayein\??|.*design ideas)$/i.test(cleaned);
+  const generic = /^(visiting card|wedding card|birthday card|birthday invitation|wedding invitation|birthday invitation banao|.*kaise banayein\??|.*design ideas)$/i.test(cleaned);
   if (!cleaned || generic) return base[kind];
   // Keep user-supplied details ahead of defaults so local extraction never
   // mistakes placeholder names for actual names in a personalized request.
