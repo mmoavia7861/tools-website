@@ -991,6 +991,7 @@ export const PDFEditorView: React.FC = () => {
                     {activePage && (
                       <div
                         ref={pageSurfaceRef}
+                        data-testid="pdf-editor-page"
                         onClick={handleWriteOnPage}
                         className={`relative bg-white shadow-xl rounded-lg overflow-hidden ${writeOnPageMode ? 'cursor-text ring-4 ring-blue-200' : ''}`}
                         style={{
