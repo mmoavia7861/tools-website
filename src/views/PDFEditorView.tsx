@@ -811,13 +811,22 @@ export const PDFEditorView: React.FC = () => {
                         </span>
 
                         {selectedElement.type === 'text' && (
-                          <input
-                            type="text"
-                            value={selectedElement.text || ''}
-                            onChange={(e) => updateSelectedElement({ text: e.target.value })}
-                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-900 w-44 sm:w-56 focus:outline-blue-500"
-                            placeholder="Type words..."
-                          />
+                          <div className="flex flex-col gap-1">
+                            <label htmlFor="selected-pdf-text" className="text-[11px] font-semibold text-slate-600">Replacement text</label>
+                            <textarea
+                              id="selected-pdf-text"
+                              rows={2}
+                              maxLength={2000}
+                              value={selectedElement.text || ''}
+                              onChange={(e) => updateSelectedElement({ text: e.target.value })}
+                              className="rounded-lg border border-slate-300 px-2.5 py-1 text-sm text-slate-900 w-52 sm:w-72 focus:outline-blue-500"
+                              placeholder="Type replacement text..."
+                            />
+                            <button type="button" onClick={() => setInlineEditingId(selectedElement.id)}
+                              className="text-left text-xs font-semibold text-blue-700 hover:underline">
+                              Edit directly on PDF page
+                            </button>
+                          </div>
                         )}
                       </div>
 
@@ -825,17 +834,25 @@ export const PDFEditorView: React.FC = () => {
                         {selectedElement.type === 'text' && (
                           <>
                             {/* Font size */}
-                            <select
-                              value={selectedElement.fontSize || 16}
-                              onChange={(e) => updateSelectedElement({ fontSize: parseInt(e.target.value) })}
-                              className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700"
-                            >
-                              {[12, 14, 16, 18, 22, 28, 36, 48].map((s) => (
-                                <option key={s} value={s}>
-                                  {s}pt
-                                </option>
-                              ))}
-                            </select>
+                            <label className="text-xs text-slate-700 flex items-center gap-1">
+                              Size
+                              <input type="number" min={6} max={72} step={1}
+                                value={selectedElement.fontSize || 16}
+                                onChange={e => updateSelectedElement({ fontSize: Math.max(6, Math.min(72, Number(e.target.value) || 6)) })}
+                                className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700"
+                                aria-label="Text font size" />
+                            </label>
+                            <label className="text-xs text-slate-700 flex items-center gap-1">
+                              Font
+                              <select value={selectedElement.fontFamily || 'Helvetica'}
+                                onChange={e => updateSelectedElement({ fontFamily: e.target.value as NormalizedElement['fontFamily'] })}
+                                className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700">
+                                <option value="Helvetica">Sans serif</option>
+                                <option value="HelveticaBold">Bold</option>
+                                <option value="TimesRoman">Serif</option>
+                                <option value="Courier">Monospace</option>
+                              </select>
+                            </label>
 
                             {/* Color */}
                             <input
@@ -957,7 +974,9 @@ export const PDFEditorView: React.FC = () => {
                           return (
                             <div
                               key={element.id}
-                              onPointerDown={(e) => handleElementMouseDown(e, element)}
+                              onPointerDown={(e) => { if (inlineEditingId !== element.id) handleElementMouseDown(e, element); }}
+                              onDoubleClick={e => { e.stopPropagation(); if (element.type === 'text') setInlineEditingId(element.id); }}
+                              onClick={e => e.stopPropagation()}
                               className={`absolute cursor-move touch-none transition-shadow rounded-sm ${
                                 isSelected
                                   ? 'ring-2 ring-blue-500 ring-offset-1 shadow-md'
@@ -971,7 +990,25 @@ export const PDFEditorView: React.FC = () => {
                                 minHeight: element.type === 'text' ? '24px' : undefined
                               }}
                             >
-                              {element.type === 'text' && (
+                              {element.type === 'text' && (inlineEditingId === element.id ? (
+                                <div onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
+                                  className="relative z-20 w-full min-w-[180px]">
+                                  <textarea ref={inlineEditorRef} autoFocus rows={3} maxLength={2000}
+                                    value={element.text || ''}
+                                    onChange={e => updateSelectedElement({ text: e.target.value })}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
+                                        e.stopPropagation();
+                                        setInlineEditingId(null);
+                                      }
+                                    }}
+                                    aria-label="Edit PDF replacement text"
+                                    className="w-full min-h-[72px] rounded border-2 border-blue-600 bg-white p-2 text-slate-900 shadow-lg"
+                                    style={{ fontSize: '14px', fontFamily: 'sans-serif' }} />
+                                  <button type="button" onClick={e => { e.stopPropagation(); setInlineEditingId(null); }}
+                                    className="rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white shadow">Done</button>
+                                </div>
+                              ) : (
                                 <div
                                   className="px-2 py-0.5 rounded font-sans leading-tight whitespace-pre-wrap select-none"
                                   style={{
@@ -989,7 +1026,7 @@ export const PDFEditorView: React.FC = () => {
                                 >
                                   {element.text || 'Text'}
                                 </div>
-                              )}
+                              ))}
 
                               {(element.type === 'signature' || element.type === 'image') && element.imageDataUrl && (
                                 <img
