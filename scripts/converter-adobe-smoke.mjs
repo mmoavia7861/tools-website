@@ -11,7 +11,8 @@ const server = spawn(process.execPath,['node_modules/vite/bin/vite.js','preview'
 let log='';
 server.stdout.on('data', chunk=>log+=String(chunk));
 server.stderr.on('data', chunk=>log+=String(chunk));
-const base='http://127.0.0.1:4175/ToolCresta/';
+// Keep the actual GitHub Pages repository path; ToolCresta is the displayed brand, not the repo name.
+const base='http://127.0.0.1:4175/RankNova/';
 let browser;
 try {
   let ready=false;
