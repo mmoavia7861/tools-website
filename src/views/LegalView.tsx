@@ -95,7 +95,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
                 {current.title}
               </h1>
               <p className="mt-2 text-xs text-slate-500">
-                Effective Date: October 31, 2026 • Version 1.1
+                Effective Date: November 14, 2026 • Version 1.2
               </p>
             </div>
 
@@ -133,6 +133,16 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
                     public file library. Temporary memory, network transmission and service-provider logs
                     may still exist. We cannot guarantee that every third-party service retains no data.
                     On-device processing is the more private option where available.
+                  </p>
+                  <p>
+                    For PDF-to-Word and Word-to-PDF, the default basic browser converter processes the file
+                    locally. If you explicitly choose Adobe PDF Services cloud conversion after it is enabled,
+                    RankNova sends your selected file through a secured Cloudflare Worker to Adobe for document
+                    processing. The Worker does not deliberately persist these files to a database, but Adobe
+                    may handle and retain them under its own service terms and privacy policy. Cloudflare
+                    Turnstile also checks automated abuse and may process security signals. The conversion
+                    service has file-size and rate limits. Do not upload confidential or sensitive documents
+                    unless you have authority to share them with Adobe.
                   </p>
                 </section>
                 <section>
