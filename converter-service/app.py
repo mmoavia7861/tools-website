@@ -2,6 +2,12 @@
 import asyncio
 import os
 import tempfile
+import zipfile
+import io
+import time
+from collections import defaultdict
+from threading import Lock
+from fastapi import Request
 from pathlib import Path
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +17,26 @@ from pdf2docx import Converter
 app = FastAPI(docs_url=None, redoc_url=None)
 allowed = [x.strip() for x in os.getenv("ALLOWED_ORIGINS", "").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=allowed, allow_methods=["POST"], allow_headers=["Content-Type"])
-MAX_SIZE = 15 * 1024 * 1024
+MAX_SIZE = 10 * 1024 * 1024
+RATE_LIMIT = 6
+_window = defaultdict(list)
+_lock = Lock()
+
+@app.middleware("http")
+async def limit_requests(request: Request, call_next):
+    if request.url.path.startswith("/api/convert/"):
+        client = request.client.host if request.client else "unknown"
+        now = time.monotonic()
+        with _lock:
+            timestamps = [t for t in _window[client] if now - t < 60]
+            if len(timestamps) >= RATE_LIMIT:
+                return Response("Too many requests", status_code=429)
+            timestamps.append(now)
+            _window[client] = timestamps
+            if len(_window) > 10000:
+                _window.clear()
+    return await call_next(request)
+
 
 @app.get("/health")
 async def health():
@@ -50,6 +75,16 @@ async def convert(mode: str, file: UploadFile = File(...)):
         raise HTTPException(400, "Invalid PDF file")
     if mode == "word-to-pdf" and not content.startswith(b"PK\\x03\\x04"):
         raise HTTPException(400, "Invalid DOCX file")
+    if mode == "word-to-pdf":
+        try:
+            with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                entries = archive.infolist()
+                if len(entries) > 1500 or sum(item.file_size for item in entries) > 75 * 1024 * 1024:
+                    raise ValueError("DOCX archive exceeds safe limits")
+                if "word/document.xml" not in archive.namelist():
+                    raise ValueError("Missing DOCX document body")
+        except (zipfile.BadZipFile, ValueError):
+            raise HTTPException(400, "Invalid or oversized DOCX document")
     with tempfile.TemporaryDirectory(prefix="ranknova-") as folder:
         source = Path(folder) / ("input" + extension)
         target = Path(folder) / ("input" + (".docx" if mode == "pdf-to-word" else ".pdf"))
@@ -61,7 +96,7 @@ async def convert(mode: str, file: UploadFile = File(...)):
             if not target.is_file() or target.stat().st_size == 0:
                 raise ValueError("No converted file generated")
             data = target.read_bytes()
-        except (ValueError, RuntimeError, TimeoutError, Exception) as exc:
+        except Exception:
             # Never return converter stack traces or document contents.
             raise HTTPException(422, "Could not convert this document. Check that it is not corrupted or encrypted.") from None
     mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document" if mode == "pdf-to-word" else "application/pdf"
