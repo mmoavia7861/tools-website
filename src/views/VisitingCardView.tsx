@@ -1331,6 +1331,10 @@ export const VisitingCardView: React.FC = () => {
               Create ultra-modern, professional business cards with real-time 3D preview, QR vCard integration, custom branding, and print-perfect 300 DPI exports.
             </p>
 
+            <a href={import.meta.env.BASE_URL + 'ai-card-generator/'}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-800 hover:bg-indigo-100">
+              <Sparkles className="h-4 w-4" /> Try prompt-based visiting, wedding & birthday card maker
+            </a>
             {/* Quick 1-Click Industry Presets Carousel */}
             <div className="mt-6 flex items-center justify-center gap-2 overflow-x-auto pb-2 scrollbar-none">
               <span className="text-xs font-semibold text-slate-500 shrink-0 flex items-center gap-1">
