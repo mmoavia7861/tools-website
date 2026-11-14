@@ -696,6 +696,19 @@ export const PDFEditorView: React.FC = () => {
                 </div>
               </div>
 
+              <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-3">
+                <input ref={imageInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleAddImage(file);
+                  e.target.value = '';
+                }} />
+                <button type="button" onClick={() => imageInputRef.current?.click()} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-blue-50">+ Add Image / Logo</button>
+                <button type="button" onClick={() => addMarkup('highlight')} className="rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-900">Highlight</button>
+                <button type="button" onClick={() => addMarkup('rectangle')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold">Rectangle</button>
+                <button type="button" onClick={() => addMarkup('whiteout')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold">Cover Text (Visual)</button>
+                <p className="basis-full text-[11px] text-slate-500">To visually replace words: add a white cover over the old text, then choose Add Words / Text. This is not secure redaction: original underlying PDF content may remain extractable.</p>
+              </div>
+
               {/* Main Two-Column Layout: Left Thumbnails + Focused Interactive Page, Right Inspector & Export */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 {/* Center / Left 8 Cols */}
