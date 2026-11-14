@@ -104,6 +104,16 @@ export async function editExistingPdf(
     const isSideways = finalRot === 90 || finalRot === 270;
     const effectiveWidth = isSideways ? height : width;
     const effectiveHeight = isSideways ? width : height;
+    // Map points in the rotated, displayed page back to source PDF coordinates.
+    // Apply the inverse screen rotation to each added text/image so overlays stay upright.
+    const mapPoint = (x: number, y: number) => {
+      switch (finalRot) {
+        case 90: return { x: width - y, y: x };
+        case 180: return { x: width - x, y: height - y };
+        case 270: return { x: y, y: height - x };
+        default: return { x, y };
+      }
+    };
 
     // 1. Draw page-specific annotations for page i
     const pageAnnotations = annotations.filter((ann) => ann.pageIndex === i);
@@ -114,9 +124,21 @@ export async function editExistingPdf(
         ann.y,
         ann.width,
         ann.height,
-        width,
-        height
+        effectiveWidth,
+        effectiveHeight
       );
+      const corners = [
+        mapPoint(coords.x, coords.y),
+        mapPoint(coords.x + coords.width, coords.y),
+        mapPoint(coords.x, coords.y + coords.height),
+        mapPoint(coords.x + coords.width, coords.y + coords.height)
+      ];
+      const rect = {
+        x: Math.min(...corners.map(p => p.x)),
+        y: Math.min(...corners.map(p => p.y)),
+        width: Math.max(...corners.map(p => p.x)) - Math.min(...corners.map(p => p.x)),
+        height: Math.max(...corners.map(p => p.y)) - Math.min(...corners.map(p => p.y))
+      };
 
       if (ann.type === 'text' && ann.text && ann.text.trim() !== '') {
         const textFont = getFontByName(ann.fontFamily);
@@ -127,10 +149,10 @@ export async function editExistingPdf(
         if (ann.backgroundColor && ann.backgroundColor !== 'transparent') {
           const bgRgb = hexToRgb01(ann.backgroundColor);
           page.drawRectangle({
-            x: coords.x - 2,
-            y: coords.y - 2,
-            width: coords.width + 4,
-            height: coords.height + 4,
+            x: rect.x - 2,
+            y: rect.y - 2,
+            width: rect.width + 4,
+            height: rect.height + 4,
             color: rgb(bgRgb.r, bgRgb.g, bgRgb.b),
             opacity: 0.85
           });
@@ -142,9 +164,9 @@ export async function editExistingPdf(
 
         lines.forEach((line, lineIdx) => {
           if (!line.trim()) return;
+          const anchor = mapPoint(coords.x, coords.y + coords.height - fontSize - (lineIdx * lineHeight));
           page.drawText(line, {
-            x: coords.x,
-            y: coords.y + coords.height - fontSize - (lineIdx * lineHeight),
+            x: anchor.x, y: anchor.y, rotate: degrees(finalRot),
             size: fontSize,
             font: textFont,
             color: rgb(colorRgb.r, colorRgb.g, colorRgb.b)
@@ -154,13 +176,13 @@ export async function editExistingPdf(
         const c = hexToRgb01(ann.color || '#FACC15');
         if (ann.type === 'rectangle') {
           page.drawRectangle({
-            x: coords.x, y: coords.y, width: coords.width, height: coords.height,
+            x: rect.x, y: rect.y, width: rect.width, height: rect.height,
             borderColor: rgb(c.r, c.g, c.b), borderWidth: 2
           });
         } else {
           const shade = ann.type === 'whiteout' ? { r: 1, g: 1, b: 1 } : c;
           page.drawRectangle({
-            x: coords.x, y: coords.y, width: coords.width, height: coords.height,
+            x: rect.x, y: rect.y, width: rect.width, height: rect.height,
             color: rgb(shade.r, shade.g, shade.b),
             opacity: ann.type === 'whiteout' ? 1 : Math.max(0.05, Math.min(0.8, ann.opacity ?? 0.28))
           });
@@ -183,11 +205,13 @@ export async function editExistingPdf(
           }
 
           if (embeddedImage) {
+            const anchor = mapPoint(coords.x, coords.y);
             page.drawImage(embeddedImage, {
-              x: coords.x,
-              y: coords.y,
+              x: anchor.x,
+              y: anchor.y,
               width: coords.width,
-              height: coords.height
+              height: coords.height,
+              rotate: degrees(finalRot)
             });
           }
         } catch (imgErr) {
