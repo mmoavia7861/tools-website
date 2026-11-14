@@ -16,6 +16,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
     { label: 'PDF Tools', path: '/compress-pdf', icon: FileText },
     { label: 'BG Remover', path: '/background-remover', icon: Sparkles },
     { label: 'Visiting Card', path: '/visiting-card-generator', icon: CreditCard },
+    { label: 'AI Cards', path: '/ai-card-generator', icon: Sparkles },
     { label: 'Blog', path: '/blog' },
     { label: 'About', path: '/about' },
   ];
