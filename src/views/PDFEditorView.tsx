@@ -783,10 +783,45 @@ export const PDFEditorView: React.FC = () => {
                 <button type="button" onClick={() => addMarkup('highlight')} className="rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-900">Highlight</button>
                 <button type="button" onClick={() => addMarkup('rectangle')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold">Rectangle</button>
                 <button type="button" onClick={() => addMarkup('whiteout')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold">Cover Text (Visual)</button>
-                <button type="button" onClick={() => setReplaceMode(value => !value)} aria-pressed={replaceMode} className={replaceMode ? "rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white" : "rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700"}>Select Text to Replace (Visual)</button>
-                {replaceMode && <p role="status" className="basis-full text-xs font-semibold text-blue-700">{(pages[activePageIndex]?.originalRotation + pages[activePageIndex]?.rotation) % 360 !== 0 ? 'Reset page rotation before selecting existing text.' : textHits.length ? 'Select one of the outlined text fragments on the page.' : 'No selectable text detected yet. Scanned PDFs need OCR.'}</p>}
-                <p className="basis-full text-[11px] text-slate-500">To visually replace words: add a white cover over the old text, then choose Add Words / Text. This is not secure redaction: original underlying PDF content may remain extractable.</p>
+                <button type="button" onClick={() => setReplaceMode(value => !value)} aria-pressed={replaceMode} className={replaceMode ? "rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white" : "rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700"}>Edit Existing Page Text (Visual)</button>
+                {replaceMode && <p role="status" className="basis-full text-xs font-semibold text-blue-700">{(pages[activePageIndex]?.originalRotation + pages[activePageIndex]?.rotation) % 360 !== 0 ? 'Reset page rotation before selecting existing text.' : textHits.length ? 'Click outlined text, then type directly over it or use the Edit Words panel.' : 'No selectable text detected yet. Scanned PDFs need OCR.'}</p>}
+                <p className="basis-full text-[11px] text-slate-500">To edit existing selectable text, choose Edit Existing Page Text, click a line, type the replacement, and export. This is a visual cover-and-replace method, not secure redaction or actual deletion of original text. Scanned PDFs and text over complex backgrounds may not replace cleanly.</p>
               </div>
+
+              {nativeTextFields.length > 0 && (
+                <section aria-label="Edit native PDF form text" className="rounded-xl border border-indigo-200 bg-white p-4 space-y-3">
+                  <h2 className="text-sm font-bold text-slate-900">Edit Fillable PDF Text Fields</h2>
+                  <p className="text-xs text-slate-600">
+                    These fields are part of the original PDF form. Changing them updates the actual form values.
+                    On export, the form is flattened so the changed text remains visible; other fields also become non-editable.
+                    The page preview shows the original form until you export.
+                  </p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {nativeTextFields.map(field => (
+                      <label key={field.name} className="flex flex-col gap-1 text-xs font-semibold text-slate-800">
+                        <span className="break-words">{field.name}</span>
+                        <textarea rows={2} maxLength={2000}
+                          value={nativeFieldChanges[field.name] ?? field.originalValue}
+                          onChange={e => {
+                            const next = e.target.value;
+                            setNativeFieldChanges(prev => {
+                              const updated = { ...prev };
+                              if (next === field.originalValue) delete updated[field.name];
+                              else updated[field.name] = next;
+                              return updated;
+                            });
+                            setEditedPdfBytes(null);
+                          }}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 focus:border-blue-600 focus:outline-none"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  {Object.keys(nativeFieldChanges).length > 0 && <p role="status" className="text-xs font-semibold text-indigo-700">
+                    {Object.keys(nativeFieldChanges).length} form field change(s) pending. Save & Export PDF to apply.
+                  </p>}
+                </section>
+              )}
 
               {/* Main Two-Column Layout: Left Thumbnails + Focused Interactive Page, Right Inspector & Export */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
