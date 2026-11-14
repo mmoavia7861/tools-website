@@ -39,9 +39,16 @@ export function makeCardPrompt(kind: CardKind, details = ''): string {
     birthday: 'Create a colorful birthday invitation with a playful design. Name: [celebrant]. Age: [age]. Date: [date]. Time: [time]. Venue: [venue]. RSVP: [contact].'
   };
   const cleaned = details.trim().replace(/[\u0000-\u001F\u007F]/g, ' ').slice(0, 480);
-  return (cleaned && !/^(visiting card|wedding card|birthday card|birthday invitation|wedding invitation|.*kaise banayein\??|.*design ideas)$/i.test(cleaned)
-    ? base[kind] + '\nUser details / preferences: ' + cleaned
-    : base[kind]).slice(0, 1400);
+  const generic = /^(visiting card|wedding card|birthday card|birthday invitation|wedding invitation|.*kaise banayein\??|.*design ideas)$/i.test(cleaned);
+  if (!cleaned || generic) return base[kind];
+  // Keep user-supplied details ahead of defaults so local extraction never
+  // mistakes placeholder names for actual names in a personalized request.
+  const intro: Record<CardKind, string> = {
+    visiting: 'Create a clean modern blue and white visiting card.',
+    wedding: 'Create an elegant floral wedding invitation in rose and cream colors.',
+    birthday: 'Create a colorful playful birthday invitation.'
+  };
+  return (intro[kind] + '\n' + cleaned + '\nUse only the details supplied above. Leave missing names, dates and contact fields blank for editing.').slice(0, 1400);
 }
 
 export function isAssistantPath(value: unknown): value is AssistantPath {
