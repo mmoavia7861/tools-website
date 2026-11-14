@@ -150,7 +150,22 @@ export async function editExistingPdf(
             color: rgb(colorRgb.r, colorRgb.g, colorRgb.b)
           });
         });
-      } else if (ann.type === 'signature' && ann.imageDataUrl) {
+      } else if (ann.type === 'highlight' || ann.type === 'whiteout' || ann.type === 'rectangle') {
+        const c = hexToRgb01(ann.color || '#FACC15');
+        if (ann.type === 'rectangle') {
+          page.drawRectangle({
+            x: coords.x, y: coords.y, width: coords.width, height: coords.height,
+            borderColor: rgb(c.r, c.g, c.b), borderWidth: 2
+          });
+        } else {
+          const shade = ann.type === 'whiteout' ? { r: 1, g: 1, b: 1 } : c;
+          page.drawRectangle({
+            x: coords.x, y: coords.y, width: coords.width, height: coords.height,
+            color: rgb(shade.r, shade.g, shade.b),
+            opacity: ann.type === 'whiteout' ? 1 : Math.max(0.05, Math.min(0.8, ann.opacity ?? 0.28))
+          });
+        }
+      } else if ((ann.type === 'signature' || ann.type === 'image') && ann.imageDataUrl) {
         try {
           let embeddedImage = embeddedImageCache.get(ann.imageDataUrl);
           if (!embeddedImage) {
@@ -177,7 +192,7 @@ export async function editExistingPdf(
           }
         } catch (imgErr) {
           console.error('Could not embed signature image on page', i, imgErr);
-          throw new Error('Signature could not be embedded. Please recreate the signature and try again.');
+          throw new Error('Image or signature could not be embedded. Please reselect it and try again.');
         }
       }
     }
