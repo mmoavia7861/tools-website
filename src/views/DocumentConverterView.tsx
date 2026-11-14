@@ -9,6 +9,7 @@ async function convertLocally(file: File, mode: Mode): Promise<Blob> {
   if (mode === 'pdf-to-word') {
     if (new TextDecoder('latin1').decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error('Invalid PDF file.');
     const pdfjs = await import('pdfjs-dist');
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
     const { Document, Packer, Paragraph, TextRun } = await import('docx');
     const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true, disableFontFace: true }).promise;
     if (pdf.numPages > 60) throw new Error('This free converter supports up to 60 PDF pages.');
