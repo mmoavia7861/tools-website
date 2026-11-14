@@ -35,6 +35,28 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
   const widgetRef = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
 
+  // A prompt suggestion is passed locally by the site guide; no data leaves the browser.
+  useEffect(() => {
+    const applySuggestion = () => {
+      try {
+        const raw = sessionStorage.getItem('toolcresta:card-prompt');
+        if (!raw) return;
+        sessionStorage.removeItem('toolcresta:card-prompt');
+        const value = JSON.parse(raw);
+        if (!['visiting', 'wedding', 'birthday'].includes(value?.kind) ||
+            typeof value?.prompt !== 'string' || value.prompt.length > 1500) return;
+        setKind(value.kind as CardKind);
+        setDraft(blankCard(value.kind as CardKind));
+        setPrompt(value.prompt);
+        setNotice('Guide suggestion loaded. Replace placeholders and review all details before exporting.');
+        setPreviewError('');
+      } catch { /* Storage may be unavailable in private browsing. */ }
+    };
+    applySuggestion();
+    window.addEventListener('toolcresta:card-prompt', applySuggestion);
+    return () => window.removeEventListener('toolcresta:card-prompt', applySuggestion);
+  }, []);
+
   const selectKind = (next: CardKind) => {
     setKind(next); setDraft(blankCard(next)); setPrompt(EXAMPLES[next]); setPreviewError(''); setNotice('');
   };
@@ -176,7 +198,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
     try {
       const blob = await exportCardFile(canvas,draft,format);
       if (!blob.size) throw new Error('Export returned an empty file.');
-      fileDownload(blob, 'ranknova-' + kind + '-card.' + format);
+      fileDownload(blob, 'toolcresta-' + kind + '-card.' + format);
       setNotice(format.toUpperCase() + ' created in your browser. Check names, dates and layout before printing.');
     } catch (err) {
       setPreviewError(err instanceof Error ? err.message : 'Download failed.');

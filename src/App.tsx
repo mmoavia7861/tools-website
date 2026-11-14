@@ -12,6 +12,7 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { CookieBanner } from './components/CookieBanner';
 import { PointerEffects } from './components/PointerEffects';
+import { ToolAssistant } from './components/ToolAssistant';
 import { HomeView } from './views/HomeView';
 import { QRGeneratorView } from './views/QRGeneratorView';
 import { PDFCompressorView } from './views/PDFCompressorView';
@@ -161,6 +162,7 @@ export default function App() {
       <Footer navigate={navigate} />
       <CookieBanner />
       <PointerEffects />
+      <ToolAssistant navigate={navigate} />
     </div>
   );
 }
