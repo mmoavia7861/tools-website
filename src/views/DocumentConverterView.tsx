@@ -3,7 +3,7 @@ import { SEOHead } from '../components/SEOHead';
 
 type Mode = 'pdf-to-word' | 'word-to-pdf';
 const MAX_BYTES = 10 * 1024 * 1024;
-const API_URL = (import.meta.env.VITE_CONVERTER_API_URL || '').replace(/\\/$/, '');
+const API_URL = (import.meta.env.VITE_CONVERTER_API_URL || '').replace(/\/$/, '');
 
 async function convertLocally(file: File, mode: Mode): Promise<Blob> {
   const bytes = await file.arrayBuffer();
