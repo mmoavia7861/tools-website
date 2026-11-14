@@ -55,7 +55,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-3.5 py-1 text-xs font-semibold text-blue-700 shadow-xs mb-6">
             <ShieldCheck className="h-4 w-4" />
-            <span>Privacy-First Architecture • Zero File Persistence</span>
+            <span>Browser-first tools • Server conversion clearly labelled</span>
           </div>
 
           <h1 className="text-4xl font-extrabold tracking-tight text-[#0F172A] sm:text-5xl md:text-6xl max-w-4xl mx-auto leading-tight">
@@ -65,7 +65,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
 
           <p className="mt-5 max-w-2xl mx-auto text-base sm:text-lg text-slate-600 leading-relaxed">
             Create QR codes, compress PDFs, and remove image backgrounds with simple tools built for speed and strict privacy.
-            No accounts required, no hidden tracking, and no watermarks.
+            Browser-first utilities and optional server-side document conversion. Check each tool for privacy details.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
@@ -99,14 +99,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
               <EyeOff className="h-5 w-5 text-emerald-600 shrink-0" />
               <div className="text-xs">
                 <p className="font-semibold text-slate-900">Zero Storage</p>
-                <p className="text-slate-500">No uploads retained</p>
+                <p className="text-slate-500">See each tool's policy</p>
               </div>
             </div>
             <div className="flex items-center gap-2.5 rounded-xl bg-white/80 p-3 border border-slate-100 shadow-xs">
               <Zap className="h-5 w-5 text-amber-500 shrink-0" />
               <div className="text-xs">
-                <p className="font-semibold text-slate-900">100% Free</p>
-                <p className="text-slate-500">No paywalls or limits</p>
+                <p className="font-semibold text-slate-900">Free browser tools</p>
+                <p className="text-slate-500">Server limits may apply</p>
               </div>
             </div>
             <div className="flex items-center gap-2.5 rounded-xl bg-white/80 p-3 border border-slate-100 shadow-xs">
@@ -133,7 +133,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
               { title: 'Edit PDF', path: '/edit-pdf' },
               { title: 'QR Code Generator', path: '/qr-code-generator' },
               { title: 'Visiting Card Maker', path: '/visiting-card-generator' },
-              { title: 'Video Compressor', path: '/compress-video' }
+              { title: 'Video Compressor', path: '/compress-video' },
+              { title: 'PDF to Word', path: '/pdf-to-word' },
+              { title: 'Word to PDF', path: '/word-to-pdf' }
             ].map(tool => (
               <button key={tool.path} type="button" onClick={() => navigate(tool.path)}
                 className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left text-sm font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
