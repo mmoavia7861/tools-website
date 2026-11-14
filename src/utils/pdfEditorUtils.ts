@@ -6,7 +6,7 @@
 
 export interface NormalizedElement {
   id: string;
-  type: 'text' | 'signature' | 'stamp';
+  type: 'text' | 'signature' | 'stamp' | 'image' | 'highlight' | 'whiteout' | 'rectangle';
   pageIndex: number;
   // Normalized 0-1 relative to page width and height
   x: number; 
@@ -19,6 +19,7 @@ export interface NormalizedElement {
   fontFamily?: 'Helvetica' | 'HelveticaBold' | 'TimesRoman' | 'Courier';
   color?: string; // hex #rrggbb
   backgroundColor?: string; // hex or 'transparent'
+  opacity?: number; // 0 to 1 for translucent highlight
   // For signature / stamp
   imageDataUrl?: string; // PNG data URL
   stampType?: 'APPROVED' | 'CONFIDENTIAL' | 'REJECTED' | 'DATE' | 'CHECK';
