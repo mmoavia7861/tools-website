@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeCardPrompt, suggestTool, isAssistantPath } from './toolAssistant';
+import { draftFromPrompt } from './aiCard';
 
 test('visiting, wedding and birthday requests suggest the right card maker', () => {
   const wedding = suggestTool('shaadi wedding card for Ali and Ayesha');
@@ -23,6 +24,7 @@ test('PDF questions route to relevant tools and explain real limitations', () =>
 test('never invents user card facts and restricts tool paths', () => {
   const prompt = makeCardPrompt('wedding', 'Wedding for Ali and Ayesha on 12 December');
   assert.match(prompt, /Ali and Ayesha/);
+  assert.equal(draftFromPrompt('wedding', prompt).headline, 'Ali & Ayesha');
   assert.match(makeCardPrompt('birthday'), /\[celebrant\]/);
   assert.ok(prompt.length <= 1400);
   assert.equal(isAssistantPath('/wedding-card-maker'), true);
