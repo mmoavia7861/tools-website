@@ -27,10 +27,13 @@ import {
 type QRContentType = 'url' | 'text' | 'wifi' | 'vcard';
 
 export const QRGeneratorView: React.FC = () => {
+  const siteUrl = typeof window !== 'undefined'
+    ? new URL(import.meta.env.BASE_URL, window.location.origin).href
+    : 'https://mmoavia7861.github.io/RankNova/';
   const [contentType, setContentType] = useState<QRContentType>('url');
 
   // Input states
-  const [urlInput, setUrlInput] = useState('https://ranknova.app');
+  const [urlInput, setUrlInput] = useState(siteUrl);
   const [textInput, setTextInput] = useState('');
   const [wifiData, setWifiData] = useState<WifiPayload>({
     ssid: '',
@@ -70,10 +73,10 @@ export const QRGeneratorView: React.FC = () => {
         if (!validated.valid && urlInput.trim() !== '') {
           return urlInput.trim();
         }
-        return validated.formatted || 'https://ranknova.app';
+        return validated.formatted || siteUrl;
       }
       case 'text':
-        return textInput.trim() || 'RankNova Privacy-First Tools';
+        return textInput.trim() || 'ToolCresta Privacy-First Tools';
       case 'wifi':
         return buildWifiPayload({
           ssid: wifiData.ssid.trim() || 'MyNetwork',
@@ -92,7 +95,7 @@ export const QRGeneratorView: React.FC = () => {
           website: vcardData.website
         });
       default:
-        return 'https://ranknova.app';
+        return siteUrl;
     }
   };
 
@@ -167,7 +170,7 @@ export const QRGeneratorView: React.FC = () => {
       const dataUrl = offscreen.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = dataUrl;
-      a.download = `ranknova-qr-${contentType}-${downloadSize}px.png`;
+      a.download = `toolcresta-qr-${contentType}-${downloadSize}px.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -183,7 +186,7 @@ export const QRGeneratorView: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ranknova-qr-${contentType}.svg`;
+    a.download = `toolcresta-qr-${contentType}.svg`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -203,7 +206,7 @@ export const QRGeneratorView: React.FC = () => {
   };
 
   const handleReset = () => {
-    setUrlInput('https://ranknova.app');
+    setUrlInput(siteUrl);
     setTextInput('');
     setWifiData({ ssid: '', password: '', encryption: 'WPA', hidden: false });
     setVcardData({ firstName: '', lastName: '', organization: '', title: '', phone: '', email: '', website: '' });
@@ -217,13 +220,13 @@ export const QRGeneratorView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="Free QR Code Generator — PNG & SVG | RankNova"
+        title="Free QR Code Generator — PNG & SVG | ToolCresta"
         description="Create QR codes for URLs, text, Wi-Fi, and vCards. Customize size and colors, then download your QR code as PNG or SVG for free. 100% on-device privacy."
         canonicalPath="/qr-code-generator"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'RankNova Free QR Code Generator',
+          name: 'ToolCresta Free QR Code Generator',
           applicationCategory: 'UtilityApplication',
           operatingSystem: 'Any',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
@@ -329,7 +332,7 @@ export const QRGeneratorView: React.FC = () => {
                       />
                     </div>
                     <p className="mt-1.5 text-xs text-slate-500">
-                      RankNova encodes this URL locally. Our servers will never connect to or crawl this address.
+                      ToolCresta encodes this URL locally. Our servers will never connect to or crawl this address.
                     </p>
                   </div>
                 )}
@@ -725,7 +728,7 @@ export const QRGeneratorView: React.FC = () => {
               <div>
                 <h3 className="font-semibold text-slate-900 text-sm">Static vs. Redirect Codes</h3>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                  RankNova generates permanent static QR codes. Static codes store your actual payload directly.
+                  ToolCresta generates permanent static QR codes. Static codes store your actual payload directly.
                   They do not depend on third-party redirection servers, ensuring your barcode will function indefinitely without subscription fees.
                 </p>
               </div>

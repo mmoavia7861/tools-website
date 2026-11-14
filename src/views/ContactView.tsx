@@ -60,8 +60,8 @@ export const ContactView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="Contact RankNova — Support, Privacy & DMCA Inquiries"
-        description="Contact the RankNova engineering team for technical support, privacy data requests, security disclosures, and DMCA inquiries."
+        title="Contact ToolCresta — Support, Privacy & DMCA Inquiries"
+        description="Contact the ToolCresta engineering team for technical support, privacy data requests, security disclosures, and DMCA inquiries."
         canonicalPath="/contact"
       />
 

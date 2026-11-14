@@ -38,7 +38,7 @@ export const ImageToPdfView: React.FC = () => {
   const [pageSize, setPageSize] = useState<PageSizeOption>('a4');
   const [orientation, setOrientation] = useState<PageOrientationOption>('auto');
   const [margin, setMargin] = useState<PageMarginOption>('none');
-  const [pdfFileName, setPdfFileName] = useState('ranknova-converted-document');
+  const [pdfFileName, setPdfFileName] = useState('toolcresta-converted-document');
 
   // PDF Stamp & Page Numbering Edit Options
   const [addPageNumbers, setAddPageNumbers] = useState(false);
@@ -262,13 +262,13 @@ export const ImageToPdfView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="Image to PDF Converter & Editor — Edit, Rotate & Convert | RankNova"
+        title="Image to PDF Converter & Editor — Edit, Rotate & Convert | ToolCresta"
         description="Convert JPG and PNG images to PDF and edit document pages: rotate pages, add page numbering, stamp watermarks, and reorder on-device with zero file uploads."
         canonicalPath="/image-to-pdf"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'RankNova Image to PDF Converter and Editor',
+          name: 'ToolCresta Image to PDF Converter and Editor',
           applicationCategory: 'UtilityApplication',
           operatingSystem: 'Any',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
@@ -687,7 +687,7 @@ export const ImageToPdfView: React.FC = () => {
                 How to Convert and Edit Images to PDF Online
               </h2>
               <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-                RankNova gives you granular control over every page before compiling your final PDF document.
+                ToolCresta gives you granular control over every page before compiling your final PDF document.
                 Fix upside-down photos with 90° rotation, enhance contrast for readable document scans, and apply page numbering automatically.
               </p>
             </div>

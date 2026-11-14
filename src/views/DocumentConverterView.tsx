@@ -179,7 +179,7 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
   };
 
   return <section className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
-    <SEOHead title={title + ' | RankNova'} description={toWord ? 'Convert PDF text to editable DOCX using browser processing or an optional conversion server. Scanned PDFs and complex formatting are not supported.' : 'Convert Word DOCX to PDF using browser processing or an optional conversion server. Basic text only; complex formatting and non-Latin scripts are not supported.'} canonicalPath={'/' + mode} />
+    <SEOHead title={title + ' | ToolCresta'} description={toWord ? 'Convert PDF text to editable DOCX using browser processing or an optional conversion server. Scanned PDFs and complex formatting are not supported.' : 'Convert Word DOCX to PDF using browser processing or an optional conversion server. Basic text only; complex formatting and non-Latin scripts are not supported.'} canonicalPath={'/' + mode} />
     <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
     <p className="mt-3 text-slate-600">{toWord ? 'Extract selectable text from PDFs into editable DOCX. Scanned PDFs, images, tables and precise layouts are not preserved in basic browser mode.' : 'Convert basic DOCX text into PDF. Images, tables, styles and complex layouts are not preserved in basic browser mode; some non-Latin scripts are unsupported.'}</p>
     <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

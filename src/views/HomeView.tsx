@@ -32,20 +32,20 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: 'RankNova',
-    url: typeof window !== 'undefined' ? window.location.origin : 'https://ranknova.app',
+    name: 'ToolCresta',
+    url: typeof window !== 'undefined' ? new URL(import.meta.env.BASE_URL, window.location.origin).href : 'https://mmoavia7861.github.io/RankNova/',
     description: 'Free, fast, and privacy-first online tools: QR Code Generator, PDF Compressor, and AI Background Remover.',
     publisher: {
       '@type': 'Organization',
-      name: 'RankNova'
+      name: 'ToolCresta'
     }
   };
 
   return (
     <>
       <SEOHead
-        title="RankNova — Free QR Code, PDF Compression & Background Removal Tools"
-        description="Create QR codes, compress PDF files, and remove image backgrounds online with RankNova. Fast, simple tools designed with privacy and security in mind."
+        title="ToolCresta — Free QR Code, PDF Compression & Background Removal Tools"
+        description="Create QR codes, compress PDF files, and remove image backgrounds online with ToolCresta. Fast, simple tools designed with privacy and security in mind."
         canonicalPath="/"
         jsonLd={jsonLd}
       />
@@ -82,7 +82,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
               onClick={() => navigate('/about')}
               className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3.5 text-base font-medium text-slate-700 hover:bg-slate-50 transition"
             >
-              How RankNova Protects Privacy
+              How ToolCresta Protects Privacy
             </button>
           </div>
 
@@ -414,7 +414,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
               </h2>
               <p className="mt-4 text-slate-600 leading-relaxed text-sm sm:text-base">
                 Most web utilities secretly upload your files to remote cloud buckets, sell analytics to data brokers,
-                or silently compress documents by degrading text into unreadable pixels. RankNova was built to be fundamentally different.
+                or silently compress documents by degrading text into unreadable pixels. ToolCresta was built to be fundamentally different.
               </p>
 
               <div className="mt-6 space-y-4">
@@ -461,7 +461,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
               <div className="space-y-3 text-sm">
                 <div className="flex items-center justify-between py-2 border-b border-slate-200/80">
                   <span className="text-slate-600">On-device client-side QR generation</span>
-                  <span className="font-semibold text-emerald-600">✓ RankNova (Yes)</span>
+                  <span className="font-semibold text-emerald-600">✓ ToolCresta (Yes)</span>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-slate-200/80">
                   <span className="text-slate-600">Permanent PDF upload retention</span>

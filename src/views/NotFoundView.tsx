@@ -10,7 +10,7 @@ export const NotFoundView: React.FC<NotFoundViewProps> = ({ navigate }) => {
   return (
     <>
       <SEOHead
-        title="404 — Page Not Found | RankNova"
+        title="404 — Page Not Found | ToolCresta"
         description="The requested page could not be found."
         canonicalPath="/404"
       />

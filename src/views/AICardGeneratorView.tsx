@@ -198,9 +198,9 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
   );
 
   return <div className="bg-slate-50 min-h-screen pb-20">
-    <SEOHead title={title + ' | RankNova'} description={description} canonicalPath={kind==='wedding'?'/wedding-card-maker':kind==='birthday'?'/birthday-card-maker':'/ai-card-generator'}/>
+    <SEOHead title={title + ' | ToolCresta'} description={description} canonicalPath={kind==='wedding'?'/wedding-card-maker':kind==='birthday'?'/birthday-card-maker':'/ai-card-generator'}/>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
-      <div className="flex items-center gap-2 text-blue-700 text-xs font-bold tracking-wide uppercase"><Sparkles className="w-4 h-4"/> RankNova Creative Tools</div>
+      <div className="flex items-center gap-2 text-blue-700 text-xs font-bold tracking-wide uppercase"><Sparkles className="w-4 h-4"/> ToolCresta Creative Tools</div>
       <h1 className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900">AI Card Generator & Invitation Maker</h1>
       <p className="mt-3 max-w-3xl text-slate-600 leading-relaxed">Create printable visiting cards, wedding invitations and birthday invitations. Design with free local templates now. Gemini-powered prompt generation activates after the secure API is connected.</p>
 

@@ -10,8 +10,8 @@ export const AboutView: React.FC<AboutViewProps> = ({ navigate }) => {
   return (
     <>
       <SEOHead
-        title="About RankNova — Privacy-First Online Tools Architecture"
-        description="Learn about RankNova's mission, on-device browser processing, zero file persistence policy, and engineering principles."
+        title="About ToolCresta — Privacy-First Online Tools Architecture"
+        description="Learn about ToolCresta's mission, on-device browser processing, zero file persistence policy, and engineering principles."
         canonicalPath="/about"
       />
 
@@ -23,7 +23,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ navigate }) => {
               Our Principles & Architecture
             </span>
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-              About RankNova
+              About ToolCresta
             </h1>
             <p className="mt-3 text-base text-slate-600 leading-relaxed">
               Fast, focused, and respectful online utilities designed for engineers, creators, and professionals who value privacy and honest metrics.
@@ -39,7 +39,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ navigate }) => {
               and manipulative download buttons designed to look like banner advertisements.
             </p>
             <p className="text-sm text-slate-700 leading-relaxed">
-              <strong>RankNova was engineered with a contrarian philosophy:</strong>
+              <strong>ToolCresta was engineered with a contrarian philosophy:</strong>
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
@@ -132,7 +132,7 @@ export const AboutView: React.FC<AboutViewProps> = ({ navigate }) => {
               onClick={() => navigate('/contact')}
               className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 transition"
             >
-              Get in Touch with the RankNova Team
+              Get in Touch with the ToolCresta Team
             </button>
           </div>
         </div>

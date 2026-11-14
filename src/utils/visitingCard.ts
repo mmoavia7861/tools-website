@@ -800,7 +800,9 @@ export function generateCardVCardPayload(card: VisitingCardData): string {
  */
 export function normalizeContactUrl(url: string | undefined | null): string {
   const trimmed = (url || '').trim();
-  if (!trimmed) return 'https://ranknova.app';
+  if (!trimmed) return typeof window !== 'undefined'
+    ? new URL(import.meta.env.BASE_URL, window.location.origin).href
+    : 'https://mmoavia7861.github.io/RankNova/';
   if (/^https?:\/\//i.test(trimmed)) {
     return trimmed;
   }

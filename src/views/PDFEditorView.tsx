@@ -83,7 +83,7 @@ export const PDFEditorView: React.FC = () => {
   const [pageNumberPosition, setPageNumberPosition] = useState<'bottom-center' | 'bottom-right' | 'top-right'>('bottom-center');
   const [watermarkText, setWatermarkText] = useState('');
   const [watermarkOpacity, setWatermarkOpacity] = useState(0.2);
-  const [outputFileName, setOutputFileName] = useState('ranknova-edited-document');
+  const [outputFileName, setOutputFileName] = useState('toolcresta-edited-document');
 
   // Processing & Export
   const [isProcessing, setIsProcessing] = useState(false);
@@ -615,13 +615,13 @@ export const PDFEditorView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="Free PDF Editor Online — Edit Pages, Add Words & Signatures | RankNova"
+        title="Free PDF Editor Online — Edit Pages, Add Words & Signatures | ToolCresta"
         description="Edit PDF files online for free. Rearrange pages, rotate pages, add words, text boxes, and digital signatures directly on your documents with 100% on-device privacy."
         canonicalPath="/edit-pdf"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'RankNova PDF Editor',
+          name: 'ToolCresta PDF Editor',
           applicationCategory: 'UtilityApplication',
           operatingSystem: 'Any',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
@@ -1411,7 +1411,7 @@ export const PDFEditorView: React.FC = () => {
                 How to Edit PDF Pages, Add Words, and Sign Documents
               </h2>
               <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-                RankNova gives you desktop-grade PDF editing without pricey subscription software.
+                ToolCresta gives you desktop-grade PDF editing without pricey subscription software.
                 Rearrange pages, rotate upside-down scans, add words or dates, and sign contracts with 100% on-device privacy.
               </p>
             </div>

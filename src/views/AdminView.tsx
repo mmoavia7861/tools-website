@@ -136,7 +136,7 @@ export const AdminView: React.FC = () => {
     return (
       <>
         <SEOHead
-          title="Admin Authentication | RankNova"
+          title="Admin Authentication | ToolCresta"
           description="Owner restricted administration portal."
           canonicalPath="/admin"
         />
@@ -147,7 +147,7 @@ export const AdminView: React.FC = () => {
                 <Lock className="h-7 w-7" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">RankNova Admin Portal</h1>
+                <h1 className="text-2xl font-bold text-slate-900">ToolCresta Admin Portal</h1>
                 <p className="mt-2 text-xs text-slate-500">
                   Protected portal for authorized operators. Sign in with an authorized, verified Google account.
                 </p>
@@ -216,7 +216,7 @@ export const AdminView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="Admin Control Center | RankNova"
+        title="Admin Control Center | ToolCresta"
         description="Private operator panel."
         canonicalPath="/admin"
       />
@@ -233,7 +233,7 @@ export const AdminView: React.FC = () => {
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
-                RankNova Control Center
+                ToolCresta Control Center
               </h1>
             </div>
 

@@ -1,5 +1,5 @@
 {
-  "name": "RankNova",
+  "name": "ToolCresta",
   "description": "Free online tools for creating QR codes, compressing PDFs, converting images to PDF, editing PDFs, compressing videos, generating visiting cards and removing image backgrounds.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

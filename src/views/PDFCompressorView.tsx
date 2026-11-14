@@ -165,13 +165,13 @@ export const PDFCompressorView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="Compress PDF Online — Reduce PDF File Size | RankNova"
+        title="Compress PDF Online — Reduce PDF File Size | ToolCresta"
         description="Compress PDF files online with adjustable quality settings. See real before-and-after file sizes and download the smaller PDF securely. On-device privacy first."
         canonicalPath="/compress-pdf"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'RankNova PDF Compressor',
+          name: 'ToolCresta PDF Compressor',
           applicationCategory: 'UtilityApplication',
           operatingSystem: 'Any',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
@@ -455,7 +455,7 @@ export const PDFCompressorView: React.FC = () => {
               </h2>
               <p className="mt-2 text-sm text-slate-600 leading-relaxed">
                 PDF documents are compound binary containers. Rather than rasterizing entire pages into blurry images,
-                RankNova uses mathematical optimization to compress document structure without compromising text clarity.
+                ToolCresta uses mathematical optimization to compress document structure without compromising text clarity.
               </p>
             </div>
 
@@ -480,7 +480,7 @@ export const PDFCompressorView: React.FC = () => {
                 <h3 className="font-semibold text-slate-900 text-sm">Why We Report Honestly</h3>
                 <p className="mt-1 text-xs text-slate-500 leading-relaxed">
                   If a document is already compressed, attempting further lossy degradation ruins legibility.
-                  RankNova reports real before-and-after byte counts honestly and never fabricates artificial savings percentages.
+                  ToolCresta reports real before-and-after byte counts honestly and never fabricates artificial savings percentages.
                 </p>
               </div>
             </div>

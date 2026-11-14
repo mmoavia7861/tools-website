@@ -82,6 +82,9 @@ const QUICK_AI_PROMPTS = [
 ];
 
 export const VisitingCardView: React.FC = () => {
+  const siteUrl = typeof window !== 'undefined'
+    ? new URL(import.meta.env.BASE_URL, window.location.origin).href
+    : 'https://mmoavia7861.github.io/RankNova/';
   const [cardData, setCardData] = useState<VisitingCardData>(() => ({
     ...DEFAULT_CARD_DATA
   }));
@@ -213,7 +216,7 @@ export const VisitingCardView: React.FC = () => {
   const handleToggleContactUrlQr = useCallback((enabled: boolean) => {
     setCardData(prev => toggleContactUrlQr(prev, enabled));
     if (enabled) {
-      const targetUrl = cardData.website ? normalizeContactUrl(cardData.website) : 'https://ranknova.app';
+      const targetUrl = cardData.website ? normalizeContactUrl(cardData.website) : siteUrl;
       setCopiedAlert(`Auto-generated and embedded QR code linking to: ${targetUrl}`);
     } else {
       setCopiedAlert('QR code disabled on visiting card.');
@@ -794,7 +797,7 @@ export const VisitingCardView: React.FC = () => {
       ctx.fillStyle = theme.accent;
       ctx.fillText('WEB', col1X, contactStartY + 96);
       ctx.fillStyle = theme.secondaryText;
-      ctx.fillText(cardData.website || 'https://ranknova.app', col1X + 55, contactStartY + 96);
+      ctx.fillText(cardData.website || siteUrl, col1X + 55, contactStartY + 96);
 
       // Location
       ctx.fillStyle = theme.accent;
@@ -911,7 +914,7 @@ export const VisitingCardView: React.FC = () => {
 
       ctx.fillStyle = theme.accent;
       ctx.font = `600 ${Math.round(19 * textScale)}px ${face}`;
-      ctx.fillText(cardData.website || 'https://ranknova.app', centerX, H - 70, W - 140);
+      ctx.fillText(cardData.website || siteUrl, centerX, H - 70, W - 140);
 
       const socials = [cardData.linkedIn, cardData.twitter, cardData.github, cardData.instagram]
         .filter(Boolean)
@@ -1220,7 +1223,7 @@ export const VisitingCardView: React.FC = () => {
               </div>
               <div className="flex items-center gap-1.5" style={{ color: activeTheme.secondaryText }}>
                 <Globe className="h-3 w-3 shrink-0" style={{ color: activeTheme.accent }} />
-                <span className="truncate">{cardData.website || 'https://ranknova.app'}</span>
+                <span className="truncate">{cardData.website || siteUrl}</span>
               </div>
               <div className="flex items-center gap-1.5" style={{ color: activeTheme.secondaryText }}>
                 <MapPin className="h-3 w-3 shrink-0" style={{ color: activeTheme.accent }} />
@@ -1272,7 +1275,7 @@ export const VisitingCardView: React.FC = () => {
               className="text-[11px] font-semibold tracking-wide pt-1"
               style={{ color: activeTheme.accent }}
             >
-              {cardData.website || 'https://ranknova.app'}
+              {cardData.website || siteUrl}
             </p>
 
             {(cardData.linkedIn || cardData.twitter || cardData.github || cardData.instagram) && (
@@ -1294,13 +1297,13 @@ export const VisitingCardView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="Modern Visiting Card Maker — Free Business Card Generator | RankNova"
+        title="Modern Visiting Card Maker — Free Business Card Generator | ToolCresta"
         description="Design professional modern visiting cards with 18+ luxury styles, live scannable QR codes, instant vCard export, and 300 DPI print-ready PNG, JPG and PDF downloads."
         canonicalPath="/visiting-card-generator"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'RankNova Visiting Card Maker',
+          name: 'ToolCresta Visiting Card Maker',
           applicationCategory: 'DesignApplication',
           operatingSystem: 'Any',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }

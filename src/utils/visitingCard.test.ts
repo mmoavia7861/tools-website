@@ -162,8 +162,8 @@ test('normalizeContactUrl cleans URLs and guarantees valid web protocol', () => 
   assert.equal(normalizeContactUrl('http://insecure.site'), 'http://insecure.site');
   assert.equal(normalizeContactUrl('example.com/profile'), 'https://example.com/profile');
   assert.equal(normalizeContactUrl('  www.novadynamics.io  '), 'https://www.novadynamics.io');
-  assert.equal(normalizeContactUrl(''), 'https://ranknova.app');
-  assert.equal(normalizeContactUrl(undefined), 'https://ranknova.app');
+  assert.equal(normalizeContactUrl(''), 'https://mmoavia7861.github.io/RankNova/');
+  assert.equal(normalizeContactUrl(undefined), 'https://mmoavia7861.github.io/RankNova/');
 });
 
 test('getContactUrlQrPayload extracts normalized contact URL from card website', () => {

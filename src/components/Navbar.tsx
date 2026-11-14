@@ -34,7 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
           type="button"
           onClick={() => handleNav('/')}
           className="group flex items-center gap-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 rounded-lg p-1"
-          aria-label="RankNova Home"
+          aria-label="ToolCresta Home"
         >
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-500/20 group-hover:bg-blue-700 transition">
             <svg
@@ -48,7 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
             </svg>
           </div>
           <span className="text-xl font-bold tracking-tight text-[#0F172A] font-sans">
-            Rank<span className="text-blue-600">Nova</span>
+            Tool<span className="text-blue-600">Cresta</span>
           </span>
         </button>
 

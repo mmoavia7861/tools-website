@@ -196,9 +196,9 @@ export const BlogPostView: React.FC<BlogPostViewProps> = ({ slug, navigate }) =>
           <div className="mt-12 rounded-2xl bg-blue-50/70 border border-blue-200 p-6 flex items-start gap-3">
             <ShieldCheck className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-sm font-bold text-blue-900">RankNova Educational Standards</h4>
+              <h4 className="text-sm font-bold text-blue-900">ToolCresta Educational Standards</h4>
               <p className="mt-1 text-xs text-blue-800 leading-relaxed">
-                RankNova guides are written by engineers with verifiable technical accuracy.
+                ToolCresta guides are written by engineers with verifiable technical accuracy.
                 We do not use mass-generated SEO content or invent unverifiable statistics.
               </p>
             </div>

@@ -11,7 +11,7 @@ const server = spawn(process.execPath,['node_modules/vite/bin/vite.js','preview'
 let log='';
 server.stdout.on('data', chunk=>log+=String(chunk));
 server.stderr.on('data', chunk=>log+=String(chunk));
-const base='http://127.0.0.1:4175/RankNova/';
+const base='http://127.0.0.1:4175/ToolCresta/';
 let browser;
 try {
   let ready=false;
@@ -23,10 +23,10 @@ try {
   const pdf=await PDFDocument.create();
   const font=await pdf.embedFont(StandardFonts.Helvetica);
   const page1=pdf.addPage([595,842]);
-  page1.drawText('RankNova PDF to Word conversion smoke test',{x:50,y:760,size:16,font});
+  page1.drawText('ToolCresta PDF to Word conversion smoke test',{x:50,y:760,size:16,font});
   const pdfBytes=Buffer.from(await pdf.save());
 
-  const docx = new Document({sections:[{children:[new Paragraph('RankNova Word to PDF conversion smoke test')]}]});
+  const docx = new Document({sections:[{children:[new Paragraph('ToolCresta Word to PDF conversion smoke test')]}]});
   const docxBytes=Buffer.from(await Packer.toBuffer(docx));
   browser=await chromium.launch({headless:true,args:['--no-sandbox']});
   const page=await browser.newPage({acceptDownloads:true,viewport:{width:1320,height:900}});

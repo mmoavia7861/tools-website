@@ -21,7 +21,7 @@ export const BlogView: React.FC<BlogViewProps> = ({ navigate }) => {
   return (
     <>
       <SEOHead
-        title="RankNova Tech Guides & Educational Blog"
+        title="ToolCresta Tech Guides & Educational Blog"
         description="Read in-depth guides on QR code generation, PDF optimization, alpha channel raster graphics, and client-side privacy architecture."
         canonicalPath="/blog"
       />
@@ -35,7 +35,7 @@ export const BlogView: React.FC<BlogViewProps> = ({ navigate }) => {
               <span>Original Engineering Articles</span>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-              RankNova Guides & Resources
+              ToolCresta Guides & Resources
             </h1>
             <p className="mt-3 text-sm sm:text-base text-slate-600">
               Technical articles exploring digital document optimization, barcode standards, image encoding, and privacy engineering.
