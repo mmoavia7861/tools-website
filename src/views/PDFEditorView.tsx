@@ -65,6 +65,7 @@ export const PDFEditorView: React.FC = () => {
   const [nativeTextFields, setNativeTextFields] = useState<NativeTextField[]>([]);
   const [nativeFieldChanges, setNativeFieldChanges] = useState<Record<string, string>>({});
   const [inlineEditingId, setInlineEditingId] = useState<string | null>(null);
+  const [writeOnPageMode, setWriteOnPageMode] = useState(false);
   const inlineEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
 
@@ -168,6 +169,7 @@ export const PDFEditorView: React.FC = () => {
     setSelectedElementId(null);
     setInlineEditingId(null);
     setReplaceMode(false);
+    setWriteOnPageMode(false);
     setNativeTextFields([]);
     setNativeFieldChanges({});
 
@@ -329,11 +331,27 @@ export const PDFEditorView: React.FC = () => {
   // ----------------------------------------------------
   // ANNOTATION TOOLS (Text, Signature, Stamps)
   // ----------------------------------------------------
-  const handleAddText = () => {
-    const newText = createDefaultTextElement(activePageIndex, 'Type text here...', 0.3, 0.4);
+  // One click on Add Text should immediately allow typing, without requiring
+  // a hidden double-click on the PDF. Users can also click a position on-page.
+  const handleAddText = (x = 0.3, y = 0.4) => {
+    const newText = createDefaultTextElement(activePageIndex, '', x, y);
+    newText.fontFamily = 'Helvetica';
     setAnnotations((prev) => [...prev, newText]);
     setSelectedElementId(newText.id);
+    setInlineEditingId(newText.id);
+    setReplaceMode(false);
+    setWriteOnPageMode(false);
+    setErrorMessage(null);
     setEditedPdfBytes(null);
+  };
+
+  const handleWriteOnPage = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!writeOnPageMode || !pageSurfaceRef.current) return;
+    event.stopPropagation();
+    const rect = pageSurfaceRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(0.85, (event.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(0.9, (event.clientY - rect.top) / rect.height));
+    handleAddText(x, y);
   };
 
   const handleApplySignature = (imageDataUrl: string) => {
@@ -571,6 +589,7 @@ export const PDFEditorView: React.FC = () => {
     setNativeTextFields([]);
     setNativeFieldChanges({});
     setReplaceMode(false);
+    setWriteOnPageMode(false);
     setInlineEditingId(null);
     setSelectedFile(null);
     setSourcePdfBytes(null);
@@ -692,7 +711,7 @@ export const PDFEditorView: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleAddText}
+                    onClick={() => handleAddText()}
                     className="flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200 px-3.5 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs"
                   >
                     <Type className="h-4 w-4 text-blue-600" />
@@ -783,7 +802,12 @@ export const PDFEditorView: React.FC = () => {
                 <button type="button" onClick={() => addMarkup('highlight')} className="rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-900">Highlight</button>
                 <button type="button" onClick={() => addMarkup('rectangle')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold">Rectangle</button>
                 <button type="button" onClick={() => addMarkup('whiteout')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold">Cover Text (Visual)</button>
-                <button type="button" onClick={() => setReplaceMode(value => !value)} aria-pressed={replaceMode} className={replaceMode ? "rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white" : "rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700"}>Edit Existing Page Text (Visual)</button>
+                <button type="button" onClick={() => { setWriteOnPageMode(value => !value); setInlineEditingId(null); setReplaceMode(false); }}
+                  aria-pressed={writeOnPageMode} className={writeOnPageMode ? "rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white" : "rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700"}>
+                  Write Anywhere (Click PDF)
+                </button>
+                {writeOnPageMode && <p role="status" className="basis-full text-sm font-semibold text-blue-700">Click anywhere on the PDF page to add a text box and start typing.</p>}
+                <button type="button" onClick={() => { setReplaceMode(value => !value); setWriteOnPageMode(false); }} aria-pressed={replaceMode} className={replaceMode ? "rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white" : "rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700"}>Edit Existing Page Text (Visual)</button>
                 {replaceMode && <p role="status" className="basis-full text-xs font-semibold text-blue-700">{(pages[activePageIndex]?.originalRotation + pages[activePageIndex]?.rotation) % 360 !== 0 ? 'Reset page rotation before selecting existing text.' : textHits.length ? 'Click outlined text, then type directly over it or use the Edit Words panel.' : 'No selectable text detected yet. Scanned PDFs need OCR.'}</p>}
                 <p className="basis-full text-[11px] text-slate-500">To edit existing selectable text, choose Edit Existing Page Text, click a line, type the replacement, and export. This is a visual cover-and-replace method, not secure redaction or actual deletion of original text. Scanned PDFs and text over complex backgrounds may not replace cleanly.</p>
               </div>
@@ -959,13 +983,16 @@ export const PDFEditorView: React.FC = () => {
                     onPointerMove={handleContainerMouseMove}
                     onPointerUp={handleContainerMouseUp}
                     onPointerCancel={handleContainerMouseUp}
-                    onClick={() => setSelectedElementId(null)}
+                    onClick={(event) => {
+                      if (!writeOnPageMode) setSelectedElementId(null);
+                    }}
                     className="relative w-full rounded-2xl border-2 border-slate-300 bg-slate-100 shadow-inner min-h-[520px] flex items-center justify-center p-4 overflow-auto select-none"
                   >
                     {activePage && (
                       <div
                         ref={pageSurfaceRef}
-                        className="relative bg-white shadow-xl rounded-lg overflow-hidden"
+                        onClick={handleWriteOnPage}
+                        className={`relative bg-white shadow-xl rounded-lg overflow-hidden ${writeOnPageMode ? 'cursor-text ring-4 ring-blue-200' : ''}`}
                         style={{
                           width: '100%',
                           maxWidth: `${Math.round(560 * previewZoom / 100)}px`,
