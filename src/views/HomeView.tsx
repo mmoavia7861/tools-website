@@ -133,6 +133,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
               { title: 'Edit PDF', path: '/edit-pdf' },
               { title: 'QR Code Generator', path: '/qr-code-generator' },
               { title: 'Visiting Card Maker', path: '/visiting-card-generator' },
+              { title: 'AI Card & Invitation Maker', path: '/ai-card-generator' },
+              { title: 'Wedding Card Maker', path: '/wedding-card-maker' },
+              { title: 'Birthday Card Maker', path: '/birthday-card-maker' }
               { title: 'Video Compressor', path: '/compress-video' },
               { title: 'PDF to Word', path: '/pdf-to-word' },
               { title: 'Word to PDF', path: '/word-to-pdf' }
