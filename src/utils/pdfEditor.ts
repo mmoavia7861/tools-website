@@ -26,6 +26,8 @@ export interface EditPdfOptions {
   watermarkOpacity?: number;
   addPageNumbers?: boolean;
   pageNumberPosition?: 'bottom-center' | 'bottom-right' | 'top-right';
+  /** Real changes to AcroForm PDF text fields (not ordinary page text). */
+  textFieldUpdates?: Record<string, string>;
 }
 
 /**
@@ -48,7 +50,8 @@ export async function editExistingPdf(
     watermarkText = '',
     watermarkOpacity = 0.25,
     addPageNumbers = false,
-    pageNumberPosition = 'bottom-center'
+    pageNumberPosition = 'bottom-center',
+    textFieldUpdates = {}
   } = options;
 
   // Filter out any marked deleted
@@ -56,6 +59,25 @@ export async function editExistingPdf(
 
   if (activePages.length === 0) {
     throw new Error('At least one page must be retained in the PDF document.');
+  }
+
+  // Update native AcroForm fields in the source before copying pages.
+  // Flatten first so the updated appearances are real, visible PDF page
+  // content even after page reordering/copying strips the form structure.
+  const requestedFields = Object.entries(textFieldUpdates);
+  if (requestedFields.length > 0) {
+    try {
+      const form = sourceDoc.getForm();
+      for (const [name, value] of requestedFields) {
+        if (value.length > 2000) throw new Error('Form field value is too long.');
+        const field = form.getTextField(name);
+        if (field.isReadOnly()) throw new Error('A PDF form field is read-only: ' + name);
+        field.setText(value);
+      }
+      form.flatten();
+    } catch (err) {
+      throw new Error(err instanceof Error ? 'Could not edit PDF form fields: ' + err.message : 'Could not edit PDF form fields.');
+    }
   }
 
   const newDoc = await PDFDocument.create();
