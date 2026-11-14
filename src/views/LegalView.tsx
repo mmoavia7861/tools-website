@@ -95,7 +95,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
                 {current.title}
               </h1>
               <p className="mt-2 text-xs text-slate-500">
-                Effective Date: November 14, 2026 • Version 1.2
+                Effective Date: November 14, 2026 • Version 1.3
               </p>
             </div>
 
@@ -143,6 +143,15 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
                     Turnstile also checks automated abuse and may process security signals. The conversion
                     service has file-size and rate limits. Do not upload confidential or sensitive documents
                     unless you have authority to share them with Adobe.
+                  </p>
+                  <p>
+                    The ToolCresta Guide offers an on-device suggestion mode that matches the questions you type
+                    to card and PDF tools without sending them to a generative AI service. If you explicitly
+                    choose &quot;Ask Gemini AI&quot; after anti-bot verification, your typed question and recent
+                    assistant chat messages are sent to a secured Cloudflare Worker and Google's Gemini service
+                    to generate suggestions. The guide does not attach or read your uploaded PDF or image files.
+                    Please avoid entering confidential documents, passwords or sensitive personal details in chat.
+                    Provider and security logs may still be processed under their respective policies.
                   </p>
                 </section>
                 <section>
