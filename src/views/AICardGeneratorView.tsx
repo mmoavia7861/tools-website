@@ -206,8 +206,8 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
 
       <div className="mt-7 grid grid-cols-1 sm:grid-cols-3 gap-3" role="tablist" aria-label="Card type">
         {kinds.map(({kind:k,label,description:desc,icon:Icon})=><button type="button" key={k} role="tab" aria-selected={kind===k} onClick={()=>selectKind(k)}
-          className={\`flex items-center gap-3 rounded-2xl border p-4 text-left shadow-sm transition \${kind===k?'border-blue-600 bg-blue-50 ring-1 ring-blue-200':'border-slate-200 bg-white hover:border-blue-300'}\`}>
-          <Icon className={\`w-6 h-6 \${kind===k?'text-blue-700':'text-slate-500'}\`}/>
+          className={`flex items-center gap-3 rounded-2xl border p-4 text-left shadow-sm transition ${kind===k?'border-blue-600 bg-blue-50 ring-1 ring-blue-200':'border-slate-200 bg-white hover:border-blue-300'}`}>
+          <Icon className={`w-6 h-6 ${kind===k?'text-blue-700':'text-slate-500'}`}/>
           <span><strong className="block text-sm text-slate-900">{label}</strong><span className="text-xs text-slate-500">{desc}</span></span>
         </button>)}
       </div>
@@ -248,8 +248,8 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
               <button type="button" onClick={()=>setDraft(blankCard(kind))} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"><RefreshCcw className="w-3 h-3"/> Reset</button>
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={()=>setActivePanel('content')} aria-pressed={activePanel==='content'} className={\`rounded-lg px-4 py-2 text-sm font-semibold \${activePanel==='content'?'bg-slate-900 text-white':'bg-slate-100 text-slate-600'}\`}>Content</button>
-              <button type="button" onClick={()=>setActivePanel('design')} aria-pressed={activePanel==='design'} className={\`rounded-lg px-4 py-2 text-sm font-semibold \${activePanel==='design'?'bg-slate-900 text-white':'bg-slate-100 text-slate-600'}\`}>Colors & Style</button>
+              <button type="button" onClick={()=>setActivePanel('content')} aria-pressed={activePanel==='content'} className={`rounded-lg px-4 py-2 text-sm font-semibold ${activePanel==='content'?'bg-slate-900 text-white':'bg-slate-100 text-slate-600'}`}>Content</button>
+              <button type="button" onClick={()=>setActivePanel('design')} aria-pressed={activePanel==='design'} className={`rounded-lg px-4 py-2 text-sm font-semibold ${activePanel==='design'?'bg-slate-900 text-white':'bg-slate-100 text-slate-600'}`}>Colors & Style</button>
             </div>
             {activePanel==='content'?<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {field('headline',kind==='visiting'?'Full name':kind==='wedding'?'Couple names':'Birthday person','Enter the main name')}
