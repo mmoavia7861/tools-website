@@ -35,7 +35,7 @@ import {
   createSignatureElement,
   reorderArray
 } from '../utils/pdfEditorUtils';
-import { renderPdfPageToDataUrl } from '../utils/pdfRenderer';
+import { renderPdfPageToDataUrl, getPdfPageTextHits, type PdfTextHit } from '../utils/pdfRenderer';
 import { SignatureModal } from '../components/SignatureModal';
 
 interface PageDisplayItem {
@@ -54,6 +54,8 @@ export const PDFEditorView: React.FC = () => {
   const [focusedPreview, setFocusedPreview] = useState<string | null>(null);
   const [focusedLoading, setFocusedLoading] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
+  const [replaceMode, setReplaceMode] = useState(false);
+  const [textHits, setTextHits] = useState<PdfTextHit[]>([]);
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
 
   // Annotations (Words, Signatures, Stamps) per page
@@ -129,6 +131,20 @@ export const PDFEditorView: React.FC = () => {
     });
     return () => { cancelled = true; };
   }, [sourcePdfBytes, activePageIndex, pages[activePageIndex]?.id, pages[activePageIndex]?.rotation]);
+
+  // Detected text is for visible cover-and-replace only, not underlying PDF changes.
+  useEffect(() => {
+    const page = pages[activePageIndex];
+    let cancelled = false;
+    setTextHits([]);
+    if (!replaceMode || !sourcePdfBytes || !page || page.rotation !== 0) return;
+    getPdfPageTextHits(sourcePdfBytes, page.originalIndex).then(hits => {
+      if (!cancelled) setTextHits(hits);
+    }).catch(() => {
+      if (!cancelled) setErrorMessage('Text positions could not be detected in this PDF.');
+    });
+    return () => { cancelled = true; };
+  }, [replaceMode, sourcePdfBytes, activePageIndex, pages[activePageIndex]?.id, pages[activePageIndex]?.rotation]);
 
   const handleFileSelect = async (file: File) => {
     ++thumbnailRequestRef.current;
@@ -302,6 +318,26 @@ export const PDFEditorView: React.FC = () => {
     const newSig = createSignatureElement(activePageIndex, imageDataUrl, 0.4, 0.65, 0.32, 0.12);
     setAnnotations((prev) => [...prev, newSig]);
     setSelectedElementId(newSig.id);
+    setEditedPdfBytes(null);
+  };
+
+  const visuallyReplaceText = (hit: PdfTextHit) => {
+    const page = pages[activePageIndex];
+    if (!page || page.rotation !== 0) return;
+    const cover: NormalizedElement = {
+      id: `cover-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      type: 'whiteout', pageIndex: activePageIndex,
+      x: hit.x, y: hit.y, width: hit.width, height: hit.height,
+      color: '#FFFFFF'
+    };
+    const editable = createDefaultTextElement(activePageIndex, hit.text, hit.x, hit.y);
+    editable.width = Math.max(hit.width, 0.08);
+    editable.height = Math.max(hit.height, 0.03);
+    editable.fontSize = Math.max(8, Math.min(36, Math.round(hit.height * page.height * 0.85)));
+    editable.fontFamily = 'Helvetica';
+    setAnnotations(prev => [...prev, cover, editable]);
+    setSelectedElementId(editable.id);
+    setReplaceMode(false);
     setEditedPdfBytes(null);
   };
 
