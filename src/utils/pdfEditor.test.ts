@@ -69,3 +69,31 @@ test('editExistingPdf embeds visual markup and text on rotated pages', async () 
     assert.ok(result.byteLength > 0);
   }
 });
+
+test('editExistingPdf updates real fillable form text fields and flattens them', async () => {
+  const source = await PDFDocument.create();
+  const page = source.addPage([400, 400]);
+  const field = source.getForm().createTextField('client.name');
+  field.addToPage(page, { x: 40, y: 300, width: 250, height: 24 });
+  field.setText('Original Name');
+  const input = await source.save();
+  const result = await editExistingPdf(input, {
+    pageStates: [{ originalIndex: 0, rotation: 0 }],
+    textFieldUpdates: { 'client.name': 'Updated Name' }
+  });
+  const output = await PDFDocument.load(result);
+  assert.equal(output.getPageCount(), 1);
+  assert.equal(output.getForm().getFields().length, 0, 'Form fields should be flattened into visible page content');
+  assert.ok(result.byteLength > 0);
+});
+
+test('editExistingPdf rejects unknown native fields instead of silently ignoring changes', async () => {
+  const source = await createSamplePdf();
+  await assert.rejects(
+    () => editExistingPdf(source, {
+      pageStates: [{ originalIndex: 0, rotation: 0 }],
+      textFieldUpdates: { 'not-a-field': 'This must not be silently added' }
+    }),
+    /Could not edit PDF form fields/
+  );
+});
