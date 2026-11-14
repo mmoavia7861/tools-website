@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: ranknova-converter
+    runtime: docker
+    plan: free
+    rootDir: converter-service
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ALLOWED_ORIGINS
+        value: https://mmoavia7861.github.io
