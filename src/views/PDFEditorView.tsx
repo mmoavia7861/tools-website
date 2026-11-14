@@ -747,6 +747,8 @@ export const PDFEditorView: React.FC = () => {
                 <button type="button" onClick={() => addMarkup('highlight')} className="rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-900">Highlight</button>
                 <button type="button" onClick={() => addMarkup('rectangle')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold">Rectangle</button>
                 <button type="button" onClick={() => addMarkup('whiteout')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold">Cover Text (Visual)</button>
+                <button type="button" onClick={() => setReplaceMode(value => !value)} aria-pressed={replaceMode} className={replaceMode ? "rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white" : "rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700"}>Select Text to Replace (Visual)</button>
+                {replaceMode && <p role="status" className="basis-full text-xs font-semibold text-blue-700">{pages[activePageIndex]?.rotation !== 0 ? 'Reset page rotation before selecting existing text.' : textHits.length ? 'Select one of the outlined text fragments on the page.' : 'No selectable text detected yet. Scanned PDFs need OCR.'}</p>}
                 <p className="basis-full text-[11px] text-slate-500">To visually replace words: add a white cover over the old text, then choose Add Words / Text. This is not secure redaction: original underlying PDF content may remain extractable.</p>
               </div>
 
@@ -903,6 +905,16 @@ export const PDFEditorView: React.FC = () => {
                           </div>
                         )}
 
+                        {replaceMode && activePage.rotation === 0 && textHits.map((hit, index) => (
+                          <button key={index} type="button"
+                            onClick={event => { event.stopPropagation(); visuallyReplaceText(hit); }}
+                            title={'Visually replace: ' + hit.text.slice(0, 80)}
+                            aria-label={'Visually replace: ' + hit.text.slice(0, 60)}
+                            className="absolute z-10 cursor-text border border-blue-500 bg-blue-200/20 hover:bg-blue-300/40"
+                            style={{ left: (hit.x * 100) + '%', top: (hit.y * 100) + '%',
+                              width: (hit.width * 100) + '%', height: (hit.height * 100) + '%' }}
+                          />
+                        ))}
                         {/* Interactive Annotations Overlay on Page */}
                         {activePageAnnotations.map((element) => {
                           const isSelected = selectedElementId === element.id;
