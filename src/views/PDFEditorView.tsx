@@ -81,6 +81,7 @@ export const PDFEditorView: React.FC = () => {
   const pageContainerRef = useRef<HTMLDivElement | null>(null);
   const pageSurfaceRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   // Dragging state for elements
   const [isDraggingElement, setIsDraggingElement] = useState(false);
@@ -304,6 +305,61 @@ export const PDFEditorView: React.FC = () => {
     setEditedPdfBytes(null);
   };
 
+  const addMarkup = (type: 'highlight' | 'whiteout' | 'rectangle') => {
+    const next: NormalizedElement = {
+      id: `mark-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      pageIndex: activePageIndex, type,
+      x: 0.15, y: 0.3, width: 0.35, height: 0.08,
+      color: type === 'rectangle' ? '#EF4444' : '#FACC15',
+      opacity: type === 'highlight' ? 0.28 : 1
+    };
+    setAnnotations(prev => [...prev, next]);
+    setSelectedElementId(next.id);
+    setEditedPdfBytes(null);
+  };
+
+  const handleAddImage = async (file: File) => {
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024 || file.size === 0) {
+      setErrorMessage('Choose a PNG, JPEG or WebP image up to 5 MB.');
+      return;
+    }
+    setErrorMessage(null);
+    const pageIndex = activePageIndex;
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('This image could not be opened.'));
+        image.src = url;
+      });
+      if (image.naturalWidth * image.naturalHeight > 16000000) {
+        throw new Error('Image is too large. Try one under 16 megapixels.');
+      }
+      const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Could not process image in this browser.');
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const data = canvas.toDataURL('image/png');
+      const next: NormalizedElement = {
+        id: `image-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type: 'image', pageIndex, x: 0.24, y: 0.25,
+        width: 0.38, height: Math.min(0.45, Math.max(0.08, 0.38 * canvas.height / canvas.width)),
+        imageDataUrl: data
+      };
+      setAnnotations(prev => [...prev, next]);
+      setSelectedElementId(next.id);
+      setEditedPdfBytes(null);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Image could not be loaded.');
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
   const handleAddStamp = (type: 'APPROVED' | 'CONFIDENTIAL' | 'REJECTED' | 'DATE') => {
     let text: string = type;
     let color = '#15803D'; // Green
@@ -363,10 +419,11 @@ export const PDFEditorView: React.FC = () => {
 
   // Dragging logic for elements on page overlay
   const handleElementMouseDown = (
-    e: React.MouseEvent,
+    e: React.PointerEvent,
     element: NormalizedElement
   ) => {
     e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
     setSelectedElementId(element.id);
     setIsDraggingElement(true);
 
@@ -381,7 +438,7 @@ export const PDFEditorView: React.FC = () => {
     }
   };
 
-  const handleContainerMouseMove = (e: React.MouseEvent) => {
+  const handleContainerMouseMove = (e: React.PointerEvent) => {
     if (!isDraggingElement || !selectedElementId || !pageSurfaceRef.current) return;
 
     const rect = pageSurfaceRef.current.getBoundingClientRect();
@@ -524,7 +581,7 @@ export const PDFEditorView: React.FC = () => {
                   Select or drag &amp; drop your PDF to edit
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Supports standard PDF documents up to 35 MB. Client-side privacy guaranteed.
+                  Supports standard unencrypted PDF documents up to 25 MB. Files stay in your browser.
                 </p>
               </div>
 
@@ -656,7 +713,7 @@ export const PDFEditorView: React.FC = () => {
                           ) : (
                             <>
                               <PenTool className="h-3.5 w-3.5 text-purple-600" />
-                              <span>Signature:</span>
+                              <span>{selectedElement.type === 'image' ? 'Image:' : selectedElement.type === 'signature' ? 'Signature:' : 'Markup:'}</span>
                             </>
                           )}
                         </span>
@@ -713,24 +770,22 @@ export const PDFEditorView: React.FC = () => {
                           </>
                         )}
 
-                        {selectedElement.type === 'signature' && (
+                        {selectedElement.type !== 'text' && (
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-500">Size:</span>
+                            <span className="text-xs text-slate-500">Width:</span>
                             <input
                               type="range"
                               min={0.15}
                               max={0.6}
                               step={0.02}
                               value={selectedElement.width}
-                              onChange={(e) => {
-                                const newW = parseFloat(e.target.value);
-                                updateSelectedElement({
-                                  width: newW,
-                                  height: newW * 0.4
-                                });
-                              }}
+                              onChange={(e) => updateSelectedElement({ width: parseFloat(e.target.value) })}
                               className="w-24 accent-purple-600"
                             />
+                            <span className="text-xs text-slate-500">Height:</span>
+                            <input type="range" min={0.03} max={0.6} step={0.01} value={selectedElement.height}
+                              onChange={e => updateSelectedElement({ height: parseFloat(e.target.value) })}
+                              className="w-20 accent-purple-600" aria-label="Element height" />
                           </div>
                         )}
 
@@ -757,9 +812,9 @@ export const PDFEditorView: React.FC = () => {
                   {/* Focused Page Interactive Viewport */}
                   <div
                     ref={pageContainerRef}
-                    onMouseMove={handleContainerMouseMove}
-                    onMouseUp={handleContainerMouseUp}
-                    onMouseLeave={handleContainerMouseUp}
+                    onPointerMove={handleContainerMouseMove}
+                    onPointerUp={handleContainerMouseUp}
+                    onPointerCancel={handleContainerMouseUp}
                     onClick={() => setSelectedElementId(null)}
                     className="relative w-full rounded-2xl border-2 border-slate-300 bg-slate-100 shadow-inner min-h-[520px] flex items-center justify-center p-4 overflow-auto select-none"
                   >
@@ -800,8 +855,8 @@ export const PDFEditorView: React.FC = () => {
                           return (
                             <div
                               key={element.id}
-                              onMouseDown={(e) => handleElementMouseDown(e, element)}
-                              className={`absolute cursor-move transition-shadow rounded-sm ${
+                              onPointerDown={(e) => handleElementMouseDown(e, element)}
+                              className={`absolute cursor-move touch-none transition-shadow rounded-sm ${
                                 isSelected
                                   ? 'ring-2 ring-blue-500 ring-offset-1 shadow-md'
                                   : 'hover:ring-1 hover:ring-blue-400'
@@ -810,7 +865,8 @@ export const PDFEditorView: React.FC = () => {
                                 left: `${element.x * 100}%`,
                                 top: `${element.y * 100}%`,
                                 width: `${element.width * 100}%`,
-                                minHeight: '24px'
+                                height: element.type === 'text' ? undefined : `${element.height * 100}%`,
+                                minHeight: element.type === 'text' ? '24px' : undefined
                               }}
                             >
                               {element.type === 'text' && (
@@ -833,7 +889,7 @@ export const PDFEditorView: React.FC = () => {
                                 </div>
                               )}
 
-                              {element.type === 'signature' && element.imageDataUrl && (
+                              {(element.type === 'signature' || element.type === 'image') && element.imageDataUrl && (
                                 <img
                                   src={element.imageDataUrl}
                                   alt="Signature"
@@ -841,6 +897,12 @@ export const PDFEditorView: React.FC = () => {
                                 />
                               )}
 
+                              {(element.type === 'highlight' || element.type === 'whiteout' || element.type === 'rectangle') && (
+                                <div className="h-full w-full" style={{
+                                  backgroundColor: element.type === 'highlight' ? 'rgba(250, 204, 21, .28)' : element.type === 'whiteout' ? '#fff' : 'transparent',
+                                  border: element.type === 'rectangle' ? `2px solid ${element.color || '#ef4444'}` : element.type === 'whiteout' ? '1px dashed #94a3b8' : 'none'
+                                }} />
+                              )}
                               {isSelected && (
                                 <div className="absolute -top-3 -right-3 flex items-center gap-1 bg-white border border-slate-200 rounded-full shadow-xs px-1.5 py-0.5 text-[10px] text-slate-500 font-semibold pointer-events-none">
                                   <Move className="h-2.5 w-2.5 text-blue-600" />
