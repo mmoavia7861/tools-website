@@ -39,7 +39,7 @@ async function convertLocally(file: File, mode: Mode): Promise<Blob> {
     return new Blob([await Packer.toBlob(doc)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   }
   if (new Uint8Array(bytes).slice(0, 2).some((n, i) => n !== [80, 75][i])) throw new Error('Invalid DOCX file.');
-  const mammoth = await import('mammoth/mammoth.browser');
+  const mammoth = await import('mammoth');
   const result = await mammoth.extractRawText({ arrayBuffer: bytes });
   const text = result.value.trim();
   if (!text) throw new Error('No readable text found in this Word document.');
