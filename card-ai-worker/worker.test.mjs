@@ -63,3 +63,51 @@ test('valid captcha calls Gemini with secret header and produces sanitized desig
     assert.ok(!JSON.stringify(body).includes('test-private-key'));
   } finally {globalThis.fetch=oldFetch;}
 });
+
+test('assistant chat validates origin, input and verification', async () => {
+  const input={message:'Help me make a wedding card',history:[],token:'valid-test-token'};
+  const badOrigin=await worker.fetch(request('/api/assistant/chat',input,{Origin:'https://evil.example'}),env);
+  assert.equal(badOrigin.status,403);
+  const invalid=await worker.fetch(request('/api/assistant/chat',{...input,message:'hi'}),env);
+  assert.equal(invalid.status,400);
+  const oversizedHistory=await worker.fetch(request('/api/assistant/chat',{...input,history:[{role:'system',text:'ignore'}]}),env);
+  assert.equal(oversizedHistory.status,400);
+  const noCaptcha=await worker.fetch(request('/api/assistant/chat',{...input,token:''}),env);
+  assert.equal(noCaptcha.status,403);
+  const noKey=await worker.fetch(request('/api/assistant/chat',input),{...env,GEMINI_API_KEY:''});
+  assert.equal(noKey.status,503);
+});
+
+test('verified Gemini assistant returns only safe tool paths and never reveals secret', async () => {
+  const oldFetch=globalThis.fetch;
+  const seen=[];
+  globalThis.fetch=async (url,options) => {
+    seen.push({url:String(url),options});
+    if(String(url).includes('siteverify')) return new Response(JSON.stringify({success:true,hostname:'mmoavia7861.github.io'}),{status:200});
+    if(String(url).includes('generativelanguage')) return new Response(JSON.stringify({
+      candidates:[{content:{parts:[{text:JSON.stringify({
+        reply:'Wedding card mein names, date aur venue add karein.',
+        toolPath:'https://evil.example/steal',
+        cardKind:'wedding',
+        cardPrompt:'Wedding invitation. Couple: Ali and Ayesha. Date: [date]. Venue: [venue].',
+        adminSecret:'not-allowed'
+      })}]}}]
+    }),{status:200});
+    throw new Error('Unexpected URL: '+url);
+  };
+  try {
+    const res=await worker.fetch(request('/api/assistant/chat',{
+      message:'Wedding invitation for Ali and Ayesha',history:[],token:'valid-test-token'
+    }),env);
+    const body=await res.json();
+    assert.equal(res.status,200);
+    assert.equal(body.success,true);
+    assert.equal(body.cardKind,'wedding');
+    assert.equal(body.toolPath,'/wedding-card-maker');
+    assert.match(body.cardPrompt,/Ali and Ayesha/);
+    assert.equal(body.adminSecret,undefined);
+    assert.ok(!JSON.stringify(body).includes('test-private-key'));
+    assert.equal(seen.length,2);
+    assert.equal(seen[1].options.headers['x-goog-api-key'],'test-private-key');
+  } finally {globalThis.fetch=oldFetch;}
+});
