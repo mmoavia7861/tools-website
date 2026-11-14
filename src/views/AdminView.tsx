@@ -39,6 +39,7 @@ const OWNER_EMAIL = 'moaviah760@gmail.com';
 export const AdminView: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'blog' | 'ads' | 'ai' | 'messages'>('overview');
 
   // Server health data
@@ -88,10 +89,22 @@ export const AdminView: React.FC = () => {
   }, []);
 
   const handleGoogleLogin = async () => {
+    setLoginError('');
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err: unknown) {
-      console.error('Google Sign-in was unsuccessful.');
+      const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+      if (code === 'auth/unauthorized-domain') {
+        setLoginError('Firebase login domain not authorized. Add mmoavia7861.github.io in Firebase Authentication > Settings > Authorized domains.');
+      } else if (code === 'auth/operation-not-allowed') {
+        setLoginError('Google sign-in is disabled. Enable Google provider in Firebase Authentication > Sign-in method.');
+      } else if (code === 'auth/popup-blocked') {
+        setLoginError('Browser blocked the sign-in pop-up. Allow pop-ups for this site and try again.');
+      } else if (code === 'auth/popup-closed-by-user') {
+        setLoginError('Sign-in window was closed. Try again when ready.');
+      } else {
+        setLoginError('Google sign-in failed. Check your Firebase project settings and browser pop-up permissions.');
+      }
     }
   };
 
@@ -179,8 +192,9 @@ export const AdminView: React.FC = () => {
                 <span>Sign in with Google</span>
               </button>
 
+              {loginError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-left text-xs text-red-700">{loginError}</p>}
               <div className="pt-2 text-[11px] text-slate-400">
-                Unauthorized access attempts are blocked and logged.
+                Only the configured verified owner account can view this dashboard. Firestore permissions must also be enforced by Firebase rules.
               </div>
             </div>
           </div>
@@ -305,34 +319,34 @@ export const AdminView: React.FC = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-2xs">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider">Server Status</span>
-                  <p className="text-xl font-bold text-emerald-600 mt-1">Healthy</p>
-                  <p className="text-xs text-slate-400 mt-1">Express on Node.js</p>
+                  <span className="text-xs text-slate-500 uppercase tracking-wider">Hosting</span>
+                  <p className="text-xl font-bold text-blue-600 mt-1">GitHub Pages</p>
+                  <p className="text-xs text-slate-400 mt-1">Static frontend; no Node server on this domain</p>
                 </div>
 
                 <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-2xs">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider">Uptime</span>
+                  <span className="text-xs text-slate-500 uppercase tracking-wider">Backend Uptime</span>
                   <p className="text-xl font-bold text-slate-900 mt-1">
-                    {healthData?.uptimeSeconds ? `${healthData.uptimeSeconds}s` : 'Active'}
+                    {healthData?.uptimeSeconds ? `${healthData.uptimeSeconds}s` : 'Not connected'}
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">Cloud Run Container</p>
+                  <p className="text-xs text-slate-400 mt-1">No backend health data available on Pages</p>
                 </div>
 
                 <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-2xs">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider">RSS Memory</span>
+                  <span className="text-xs text-slate-500 uppercase tracking-wider">Backend Memory</span>
                   <p className="text-xl font-bold text-slate-900 mt-1">
-                    {healthData?.memoryUsageMb ? `${healthData.memoryUsageMb} MB` : '~85 MB'}
+                    {healthData?.memoryUsageMb ? `${healthData.memoryUsageMb} MB` : 'Not available'}
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">Within safe limits</p>
+                  <p className="text-xs text-slate-400 mt-1">Browser memory depends on the device</p>
                 </div>
 
                 <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-2xs">
                   <span className="text-xs text-slate-500 uppercase tracking-wider">AI Adapter</span>
                   <p className="text-base font-bold text-slate-800 mt-1 truncate">
-                    {providerData?.aiProvider?.name || 'Remove.bg / Gemini'}
+                    {providerData?.aiProvider?.name || 'Not connected'}
                   </p>
                   <p className="text-xs text-slate-400 mt-1">
-                    {providerData?.aiProvider?.isConfigured ? 'Active' : 'Awaiting API Key'}
+                    {providerData?.aiProvider?.isConfigured ? 'Configured' : 'Cloud AI backend not confirmed'}
                   </p>
                 </div>
               </div>
@@ -342,8 +356,8 @@ export const AdminView: React.FC = () => {
                 <h2 className="text-base font-bold text-slate-900">Security & Operational Invariants</h2>
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-700">Firestore Deny-by-default Rules deployed</span>
-                    <span className="font-semibold text-emerald-600">✓ Deployed & Active</span>
+                    <span className="text-slate-700">Firestore access rules</span>
+                    <span className="font-semibold text-amber-600">Verify in Firebase Console</span>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-slate-100">
                     <span className="text-slate-700">QR Code URL Fetching Disabled (SSRF Guard)</span>
