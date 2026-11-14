@@ -69,3 +69,39 @@ export async function renderPdfPageToDataUrl(
     throw new Error('PDF page preview failed. Please check the document and try again.');
   }
 }
+
+/** Detect selectable, horizontal text for *visual* cover-and-replace only.
+ * This does not modify the PDF's underlying text operators.
+ */
+export interface PdfTextHit {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export async function getPdfPageTextHits(bytes: Uint8Array, pageIndex: number): Promise<PdfTextHit[]> {
+  const task = pdfjsLib.getDocument({ data: bytes.slice(), useSystemFonts: true });
+  try {
+    const document = await task.promise;
+    const page = await document.getPage(pageIndex + 1);
+    const viewport = page.getViewport({ scale: 1, rotation: 0 });
+    const content = await page.getTextContent();
+    const hits: PdfTextHit[] = [];
+    for (const item of content.items) {
+      if (!('str' in item) || !item.str.trim() || !item.width) continue;
+      const matrix = pdfjsLib.Util.transform(viewport.transform, item.transform);
+      const textHeight = Math.max(5, Math.abs(item.height));
+      const x = Math.max(0, matrix[4] / viewport.width);
+      const y = Math.max(0, (matrix[5] - textHeight) / viewport.height);
+      const width = Math.max(0.01, Math.min(1 - x, item.width / viewport.width));
+      const height = Math.max(0.012, Math.min(1 - y, textHeight / viewport.height));
+      if (x >= 1 || y >= 1 || width <= 0 || height <= 0) continue;
+      hits.push({ text: item.str, x, y, width, height });
+      if (hits.length >= 350) break;
+    }
+    return hits;
+  } finally {
+    await task.destroy();
+  }
+}
