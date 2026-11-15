@@ -8,7 +8,7 @@ import type { CardKind } from '../utils/aiCard';
 
 const API_URL = (import.meta.env.VITE_AI_CARD_API_URL || '').trim().replace(/\/+$/, '');
 const SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim();
-const GEMINI_READY = /^https:\/\//.test(API_URL) && Boolean(SITE_KEY);
+const GEMINI_CAPABLE = Boolean(SITE_KEY);
 
 type ChatMessage = {
   id: number;
@@ -25,6 +25,17 @@ const INTRO: ChatMessage = {
 
 export const ToolAssistant: React.FC<{ navigate: (path: string) => void }> = ({ navigate }) => {
   const [open, setOpen] = useState(false);
+  const [GEMINI_READY, setGeminiReady] = useState(false);
+  useEffect(() => {
+    if (!open || !GEMINI_CAPABLE) return;
+    let cancelled = false;
+    fetch(API_URL + '/api/integrations/status', { cache: 'no-store' })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => { if (!cancelled) setGeminiReady(Boolean(data?.gemini && data?.turnstile)); })
+      .catch(() => { if (!cancelled) setGeminiReady(false); });
+    return () => { cancelled = true; };
+  }, [open]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([INTRO]);
   const [question, setQuestion] = useState('');
   const [busy, setBusy] = useState(false);
@@ -40,7 +51,7 @@ export const ToolAssistant: React.FC<{ navigate: (path: string) => void }> = ({ 
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
-  }, [open]);
+  }, [open, GEMINI_READY]);
 
   useEffect(() => {
     if (open && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
