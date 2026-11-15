@@ -397,14 +397,32 @@ async function handleAdobe(request, env, mode) {
       : signature[0] === 0x50 && signature[1] === 0x4b;
     if (!isValid) return error("Invalid file signature. Please upload a real " + ext + " file.");
     const mediaType = mode === "pdf-to-word" ? "application/pdf" : mimeDocx;
-    const credentials = new URLSearchParams({ client_id: env.ADOBE_CLIENT_ID, client_secret: env.ADOBE_CLIENT_SECRET });
+    // Whitespace can be introduced when pasting values from Adobe credentials JSON.
+    // Preserve both credentials server-side, never return provider body to browsers.
+    const client = String(env.ADOBE_CLIENT_ID).trim();
+    const clientSecret = String(env.ADOBE_CLIENT_SECRET).trim();
+    if (!client || !clientSecret) return error("Adobe PDF Services Client ID or Client Secret is empty. Check Cloudflare runtime secrets.", 503);
+    const credentials = new URLSearchParams({ client_id: client, client_secret: clientSecret });
     const tokenResp = await fetchTimed(ADOBE_BASE + "/token", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: credentials,
     });
-    if (!tokenResp.ok) return error("Adobe credentials or subscription are not valid.", 503);
+    if (!tokenResp.ok) {
+      if ([400, 401].includes(tokenResp.status)) {
+        return error("Adobe PDF Services refused the Client ID and Client Secret (HTTP " + tokenResp.status + "). Verify both belong to the same PDF Services API credential.", 503);
+      }
+      if (tokenResp.status === 403) {
+        return error("Adobe PDF Services access denied (HTTP 403). Check the Adobe PDF Services API entitlement and credential permissions.", 503);
+      }
+      if (tokenResp.status === 429) {
+        return error("Adobe access token rate limit reached (HTTP 429). Try again later.", 429);
+      }
+      if (tokenResp.status >= 500) {
+        return error("Adobe PDF Services authentication is temporarily unavailable (HTTP " + tokenResp.status + ").", 502);
+      }
+      return error("Adobe token endpoint rejected the request (HTTP " + tokenResp.status + "). Verify your PDF Services API credentials.", 502);
+    }
     const oauth = await tokenResp.json();
-    if (!oauth.access_token) return error("Adobe did not issue an access token.", 502);
-    const client = env.ADOBE_CLIENT_ID;
+    if (!oauth.access_token) return error("Adobe did not issue an access token. Check the PDF Services API credential.", 502);
     const auth = oauth.access_token;
     const createAsset = await adobeJSON(ADOBE_BASE + "/assets", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mediaType }),
