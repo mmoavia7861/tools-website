@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { SEOHead } from '../components/SEOHead';
 import { AdSlot } from '../components/AdSlot';
-import { FAQ_ITEMS, STARTER_BLOG_POSTS } from '../data/initialContent';
+import { FAQ_ITEMS, HOME_BLOG_PREVIEWS } from '../data/homeContent';
 
 interface HomeViewProps {
   navigate: (path: string) => void;
@@ -554,7 +554,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {STARTER_BLOG_POSTS.slice(0, 3).map((post) => (
+            {HOME_BLOG_PREVIEWS.map((post) => (
               <article
                 key={post.id}
                 className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-6 hover:bg-white hover:shadow-md transition duration-200"
