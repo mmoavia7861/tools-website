@@ -27,6 +27,8 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiImageBusy, setAiImageBusy] = useState(false);
+  const [aiImage, setAiImage] = useState<{ src: string; mimeType: string } | null>(null);
   const [AI_READY, setAiReady] = useState(false);
   useEffect(() => {
     if (!AI_CAPABLE) return;
@@ -69,7 +71,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
   }, []);
 
   const selectKind = (next: CardKind) => {
-    setKind(next); setDraft(blankCard(next)); setPrompt(EXAMPLES[next]); setPreviewError(''); setNotice('');
+    setKind(next); setDraft(blankCard(next)); setPrompt(EXAMPLES[next]); setPreviewError(''); setNotice(''); setAiImage(null);
   };
   const update = (field: keyof CardDraft, value: string) => {
     setDraft(prev => ({ ...prev, [field]: value }));
@@ -178,6 +180,39 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
     }
   };
 
+
+  // A real Gemini image is deliberately separate from the editable browser canvas.
+  // AI images cannot be edited as individual text or shape layers.
+  const generateCardImage = async () => {
+    if (!AI_READY) { setPreviewError('Connect Gemini and verification before generating artwork.'); return; }
+    if (!turnstileToken) { setPreviewError('Complete the verification first.'); return; }
+    if (prompt.trim().length < 8) { setPreviewError('Describe the card in at least 8 characters.'); return; }
+    setAiImageBusy(true); setPreviewError(''); setNotice('');
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 65000);
+    try {
+      const response = await fetch(API_URL + '/api/cards/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind, prompt: prompt.trim(), token: turnstileToken }),
+        signal: controller.signal,
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success || !/^data:image\/(png|jpeg);base64,/.test(result.image || ''))
+        throw new Error(typeof result?.error === 'string' ? result.error : 'Gemini did not return an image.');
+      if (result.image.length > 8 * 1024 * 1024 + 128) throw new Error('Gemini image was too large.');
+      setAiImage({ src: result.image, mimeType: result.mimeType });
+      setNotice('AI-generated image ready. Check all names and spelling before downloading. This image is not layer-editable.');
+    } catch (err) {
+      setPreviewError(err instanceof Error ? err.message : 'Card artwork generation failed.');
+    } finally {
+      setAiImageBusy(false);
+      setTurnstileToken('');
+      window.clearTimeout(timer);
+      if (widgetId.current) (window as any).turnstile?.reset(widgetId.current);
+    }
+  };
+
   const handleLogo = async (file: File) => {
     if (!['image/jpeg','image/png'].includes(file.type) || file.size > 2*1024*1024 || file.size <= 0) {
       setPreviewError('Choose a PNG or JPEG up to 2 MB.'); return;
@@ -235,7 +270,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
       <div className="flex items-center gap-2 text-blue-700 text-xs font-bold tracking-wide uppercase"><Sparkles className="w-4 h-4"/> ToolsCresta Creative Tools</div>
       <h1 className="mt-3 text-3xl sm:text-4xl font-extrabold text-slate-900">AI Card Generator & Invitation Maker</h1>
-      <p className="mt-3 max-w-3xl text-slate-600 leading-relaxed">Create printable visiting cards, wedding invitations and birthday invitations. Design with free local templates now. Gemini-powered prompt generation activates after the secure API is connected.</p>
+      <p className="mt-3 max-w-3xl text-slate-600 leading-relaxed">Create printable visiting cards, wedding invitations and birthday invitations. Design with free local templates now. Gemini can propose an editable design; eligible paid Gemini image API accounts can also generate card artwork.</p>
 
       <div className="mt-7 grid grid-cols-1 sm:grid-cols-3 gap-3" role="tablist" aria-label="Card type">
         {kinds.map(({kind:k,label,description:desc,icon:Icon})=><button type="button" key={k} role="tab" aria-selected={kind===k} onClick={()=>selectKind(k)}
@@ -264,7 +299,13 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
               <button type="button" disabled={!AI_READY||!turnstileToken||aiBusy} onClick={()=>void generateWithAi()}
                 title={!AI_READY?'Gemini API and Turnstile must be connected first':undefined}
                 className="flex items-center gap-2 rounded-xl border border-indigo-300 px-5 py-3 text-sm font-bold text-indigo-800 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45">
-                <Sparkles className="w-4 h-4"/>{aiBusy?'Generating…':'Generate with Gemini'}
+                <Sparkles className="w-4 h-4"/>{aiBusy?"Generating editable design…":"Gemini Editable Design"}
+              </button>
+              <button type="button" disabled={!AI_READY||!turnstileToken||aiImageBusy}
+                onClick={()=>void generateCardImage()}
+                title={!AI_READY?'Requires Gemini image API access and verification':undefined}
+                className="flex items-center gap-2 rounded-xl bg-violet-700 px-5 py-3 text-sm font-bold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-45">
+                <ImageIcon className="w-4 h-4"/>{aiImageBusy?'Generating image…':'Generate AI Card Image'}
               </button>
             </div>
             {AI_READY?<div className="space-y-2"><div ref={widgetRef}/><p className="text-xs text-slate-500">{turnstileStatus||'Complete free anti-bot verification to enable Gemini.'}</p></div>
@@ -317,6 +358,15 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
           <div className="flex justify-center items-center rounded-2xl bg-slate-100 p-4 sm:p-6 min-h-[290px]">
             <canvas ref={canvasRef} aria-label="Preview of your editable card" role="img" className="max-w-full h-auto rounded-lg shadow-xl" style={{width:'100%'}}/>
           </div>
+          {aiImage&&<figure className="mt-4 space-y-3 rounded-2xl border border-violet-200 bg-violet-50 p-3">
+            <figcaption className="text-sm font-bold text-violet-900">Gemini-generated card artwork</figcaption>
+            <img src={aiImage.src} alt={kind+' card generated by Gemini'} className="mx-auto block max-h-[560px] w-full rounded-lg object-contain shadow-sm"/>
+            <a href={aiImage.src} download={'toolscresta-ai-'+kind+'-card.'+(aiImage.mimeType==='image/jpeg'?'jpg':'png')}
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-5 py-3 text-sm font-bold text-white hover:bg-violet-800">
+              <Download className="h-4 w-4"/> Download AI Image
+            </a>
+            <p className="text-xs text-violet-900">AI artwork is a flat image, not editable layers. Verify all text, dates and phone numbers before printing. This request uses Gemini's paid image-generation quota.</p>
+          </figure>}
           <p className="text-xs text-slate-500">Preview and downloads use the same browser renderer. Check names, dates, spelling and print margins before sharing.</p>
           <div className="grid grid-cols-3 gap-2">{(['png','jpg','pdf'] as const).map(format=><button key={format} type="button" disabled={busy}
             onClick={()=>void download(format)} className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-2 py-3 text-xs sm:text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"><Download className="w-4 h-4"/>{format.toUpperCase()}</button>)}</div>
