@@ -174,3 +174,68 @@ test('Gemini image HTTP 429 is reported as quota or billing failure', async () =
     globalThis.fetch = originalFetch;
   }
 });
+
+test('Gemini image request has a minimal API payload (no optional format fields)', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, options) => {
+      if (String(url).includes('/turnstile/v0/siteverify')) return Response.json({ success: true, hostname: 'toolscresta.com' });
+      const payload = JSON.parse(options.body);
+      assert.deepEqual(payload.generationConfig, { responseModalities: ['IMAGE'] });
+      assert.match(payload.contents[0].parts[0].text, /16:9/);
+      return Response.json({ candidates: [{ content: { parts: [{ inlineData: {
+        mimeType: 'image/png', data: 'iVBORw0KGgo='
+      } }] } }] });
+    };
+    const response = await worker.fetch(new Request(base + '/api/cards/generate-image', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Origin': base },
+      body: JSON.stringify(sampleBody),
+    }), { ...env, GEMINI_API_KEY: 'test-only', TURNSTILE_SECRET: 'test-only' });
+    assert.equal(response.status, 200);
+    assert.match((await response.json()).image, /^data:image\/png;base64,/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Gemini image HTTP 400 FAILED_PRECONDITION gives billing guidance without exposing upstream response', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => String(url).includes('/turnstile/v0/siteverify')
+      ? Response.json({ success: true, hostname: 'toolscresta.com' })
+      : Response.json({ error: {
+          status: 'FAILED_PRECONDITION',
+          message: 'Free tier is not supported; sensitive-upstream-info-123'
+        } }, { status: 400 });
+    const response = await worker.fetch(new Request(base + '/api/cards/generate-image', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Origin': base },
+      body: JSON.stringify(sampleBody),
+    }), { ...env, GEMINI_API_KEY: 'test-only', TURNSTILE_SECRET: 'test-only' });
+    assert.equal(response.status, 503);
+    const result = await response.json();
+    assert.match(result.error, /paid billing/);
+    assert.doesNotMatch(result.error, /sensitive-upstream-info-123/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Gemini image HTTP 400 INVALID_ARGUMENT remains a configuration error', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => String(url).includes('/turnstile/v0/siteverify')
+      ? Response.json({ success: true, hostname: 'toolscresta.com' })
+      : Response.json({ error: {
+          status: 'INVALID_ARGUMENT',
+          message: 'Bad generationConfig parameters'
+        } }, { status: 400 });
+    const response = await worker.fetch(new Request(base + '/api/cards/generate-image', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Origin': base },
+      body: JSON.stringify(sampleBody),
+    }), { ...env, GEMINI_API_KEY: 'test-only', TURNSTILE_SECRET: 'test-only' });
+    assert.equal(response.status, 502);
+    assert.match((await response.json()).error, /request rejected by Google/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
