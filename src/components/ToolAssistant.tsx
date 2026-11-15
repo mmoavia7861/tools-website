@@ -51,7 +51,7 @@ export const ToolAssistant: React.FC<{ navigate: (path: string) => void }> = ({ 
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
-  }, [open, GEMINI_READY]);
+  }, [open]);
 
   useEffect(() => {
     if (open && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
@@ -101,7 +101,7 @@ export const ToolAssistant: React.FC<{ navigate: (path: string) => void }> = ({ 
       }
       setToken('');
     };
-  }, [open]);
+  }, [open, GEMINI_READY]);
 
   useEffect(() => () => { requestRef.current?.abort(); }, []);
 
