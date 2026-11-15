@@ -43,3 +43,38 @@ test('unsupported API paths are rejected', async () => {
   const response = await worker.fetch(new Request(base + '/api/private', { method: 'POST' }), env);
   assert.equal(response.status, 404);
 });
+
+// Turnstile error categories must not be conflated. No provider keys or tokens
+// are written to logs or to user-visible messages.
+const sampleBody = { kind: 'visiting', prompt: 'A professional blue and white visiting card', token: 'mock-turnstile-token' };
+
+async function simulateSiteverify(code) {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => Response.json({
+      success: false,
+      'error-codes': [code],
+    });
+    const response = await worker.fetch(new Request(base + '/api/cards/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': base },
+      body: JSON.stringify(sampleBody),
+    }), { ...env, GEMINI_API_KEY: 'test-only-not-real', TURNSTILE_SECRET: 'test-only-not-real' });
+    return { status: response.status, body: await response.json() };
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+test('incorrect private Turnstile secret is reported as configuration failure', async () => {
+  const result = await simulateSiteverify('invalid-input-secret');
+  assert.equal(result.status, 503);
+  assert.match(result.body.error, /server Secret Key is incorrect/);
+  assert.doesNotMatch(result.body.error, /test-only-not-real/);
+});
+
+test('expired or reused Turnstile token advises new verification', async () => {
+  const result = await simulateSiteverify('timeout-or-duplicate');
+  assert.equal(result.status, 403);
+  assert.match(result.body.error, /expired or already used/i);
+});
