@@ -317,3 +317,75 @@ test('Cloudflare AI rejects non-same-origin requests before generating artwork',
   }), { ...env, TURNSTILE_SECRET: 'test-secret', AI: { run: async () => ({ image: 'a'.repeat(200) }) } });
   assert.equal(response.status, 403);
 });
+
+test('Adobe REST export flow uploads a real PDF and downloads DOCX (mocked upstream)', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  const storage = 'https://dcplatformstorageservice-prod-us-east-1.s3-accelerate.amazonaws.com/test-file?X-Amz-Signature=sample';
+  const jobStatus = 'https://pdf-services.adobe.io/operation/exportpdf/test-job/status';
+  try {
+    globalThis.fetch = async (url, options) => {
+      calls.push({ url: String(url), method: options.method || 'GET' });
+      if (String(url).includes('/turnstile/v0/siteverify')) {
+        return Response.json({ success: true, hostname: 'toolscresta.com' });
+      }
+      if (String(url) === 'https://pdf-services.adobe.io/token') {
+        assert.match(String(options.body), /client_id=test-client/);
+        assert.match(String(options.body), /client_secret=test-secret/);
+        return Response.json({ access_token: 'mock-access-token' });
+      }
+      if (String(url) === 'https://pdf-services.adobe.io/assets') {
+        return Response.json({ assetID: 'urn:aaid:AS:UE1:sample-asset', uploadUri: storage });
+      }
+      if (String(url) === storage && options.method === 'PUT') {
+        assert.equal(options.headers['Content-Type'], 'application/pdf');
+        return new Response('', { status: 200 });
+      }
+      if (String(url) === 'https://pdf-services.adobe.io/operation/exportpdf') {
+        assert.equal(JSON.parse(options.body).targetFormat, 'docx');
+        return new Response('', { status: 201, headers: { location: jobStatus } });
+      }
+      if (String(url) === jobStatus) {
+        return Response.json({ status: 'done', asset: { downloadUri: storage } });
+      }
+      if (String(url) === storage && options.method === 'GET') {
+        return new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x01]), { status: 200 });
+      }
+      throw new Error('Unexpected upstream call');
+    };
+    const body = new FormData();
+    body.append('file', new File([new TextEncoder().encode('%PDF-1.7\nmock')], 'demo.pdf', { type: 'application/pdf' }));
+    body.append('turnstileToken', 'mock-turnstile-token');
+    const response = await worker.fetch(new Request(base + '/api/convert/pdf-to-word', {
+      method: 'POST', headers: { Origin: base, 'CF-Connecting-IP': '198.51.100.90' }, body
+    }), {
+      ...env, ADOBE_CLIENT_ID: 'test-client', ADOBE_CLIENT_SECRET: 'test-secret', TURNSTILE_SECRET: 'test-turnstile'
+    });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type'), /wordprocessingml/);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.deepEqual([...new Uint8Array(await response.arrayBuffer())].slice(0,2), [0x50,0x4b]);
+    assert.equal(calls.length, 7);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Adobe credentials authorization failures return safe configuration errors', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => String(url).includes('/turnstile/v0/siteverify')
+      ? Response.json({ success: true, hostname: 'toolscresta.com' })
+      : String(url).endsWith('/token')
+        ? Response.json({ access_token: 'mock' })
+        : new Response('Upstream private error', { status: 403 });
+    const body = new FormData();
+    body.append('file', new File([new TextEncoder().encode('%PDF-1.7\nmock')], 'demo.pdf'));
+    body.append('turnstileToken', 'mock-turnstile-token');
+    const response = await worker.fetch(new Request(base + '/api/convert/pdf-to-word', {
+      method: 'POST', headers: { Origin: base, 'CF-Connecting-IP': '198.51.100.91' }, body
+    }), { ...env, ADOBE_CLIENT_ID: 'test-client', ADOBE_CLIENT_SECRET: 'test-secret', TURNSTILE_SECRET: 'test-turnstile' });
+    assert.equal(response.status, 503);
+    const result = await response.json();
+    assert.match(result.error, /rejected these API credentials or access permissions/);
+    assert.doesNotMatch(result.error, /private error/i);
+  } finally { globalThis.fetch = originalFetch; }
+});
