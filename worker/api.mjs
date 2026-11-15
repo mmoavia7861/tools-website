@@ -113,12 +113,13 @@ async function gemini(env, contents, asJson = false) {
         contents,
         generationConfig: {
           maxOutputTokens: asJson ? 1200 : 600,
-          temperature: asJson ? 0.3 : 0.5,
+          // Card design is a brief structured task; low thinking reduces latency.
+          thinkingConfig: { thinkingLevel: "low" },
           ...(asJson ? { responseMimeType: "application/json" } : {}),
         },
       }),
     },
-    25000,
+    45000,
   );
   if (!response.ok) {
     if (response.status === 429) throw { status: 429, message: "Gemini quota or rate limit reached. Please try later." };
@@ -183,7 +184,12 @@ async function handleAi(request, env, path) {
     try { generated = JSON.parse(text); } catch { return error("Gemini returned an invalid card design. Please try again.", 502); }
     if (!generated || typeof generated !== "object" || Array.isArray(generated)) return error("Gemini response is not valid.", 502);
     return reply({ success: true, design: validateCard(generated, kind) });
-  } catch (e) { return error(e?.message || "AI provider unavailable.", e?.status || 502); }
+  } catch (e) {
+    if (e?.name === "AbortError" || e?.name === "TimeoutError") {
+      return error("Gemini took too long to respond. Try again with a shorter prompt.", 504);
+    }
+    return error(e?.message || "AI provider unavailable.", e?.status || 502);
+  }
 }
 
 async function handleImageCard(request, env) {
