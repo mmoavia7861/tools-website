@@ -27,6 +27,7 @@ function available(env) {
     gemini: Boolean(env.GEMINI_API_KEY),
     adobe: Boolean(env.ADOBE_CLIENT_ID && env.ADOBE_CLIENT_SECRET),
     turnstile: Boolean(env.TURNSTILE_SECRET),
+    workersAi: Boolean(env.AI && typeof env.AI.run === "function"),
   };
 }
 function limitRequests(request, limit, windowMs) {
@@ -224,6 +225,69 @@ async function handleAi(request, env, path) {
   }
 }
 
+// Generate decorative artwork only: names and contact data are rendered accurately
+// by the client canvas, NOT by an image model that can misspell them.
+async function handleCloudflareCardBackground(request, env) {
+  if (!env.AI || typeof env.AI.run !== "function") {
+    return error("Cloudflare AI is not enabled. Add the AI binding to the production Worker and deploy.", 503);
+  }
+  if (!env.TURNSTILE_SECRET) {
+    return error("Turnstile server verification is not configured.", 503);
+  }
+  // Per-isolate throttle (in addition, configure Cloudflare zone-level rate limits).
+  if (!limitRequests(request, 2, 60000)) return error("AI background request limit reached. Try again shortly.", 429);
+  const body = await jsonInput(request);
+  if (!body) return error("Invalid request.", 400);
+  const kind = body.kind;
+  const prompt = clean(body.prompt, 1500);
+  if (!["visiting", "wedding", "birthday"].includes(kind) || prompt.length < 8) {
+    return error("Choose a card type and describe its design in at least 8 characters.", 400);
+  }
+  const verified = await verifyTurnstile(request, env, body.token);
+  if (!verified.ok) return error(verified.message, verified.status);
+  // Intentionally extract only non-personal style words. User names, contact
+  // information, dates and arbitrary text are NOT forwarded to the image model.
+  const themes = [
+    "blue", "red", "green", "gold", "silver", "black", "white", "pink", "purple",
+    "orange", "teal", "navy", "pastel", "colorful", "minimal", "modern", "luxury",
+    "elegant", "vintage", "rustic", "floral", "flowers", "roses", "botanical",
+    "geometric", "abstract", "watercolor", "marble", "sparkle", "confetti",
+    "balloons", "stars", "romantic", "traditional", "festive", "corporate",
+    "professional", "nature", "leaves", "gradient", "texture"
+  ];
+  const lower = prompt.toLowerCase();
+  const aesthetic = themes.filter(word => new RegExp("\\b" + word + "\\b", "i").test(lower)).slice(0, 9);
+  const design = aesthetic.length ? aesthetic.join(", ") : (kind === "visiting" ? "modern elegant blue geometric" :
+    kind === "wedding" ? "elegant floral pastel romantic" : "colorful festive balloons confetti");
+  const sizeHint = kind === "visiting" ? "horizontal business card" : "portrait invitation card";
+  const imagePrompt = "Create a high-quality seamless printable decorative BACKGROUND for a " + sizeHint +
+    ". Style: " + design +
+    ". Beautiful refined illustration, subtle professional composition, delicate ornamental details at the edges, clean light central area for readable editable text. " +
+    "Flat straight-on digital artwork. NO typography, NO letters, NO words, NO numbers, NO handwriting, NO logos, NO borders, NO mockups, NO watermarks.";
+  let result;
+  try {
+    result = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
+      prompt: imagePrompt, steps: 4
+    });
+  } catch (e) {
+    const details = String(e?.message || "");
+    if (/quota|neuron|limit|exceeded|429/i.test(details)) {
+      return error("Cloudflare AI daily free allowance or rate limit reached. Try again after quota resets.", 429);
+    }
+    return error("Cloudflare AI could not generate a background right now. Try the free template.", 502);
+  }
+  if (!result || typeof result.image !== "string" || result.image.length < 100 ||
+      result.image.length > 6 * 1024 * 1024 || !/^[A-Za-z0-9+/]+={0,2}$/.test(result.image)) {
+    return error("Cloudflare AI returned an invalid background image.", 502);
+  }
+  return reply({
+    success: true,
+    image: "data:image/jpeg;base64," + result.image,
+    mimeType: "image/jpeg",
+    source: "cloudflare-workers-ai",
+  });
+}
+
 async function handleImageCard(request, env) {
   if (!env.GEMINI_API_KEY || !env.TURNSTILE_SECRET) return error("Gemini image generation is not configured yet.", 503);
   // Image calls consume paid provider quota. Use an aggressive per-isolate limit,
@@ -395,6 +459,7 @@ export default {
     if (request.method !== "POST") return error("Unsupported method.", 405);
     const origin = request.headers.get("Origin");
     if (origin && origin !== ORIGIN) return error("This API accepts same-origin requests only.", 403);
+    if (path === "/api/cards/generate-background") return handleCloudflareCardBackground(request, env);
     if (path === "/api/cards/generate-image") return handleImageCard(request, env);
     if (path === "/api/assistant/chat" || path === "/api/cards/generate") return handleAi(request, env, path);
     if (path === "/api/convert/pdf-to-word" || path === "/api/convert/word-to-pdf")
