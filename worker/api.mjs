@@ -152,6 +152,65 @@ async function handleAi(request, env, path) {
     return reply({ success: true, design: validateCard(generated, kind) });
   } catch (e) { return error(e?.message || "AI provider unavailable.", e?.status || 502); }
 }
+
+async function handleImageCard(request, env) {
+  if (!env.GEMINI_API_KEY || !env.TURNSTILE_SECRET) return error("Gemini image generation is not configured yet.", 503);
+  // Image calls consume paid provider quota. Use an aggressive per-isolate limit,
+  // plus a Cloudflare zone-level rate limit before enabling public use.
+  if (!limitRequests(request, 2, 60000)) return error("Too many image requests. Try again later.", 429);
+  const body = await jsonInput(request);
+  if (!body) return error("Invalid request.", 400);
+  if (!await verifyTurnstile(request, env, body.token)) return error("Verification expired or invalid.", 403);
+  const kind = body.kind;
+  const prompt = clean(body.prompt, 1500);
+  if (!["visiting", "wedding", "birthday"].includes(kind) || prompt.length < 8)
+    return error("Choose a card type and describe the design in at least 8 characters.", 400);
+  const aspectRatio = kind === "visiting" ? "16:9" : "3:4";
+  const cardType = kind === "visiting" ? "professional visiting or business card" :
+    kind === "wedding" ? "wedding invitation card" : "birthday invitation card";
+  const detailedPrompt = "Create ONE professionally designed, printable " + cardType +
+    " as a flat, straight-on 2D graphic. Full card visible, no mockup, no hand, no desk, no shadows outside the card. " +
+    "Make composition visually attractive with harmonious typography, spacing, decorative artwork and clear hierarchy. " +
+    "Use the user's exact names, dates, venue and contact information when provided; DO NOT invent any missing details. " +
+    "Make all text legible and correctly spelled; avoid watermarks and brand logos. User request: " + prompt;
+  let response;
+  try {
+    response = await fetchTimed(
+      "https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-image:generateContent",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: detailedPrompt }] }],
+          generationConfig: {
+            responseModalities: ["IMAGE"],
+            responseFormat: { image: { aspectRatio, imageSize: "1K" } }
+          }
+        })
+      }, 55000
+    );
+  } catch {
+    return error("Gemini image generation timed out. Please try again.", 504);
+  }
+  if (response.status === 429) return error("Gemini image quota reached. Try later.", 429);
+  if ([401, 403].includes(response.status))
+    return error("Gemini image generation requires an authorized paid-tier API project and valid credentials.", 503);
+  if (!response.ok) return error("Gemini image service could not generate this card.", 502);
+  let data;
+  try { data = await response.json(); } catch { return error("Gemini image response was invalid.", 502); }
+  const output = (data.candidates?.[0]?.content?.parts || []).find(part =>
+    part.inlineData && (part.inlineData.mimeType === "image/png" || part.inlineData.mimeType === "image/jpeg")
+  )?.inlineData;
+  if (!output || typeof output.data !== "string" || output.data.length > 8 * 1024 * 1024 ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(output.data))
+    return error("Gemini did not return a usable card image.", 502);
+  return reply({
+    success: true,
+    image: "data:" + output.mimeType + ";base64," + output.data,
+    mimeType: output.mimeType,
+  });
+}
+
 function safeAdobeApiUrl(input) {
   try {
     const u = new URL(input);
@@ -263,6 +322,7 @@ export default {
     if (request.method !== "POST") return error("Unsupported method.", 405);
     const origin = request.headers.get("Origin");
     if (origin && origin !== ORIGIN) return error("This API accepts same-origin requests only.", 403);
+    if (path === "/api/cards/generate-image") return handleImageCard(request, env);
     if (path === "/api/assistant/chat" || path === "/api/cards/generate") return handleAi(request, env, path);
     if (path === "/api/convert/pdf-to-word" || path === "/api/convert/word-to-pdf")
       return handleAdobe(request, env, path.endsWith("pdf-to-word") ? "pdf-to-word" : "word-to-pdf");
