@@ -162,7 +162,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
     setTurnstileToken('');
     setAiBusy(true); setPreviewError(''); setNotice('');
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 30000);
+    const timeout = window.setTimeout(() => controller.abort(), 65000);
     try {
       const response = await fetch(API_URL + '/api/cards/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -177,7 +177,9 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
       setNotice('Gemini suggested the design. Review all details before sharing or printing.');
       setActivePanel('content');
     } catch (err) {
-      setPreviewError(err instanceof Error ? err.message : 'AI service unavailable. Use local templates instead.');
+      setPreviewError(err instanceof Error && err.name === 'AbortError'
+        ? 'Gemini request timed out. Please try again with a shorter prompt.'
+        : err instanceof Error ? err.message : 'AI service unavailable. Use local templates instead.');
     } finally {
       tokenRequestInFlight.current = false;
       setAiBusy(false); setTurnstileToken(''); window.clearTimeout(timeout);
@@ -197,7 +199,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
     setTurnstileToken('');
     setAiImageBusy(true); setPreviewError(''); setNotice('');
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 65000);
+    const timer = window.setTimeout(() => controller.abort(), 85000);
     try {
       const response = await fetch(API_URL + '/api/cards/generate-image', {
         method: 'POST',
@@ -212,7 +214,9 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
       setAiImage({ src: result.image, mimeType: result.mimeType });
       setNotice('AI-generated image ready. Check all names and spelling before downloading. This image is not layer-editable.');
     } catch (err) {
-      setPreviewError(err instanceof Error ? err.message : 'Card artwork generation failed.');
+      setPreviewError(err instanceof Error && err.name === 'AbortError'
+        ? 'Gemini image generation timed out. Please try again.'
+        : err instanceof Error ? err.message : 'Card artwork generation failed.');
     } finally {
       tokenRequestInFlight.current = false;
       setAiImageBusy(false);
