@@ -14,21 +14,21 @@ import { CookieBanner } from './components/CookieBanner';
 import { PointerEffects } from './components/PointerEffects';
 import { ToolAssistant } from './components/ToolAssistant';
 import { HomeView } from './views/HomeView';
-import { QRGeneratorView } from './views/QRGeneratorView';
-import { PDFCompressorView } from './views/PDFCompressorView';
-import { ImageToPdfView } from './views/ImageToPdfView';
-import { BackgroundRemoverView } from './views/BackgroundRemoverView';
-import { BlogView } from './views/BlogView';
-import { BlogPostView } from './views/BlogPostView';
-import { AboutView } from './views/AboutView';
-import { ContactView } from './views/ContactView';
-import { LegalView, type LegalDocType } from './views/LegalView';
-import { PDFEditorView } from './views/PDFEditorView';
-import { VisitingCardView } from './views/VisitingCardView';
-import { AICardGeneratorView } from './views/AICardGeneratorView';
-import { DocumentConverterView } from './views/DocumentConverterView';
-import { VideoCompressorView } from './views/VideoCompressorView';
-import { AdminView } from './views/AdminView';
+const QRGeneratorView = React.lazy(() => import('./views/QRGeneratorView').then(module => ({ default: module.QRGeneratorView })));
+const PDFCompressorView = React.lazy(() => import('./views/PDFCompressorView').then(module => ({ default: module.PDFCompressorView })));
+const ImageToPdfView = React.lazy(() => import('./views/ImageToPdfView').then(module => ({ default: module.ImageToPdfView })));
+const BackgroundRemoverView = React.lazy(() => import('./views/BackgroundRemoverView').then(module => ({ default: module.BackgroundRemoverView })));
+const BlogView = React.lazy(() => import('./views/BlogView').then(module => ({ default: module.BlogView })));
+const BlogPostView = React.lazy(() => import('./views/BlogPostView').then(module => ({ default: module.BlogPostView })));
+const AboutView = React.lazy(() => import('./views/AboutView').then(module => ({ default: module.AboutView })));
+const ContactView = React.lazy(() => import('./views/ContactView').then(module => ({ default: module.ContactView })));
+const LegalView = React.lazy(() => import('./views/LegalView').then(module => ({ default: module.LegalView })));
+const PDFEditorView = React.lazy(() => import('./views/PDFEditorView').then(module => ({ default: module.PDFEditorView })));
+const VisitingCardView = React.lazy(() => import('./views/VisitingCardView').then(module => ({ default: module.VisitingCardView })));
+const AICardGeneratorView = React.lazy(() => import('./views/AICardGeneratorView').then(module => ({ default: module.AICardGeneratorView })));
+const DocumentConverterView = React.lazy(() => import('./views/DocumentConverterView').then(module => ({ default: module.DocumentConverterView })));
+const VideoCompressorView = React.lazy(() => import('./views/VideoCompressorView').then(module => ({ default: module.VideoCompressorView })));
+const AdminView = React.lazy(() => import('./views/AdminView').then(module => ({ default: module.AdminView })));
 import { NotFoundView } from './views/NotFoundView';
 import { testConnection } from './services/firebase';
 
@@ -157,7 +157,9 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-[#0F172A] font-sans">
       <Navbar currentPath={currentPath} navigate={navigate} />
       <main className="flex-1">
-        {renderCurrentRoute()}
+        <React.Suspense fallback={<div role="status" aria-live="polite" className="mx-auto max-w-7xl px-6 py-16 text-center text-slate-600">Loading tool…</div>}>
+          {renderCurrentRoute()}
+        </React.Suspense>
       </main>
       <Footer navigate={navigate} />
       <CookieBanner />
