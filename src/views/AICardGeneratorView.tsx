@@ -30,12 +30,18 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
   const [aiImageBusy, setAiImageBusy] = useState(false);
   const [aiImage, setAiImage] = useState<{ src: string; mimeType: string } | null>(null);
   const [AI_READY, setAiReady] = useState(false);
+  const [BACKGROUND_READY, setBackgroundReady] = useState(false);
   useEffect(() => {
     if (!AI_CAPABLE) return;
     let cancelled = false;
     fetch(API_URL + '/api/integrations/status', { cache: 'no-store' })
       .then(response => response.ok ? response.json() : null)
-      .then(data => { if (!cancelled) setAiReady(Boolean(data?.gemini && data?.turnstile)); })
+      .then(data => {
+        if (!cancelled) {
+          setAiReady(Boolean(data?.gemini && data?.turnstile));
+          setBackgroundReady(Boolean(data?.workersAi && data?.turnstile));
+        }
+      })
       .catch(() => { if (!cancelled) setAiReady(false); });
     return () => { cancelled = true; };
   }, []);
@@ -94,7 +100,16 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
             img.src = draft.imageData;
           });
         }
-        if (!cancelled) { drawCardCanvas(canvas, draft, image); setPreviewError(''); }
+        let backgroundImage: HTMLImageElement | null = null;
+        if (draft.backgroundImageData) {
+          backgroundImage = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error('AI background preview failed. Please generate a new one.'));
+            img.src = draft.backgroundImageData;
+          });
+        }
+        if (!cancelled) { drawCardCanvas(canvas, draft, image, backgroundImage); setPreviewError(''); }
       } catch (err) {
         if (!cancelled) setPreviewError(err instanceof Error ? err.message : 'Preview unavailable.');
       }
@@ -105,7 +120,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
 
   // Turnstile is mandatory for Gemini API access. No keys or secrets reach this page.
   useEffect(() => {
-    if (!AI_READY || !widgetRef.current) return;
+    if (!(AI_READY || BACKGROUND_READY) || !widgetRef.current) return;
     let cancelled = false;
     let checks = 0;
     const display = () => {
@@ -143,7 +158,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
         widgetId.current = null;
       }
     };
-  }, [AI_READY]);
+  }, [AI_READY, BACKGROUND_READY]);
 
   const createTemplate = () => {
     if (prompt.trim().length < 8) { setPreviewError('Describe your card in at least 8 characters.'); return; }
