@@ -1,0 +1,22 @@
+# ToolsCresta static security headers (Cloudflare Workers static assets).
+# Intentionally avoid restrictive script-src/connect-src rules until Firebase,
+# Google sign-in, Turnstile, PDF/AI processing and AdSense are tested.
+# HSTS is deliberately deferred until full HTTPS and subdomains are verified.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'
+  Permissions-Policy: geolocation=(), microphone=()
+  X-Permitted-Cross-Domain-Policies: none
+
+# Admin has no search-results purpose.
+/admin/*
+  X-Robots-Tag: noindex, nofollow
+
+# The temporary workers.dev hostname must not compete with toolscresta.com
+# in search results. The final custom domain is NOT marked noindex.
+https://toolscresta.moaviah760.workers.dev/*
+  X-Robots-Tag: noindex, nofollow
+https://:version.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex, nofollow
