@@ -66,7 +66,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
     applySuggestion();
     window.addEventListener('toolcresta:card-prompt', applySuggestion);
     return () => window.removeEventListener('toolcresta:card-prompt', applySuggestion);
-  }, [AI_READY]);
+  }, []);
 
   const selectKind = (next: CardKind) => {
     setKind(next); setDraft(blankCard(next)); setPrompt(EXAMPLES[next]); setPreviewError(''); setNotice('');
@@ -140,7 +140,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
         widgetId.current = null;
       }
     };
-  }, []);
+  }, [AI_READY]);
 
   const createTemplate = () => {
     if (prompt.trim().length < 8) { setPreviewError('Describe your card in at least 8 characters.'); return; }
