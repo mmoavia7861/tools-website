@@ -24,7 +24,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
                 </svg>
               </div>
               <span className="text-lg font-bold text-[#0F172A]">
-                Tool<span className="text-blue-600">Cresta</span>
+                Tools<span className="text-blue-600">Cresta</span>
               </span>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">
