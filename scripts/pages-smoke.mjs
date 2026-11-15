@@ -131,7 +131,8 @@ try {
     window.history.pushState({}, '', '/tools-website/birthday-card-maker/');
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
-  await page.getByRole('tab', { name: /Birthday Card/ }).waitFor();
+  await page.waitForFunction(() => [...document.querySelectorAll('[role="tab"][aria-selected="true"]')]
+    .some(tab => tab.textContent?.includes('Birthday Card')));
   assert.equal(await page.getByRole('tab', { name: /Birthday Card/ }).getAttribute('aria-selected'), 'true',
     'Switching routes must reset the card kind to birthday');
   await page.getByRole('button', { name: 'Create Free Template' }).click();
