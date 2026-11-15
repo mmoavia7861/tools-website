@@ -389,3 +389,42 @@ test('Adobe credentials authorization failures return safe configuration errors'
     assert.doesNotMatch(result.error, /private error/i);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('Adobe REST create flow uploads DOCX and returns PDF (mocked upstream)', async () => {
+  const originalFetch = globalThis.fetch;
+  const storage = 'https://dcplatformstorageservice-prod-us-east-1.s3-accelerate.amazonaws.com/docx?X-Amz-Signature=sample';
+  const statusUrl = 'https://pdf-services.adobe.io/operation/createpdf/test-job/status';
+  const requests = [];
+  try {
+    globalThis.fetch = async (url, options) => {
+      requests.push({ url: String(url), method: options.method || 'GET' });
+      if (String(url).includes('/turnstile/v0/siteverify')) return Response.json({ success: true, hostname: 'toolscresta.com' });
+      if (String(url).endsWith('/token')) return Response.json({ access_token: 'mock-token' });
+      if (String(url).endsWith('/assets')) return Response.json({ assetID: 'urn:aaid:AS:UE1:test-docx', uploadUri: storage });
+      if (String(url) === storage && options.method === 'PUT') {
+        assert.equal(options.headers['Content-Type'], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        return new Response('', { status: 200 });
+      }
+      if (String(url).endsWith('/operation/createpdf')) {
+        const payload = JSON.parse(options.body);
+        assert.deepEqual(payload, { assetID: 'urn:aaid:AS:UE1:test-docx' });
+        return new Response('', { status: 201, headers: { location: statusUrl } });
+      }
+      if (String(url) === statusUrl) return Response.json({ status: 'done', asset: { downloadUri: storage } });
+      if (String(url) === storage && options.method === 'GET') return new Response(new TextEncoder().encode('%PDF-1.7\nmock'));
+      throw new Error('Unexpected upstream request');
+    };
+    const form = new FormData();
+    form.append('file', new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x01])], 'sample.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }));
+    form.append('turnstileToken', 'mock-turnstile-token');
+    const response = await worker.fetch(new Request(base + '/api/convert/word-to-pdf', {
+      method: 'POST', headers: { Origin: base, 'CF-Connecting-IP': '198.51.100.92' }, body: form
+    }), { ...env, ADOBE_CLIENT_ID: 'test-client', ADOBE_CLIENT_SECRET: 'test-secret', TURNSTILE_SECRET: 'test-turnstile' });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'application/pdf');
+    assert.equal(new TextDecoder().decode(await response.arrayBuffer()).slice(0,5), '%PDF-');
+    assert.equal(requests.length, 7);
+  } finally { globalThis.fetch = originalFetch; }
+});
