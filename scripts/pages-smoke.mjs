@@ -110,6 +110,35 @@ try {
   assert.match(pdf.suggestedFilename(), /\.pdf$/i, '2-page PDF button did not download a PDF');
   assert.equal(runtimeErrors.length, 0, 'Browser errors after card exports: ' + JSON.stringify(runtimeErrors));
 
+  // Wedding Card Maker free template, field parsing and real download.
+  const weddingResponse = await page.goto(rootUrl + 'wedding-card-maker/', { waitUntil: 'domcontentloaded', timeout: 25000 });
+  assert.equal(weddingResponse?.status(), 200, 'Wedding card route must load directly');
+  await page.getByRole('heading', { name: 'AI Card Generator & Invitation Maker' }).waitFor();
+  assert.equal(await page.getByRole('tab', { name: /Wedding Card/ }).getAttribute('aria-selected'), 'true',
+    'Wedding route should open the wedding editor');
+  await page.getByRole('button', { name: 'Create Free Template' }).click();
+  assert.equal(await page.getByLabel('Couple names').inputValue(), 'Ali & Ayesha',
+    'Wedding example must correctly populate couple names');
+  assert.equal(await page.getByLabel('Event date').inputValue(), '12 December 2027',
+    'Wedding date must not be lost in prompt parsing');
+  const weddingDownload = page.waitForEvent('download', { timeout: 25000 });
+  await page.getByRole('button', { name: 'PDF', exact: true }).click();
+  assert.match((await weddingDownload).suggestedFilename(), /wedding-card\\.pdf$/i,
+    'Wedding PDF should be a real browser download');
+
+  // Browser back/forward/client navigation must not reuse stale wedding state for birthday.
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/tools-website/birthday-card-maker/');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await page.getByRole('tab', { name: /Birthday Card/ }).waitFor();
+  assert.equal(await page.getByRole('tab', { name: /Birthday Card/ }).getAttribute('aria-selected'), 'true',
+    'Switching routes must reset the card kind to birthday');
+  await page.getByRole('button', { name: 'Create Free Template' }).click();
+  assert.equal(await page.getByLabel('Birthday person').inputValue(), 'Sara',
+    'Birthday example must not inherit wedding names');
+  assert.equal(runtimeErrors.length, 0, 'Card maker JavaScript errors: ' + JSON.stringify(runtimeErrors));
+
   const sitemapResponse = await page.goto(rootUrl + 'sitemap.xml');
   assert.equal(sitemapResponse?.status(), 200);
   const sitemap = await sitemapResponse?.text();
