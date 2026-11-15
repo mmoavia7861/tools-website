@@ -96,9 +96,9 @@ export default function App() {
       return <VisitingCardView />;
     }
 
-    if (path === '/ai-card-generator') return <AICardGeneratorView />;
-    if (path === '/wedding-card-maker') return <AICardGeneratorView initialKind="wedding" />;
-    if (path === '/birthday-card-maker') return <AICardGeneratorView initialKind="birthday" />;
+    if (path === '/ai-card-generator') return <AICardGeneratorView key="visiting" />;
+    if (path === '/wedding-card-maker') return <AICardGeneratorView key="wedding" initialKind="wedding" />;
+    if (path === '/birthday-card-maker') return <AICardGeneratorView key="birthday" initialKind="birthday" />;
 
     if (path === '/pdf-to-word') return <DocumentConverterView mode="pdf-to-word" />;
     if (path === '/word-to-pdf') return <DocumentConverterView mode="word-to-pdf" />;
