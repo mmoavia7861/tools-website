@@ -34,7 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
           type="button"
           onClick={() => handleNav('/')}
           className="group flex items-center gap-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 rounded-lg p-1"
-          aria-label="ToolCresta Home"
+          aria-label="ToolsCresta Home"
         >
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-500/20 group-hover:bg-blue-700 transition">
             <svg

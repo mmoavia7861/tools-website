@@ -19,7 +19,7 @@ type ChatMessage = {
 };
 const INTRO: ChatMessage = {
   id: 0, role: 'assistant',
-  text: 'Assalam o Alaikum! Main ToolCresta Guide hoon. Visiting, wedding ya birthday card ke ideas aur PDF tools ke steps poochhein. Quick guide aapke browser mein kaam karta hai.',
+  text: 'Assalam o Alaikum! Main ToolsCresta Guide hoon. Visiting, wedding ya birthday card ke ideas aur PDF tools ke steps poochhein. Quick guide aapke browser mein kaam karta hai.',
   source: 'local'
 };
 
@@ -177,7 +177,7 @@ export const ToolAssistant: React.FC<{ navigate: (path: string) => void }> = ({ 
       {open && (
         <section
           role="dialog"
-          aria-label="ToolCresta card and PDF assistant"
+          aria-label="ToolsCresta card and PDF assistant"
           className="mb-3 flex w-[calc(100vw-2rem)] max-w-[390px] flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-2xl shadow-slate-900/20"
           style={{ maxHeight: 'min(72dvh, 650px)' }}
           onKeyDown={event => { if (event.key === 'Escape') setOpen(false); }}
@@ -188,7 +188,7 @@ export const ToolAssistant: React.FC<{ navigate: (path: string) => void }> = ({ 
                 <Bot className="h-5 w-5" aria-hidden="true" />
               </div>
               <div>
-                <h2 className="text-sm font-bold">ToolCresta Guide</h2>
+                <h2 className="text-sm font-bold">ToolsCresta Guide</h2>
                 <p className="text-[11px] text-blue-100">Cards, PDF tools & design ideas</p>
               </div>
             </div>
@@ -278,12 +278,12 @@ export const ToolAssistant: React.FC<{ navigate: (path: string) => void }> = ({ 
       <button
         type="button"
         onClick={() => setOpen(value => !value)}
-        aria-label={open ? 'Minimize ToolCresta assistant' : 'Open ToolCresta assistant'}
+        aria-label={open ? 'Minimize ToolsCresta assistant' : 'Open ToolsCresta assistant'}
         aria-expanded={open}
         className="ml-auto flex min-h-13 items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-xl shadow-blue-600/25 transition hover:scale-[1.03] hover:shadow-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 motion-reduce:transform-none"
       >
         {open ? <ChevronDown className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
-        <span>{open ? 'Close guide' : 'Ask ToolCresta'}</span>
+        <span>{open ? 'Close guide' : 'Ask ToolsCresta'}</span>
         {!open && <Sparkles className="h-4 w-4 text-blue-100" />}
       </button>
     </div>

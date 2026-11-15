@@ -122,7 +122,7 @@ export const AdminView: React.FC = () => {
     return (
       <>
         <SEOHead
-          title="Admin Authentication | ToolCresta"
+          title="Admin Authentication | ToolsCresta"
           description="Owner restricted administration portal."
           canonicalPath="/admin"
         />
@@ -133,7 +133,7 @@ export const AdminView: React.FC = () => {
                 <Lock className="h-7 w-7" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">ToolCresta Admin Portal</h1>
+                <h1 className="text-2xl font-bold text-slate-900">ToolsCresta Admin Portal</h1>
                 <p className="mt-2 text-xs text-slate-500">
                   Protected portal for authorized operators. Sign in with an authorized, verified Google account.
                 </p>
@@ -203,7 +203,7 @@ export const AdminView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="Admin Control Center | ToolCresta"
+        title="Admin Control Center | ToolsCresta"
         description="Private operator panel."
         canonicalPath="/admin"
       />
@@ -220,7 +220,7 @@ export const AdminView: React.FC = () => {
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
-                ToolCresta Control Center
+                ToolsCresta Control Center
               </h1>
             </div>
 
@@ -465,9 +465,9 @@ export const AdminView: React.FC = () => {
           {activeTab === 'ai' && (
             <div className="rounded-2xl bg-white border border-slate-200 p-6 space-y-5">
               <div>
-                <h2 className="text-base font-bold text-slate-900">ToolCresta Assistant & Gemini Setup</h2>
+                <h2 className="text-base font-bold text-slate-900">ToolsCresta Assistant & Gemini Setup</h2>
                 <p className="mt-2 text-sm text-slate-600">
-                  Visitors can use the floating Ask ToolCresta guide on every page for card design suggestions
+                  Visitors can use the floating Ask ToolsCresta guide on every page for card design suggestions
                   and PDF tool instructions. The local guide works in the browser without a paid AI service.
                 </p>
               </div>

@@ -131,7 +131,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
                   onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/about'); } }}
                   className="text-slate-600 hover:text-blue-600 transition"
                 >
-                  About ToolCresta
+                  About ToolsCresta
                 </a>
               </li>
               <li>
@@ -204,7 +204,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
 
         {/* Bottom Bar */}
         <div className="mt-8 border-t border-slate-100 pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
-          <p>© {new Date().getFullYear()} ToolCresta. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} ToolsCresta. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <span className="inline-flex items-center gap-1.5 text-slate-500">
               <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
