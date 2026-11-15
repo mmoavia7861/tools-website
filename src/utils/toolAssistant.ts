@@ -102,10 +102,10 @@ export function suggestTool(input: string): AssistantAdvice {
     return { reply: 'PDF ke liye aap edit/sign, compress, PDF-to-Word, Word-to-PDF ya images-to-PDF use kar sakte hain. Bata dein aapko file ke saath kya karna hai. Agent files ko khud upload ya edit nahi karta.', toolPath: '/edit-pdf', actionLabel: 'PDF tools dekhein' };
   }
   if (includesAny(s, ['card', 'invitation', 'design', 'poster'])) {
-    return { reply: 'ToolCresta par visiting, wedding aur birthday cards ke editable templates hain. Aap kis type ka card banana chahte hain? Name, date, venue aur color preferences bata dein.', toolPath: '/ai-card-generator', actionLabel: 'Card Maker kholein' };
+    return { reply: 'ToolsCresta par visiting, wedding aur birthday cards ke editable templates hain. Aap kis type ka card banana chahte hain? Name, date, venue aur color preferences bata dein.', toolPath: '/ai-card-generator', actionLabel: 'Card Maker kholein' };
   }
   return {
-    reply: 'Main ToolCresta ke card aur PDF tools ke liye guide hoon. Misal: “wedding card banana hai”, “PDF ko Word mein badalna hai” ya “PDF par sign karna hai”. Main relevant tool aur steps suggest karunga. Local guide ke liye API key ki zaroorat nahi.',
+    reply: 'Main ToolsCresta ke card aur PDF tools ke liye guide hoon. Misal: “wedding card banana hai”, “PDF ko Word mein badalna hai” ya “PDF par sign karna hai”. Main relevant tool aur steps suggest karunga. Local guide ke liye API key ki zaroorat nahi.',
     toolPath: '/ai-card-generator',
     actionLabel: 'Card tools dekhein'
   };

@@ -71,8 +71,8 @@ try {
   await page.waitForSelector('#root header', { timeout: 25000 });
   assert.ok((await page.locator('#root').innerText()).includes('QR'), 'Direct deep link did not render on static fallback');
   for (const [slug, expectedTitle] of [
-    ['about', 'About ToolCresta'],
-    ['contact', 'Contact ToolCresta'],
+    ['about', 'About ToolsCresta'],
+    ['contact', 'Contact ToolsCresta'],
     ['privacy-policy', 'Privacy Policy'],
     ['terms', 'Terms of Service']
   ]) {
