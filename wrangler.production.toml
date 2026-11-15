@@ -1,0 +1,15 @@
+# Production Cloudflare Worker for ToolsCresta.
+# Activate toolscresta.com in Cloudflare before deployment.
+# Existing preview Worker is intentionally unchanged.
+name = "toolscresta"
+compatibility_date = "2026-11-14"
+workers_dev = false
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+html_handling = "auto-trailing-slash"
+
+[[routes]]
+pattern = "toolscresta.com"
+custom_domain = true
