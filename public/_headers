@@ -20,3 +20,8 @@ https://toolscresta.moaviah760.workers.dev/*
   X-Robots-Tag: noindex, nofollow
 https://:version.:subdomain.workers.dev/*
   X-Robots-Tag: noindex, nofollow
+
+# Vite emits content-hashed JS, CSS, workers and media into /assets/.
+# Cache them on repeat visits; each deployment changes the URL on content changes.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
