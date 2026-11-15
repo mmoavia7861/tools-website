@@ -48,7 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
             </svg>
           </div>
           <span className="text-xl font-bold tracking-tight text-[#0F172A] font-sans">
-            Tool<span className="text-blue-600">Cresta</span>
+            Tools<span className="text-blue-600">Cresta</span>
           </span>
         </button>
 
