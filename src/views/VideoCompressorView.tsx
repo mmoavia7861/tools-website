@@ -300,13 +300,13 @@ export const VideoCompressorView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="Free Video Compressor Online — Reduce Video Size Fast | ToolCresta"
+        title="Free Video Compressor Online — Reduce Video Size Fast | ToolsCresta"
         description="Compress MP4, WebM, and MOV videos online for free. Shrink video file sizes for Discord, WhatsApp, and email without uploading files to cloud servers. 100% on-device."
         canonicalPath="/compress-video"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'ToolCresta Video Compressor',
+          name: 'ToolsCresta Video Compressor',
           applicationCategory: 'MultimediaApplication',
           operatingSystem: 'Any',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
@@ -655,7 +655,7 @@ export const VideoCompressorView: React.FC = () => {
               </h2>
               <p className="mt-2 text-sm text-slate-600 leading-relaxed">
                 Video files from phones and screen recorders often have excessive bitrates that exceed message limits.
-                ToolCresta uses hardware-accelerated MediaRecorder encoding to reduce storage while keeping text and movement sharp.
+                ToolsCresta uses hardware-accelerated MediaRecorder encoding to reduce storage while keeping text and movement sharp.
               </p>
             </div>
 

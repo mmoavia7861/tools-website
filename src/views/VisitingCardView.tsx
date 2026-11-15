@@ -1297,13 +1297,13 @@ export const VisitingCardView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="Modern Visiting Card Maker — Free Business Card Generator | ToolCresta"
+        title="Modern Visiting Card Maker — Free Business Card Generator | ToolsCresta"
         description="Design professional modern visiting cards with 18+ luxury styles, live scannable QR codes, instant vCard export, and 300 DPI print-ready PNG, JPG and PDF downloads."
         canonicalPath="/visiting-card-generator"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'ToolCresta Visiting Card Maker',
+          name: 'ToolsCresta Visiting Card Maker',
           applicationCategory: 'DesignApplication',
           operatingSystem: 'Any',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }

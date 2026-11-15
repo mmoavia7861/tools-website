@@ -399,13 +399,13 @@ export const BackgroundRemoverView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="AI Background Remover Online — Instant Transparent Cutouts | ToolCresta"
+        title="AI Background Remover Online — Instant Transparent Cutouts | ToolsCresta"
         description="Remove image backgrounds automatically with deep learning AI and smart on-device vision. Features interactive eraser, restore brush, and studio backdrops with 100% privacy."
         canonicalPath="/background-remover"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'ToolCresta AI Background Remover Pro',
+          name: 'ToolsCresta AI Background Remover Pro',
           applicationCategory: 'MultimediaApplication',
           operatingSystem: 'Any',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
@@ -933,7 +933,7 @@ export const BackgroundRemoverView: React.FC = () => {
               Professional Grade Background Removal Pipeline
             </h2>
             <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-              ToolCresta employs client-side neural vision and hardware-accelerated canvas segmentation. It precisely differentiates complex portrait silhouettes, flyaway hair strands, jewelry, and products without uploading private photos to unvetted cloud servers.
+              ToolsCresta employs client-side neural vision and hardware-accelerated canvas segmentation. It precisely differentiates complex portrait silhouettes, flyaway hair strands, jewelry, and products without uploading private photos to unvetted cloud servers.
             </p>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">

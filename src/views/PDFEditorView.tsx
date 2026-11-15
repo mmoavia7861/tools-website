@@ -615,13 +615,13 @@ export const PDFEditorView: React.FC = () => {
   return (
     <>
       <SEOHead
-        title="Free PDF Editor Online — Edit Pages, Add Words & Signatures | ToolCresta"
+        title="Free PDF Editor Online — Edit Pages, Add Words & Signatures | ToolsCresta"
         description="Edit PDF files online for free. Rearrange pages, rotate pages, add words, text boxes, and digital signatures directly on your documents with 100% on-device privacy."
         canonicalPath="/edit-pdf"
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'ToolCresta PDF Editor',
+          name: 'ToolsCresta PDF Editor',
           applicationCategory: 'UtilityApplication',
           operatingSystem: 'Any',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
@@ -1411,7 +1411,7 @@ export const PDFEditorView: React.FC = () => {
                 How to Edit PDF Pages, Add Words, and Sign Documents
               </h2>
               <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-                ToolCresta gives you desktop-grade PDF editing without pricey subscription software.
+                ToolsCresta gives you desktop-grade PDF editing without pricey subscription software.
                 Rearrange pages, rotate upside-down scans, add words or dates, and sign contracts with 100% on-device privacy.
               </p>
             </div>
