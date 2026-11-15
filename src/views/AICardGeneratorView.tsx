@@ -47,6 +47,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
   const uploadRef = useRef<HTMLInputElement>(null);
   const widgetRef = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
+  const tokenRequestInFlight = useRef(false);
 
   // A prompt suggestion is passed locally by the site guide; no data leaves the browser.
   useEffect(() => {
@@ -154,15 +155,18 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
 
   const generateWithAi = async () => {
     if (!AI_READY) { setPreviewError('Gemini API is not configured yet. Use Create Template for a free on-device design.'); return; }
-    if (!turnstileToken) { setPreviewError('Complete the anti-bot verification before generating.'); return; }
+    if (!turnstileToken || tokenRequestInFlight.current) { setPreviewError('Complete a fresh verification before generating.'); return; }
     if (prompt.trim().length < 8 || prompt.length > 1500) { setPreviewError('Enter a prompt between 8 and 1500 characters.'); return; }
+    const freshToken = turnstileToken;
+    tokenRequestInFlight.current = true;
+    setTurnstileToken('');
     setAiBusy(true); setPreviewError(''); setNotice('');
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 30000);
     try {
       const response = await fetch(API_URL + '/api/cards/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, prompt: prompt.trim(), token: turnstileToken }),
+        body: JSON.stringify({ kind, prompt: prompt.trim(), token: freshToken }),
         signal: controller.signal
       });
       const json = await response.json().catch(() => null);
@@ -175,6 +179,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
     } catch (err) {
       setPreviewError(err instanceof Error ? err.message : 'AI service unavailable. Use local templates instead.');
     } finally {
+      tokenRequestInFlight.current = false;
       setAiBusy(false); setTurnstileToken(''); window.clearTimeout(timeout);
       if (widgetId.current) (window as any).turnstile?.reset(widgetId.current);
     }
@@ -185,8 +190,11 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
   // AI images cannot be edited as individual text or shape layers.
   const generateCardImage = async () => {
     if (!AI_READY) { setPreviewError('Connect Gemini and verification before generating artwork.'); return; }
-    if (!turnstileToken) { setPreviewError('Complete the verification first.'); return; }
+    if (!turnstileToken || tokenRequestInFlight.current) { setPreviewError('Complete a fresh verification before generating.'); return; }
     if (prompt.trim().length < 8) { setPreviewError('Describe the card in at least 8 characters.'); return; }
+    const freshToken = turnstileToken;
+    tokenRequestInFlight.current = true;
+    setTurnstileToken('');
     setAiImageBusy(true); setPreviewError(''); setNotice('');
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 65000);
@@ -194,7 +202,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
       const response = await fetch(API_URL + '/api/cards/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, prompt: prompt.trim(), token: turnstileToken }),
+        body: JSON.stringify({ kind, prompt: prompt.trim(), token: freshToken }),
         signal: controller.signal,
       });
       const result = await response.json().catch(() => null);
@@ -206,6 +214,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
     } catch (err) {
       setPreviewError(err instanceof Error ? err.message : 'Card artwork generation failed.');
     } finally {
+      tokenRequestInFlight.current = false;
       setAiImageBusy(false);
       setTurnstileToken('');
       window.clearTimeout(timer);
@@ -296,12 +305,12 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
               <button type="button" onClick={createTemplate} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-400">
                 Create Free Template
               </button>
-              <button type="button" disabled={!AI_READY||!turnstileToken||aiBusy} onClick={()=>void generateWithAi()}
+              <button type="button" disabled={!AI_READY||!turnstileToken||aiBusy||aiImageBusy} onClick={()=>void generateWithAi()}
                 title={!AI_READY?'Gemini API and Turnstile must be connected first':undefined}
                 className="flex items-center gap-2 rounded-xl border border-indigo-300 px-5 py-3 text-sm font-bold text-indigo-800 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-45">
                 <Sparkles className="w-4 h-4"/>{aiBusy?"Generating editable design…":"Gemini Editable Design"}
               </button>
-              <button type="button" disabled={!AI_READY||!turnstileToken||aiImageBusy}
+              <button type="button" disabled={!AI_READY||!turnstileToken||aiImageBusy||aiBusy}
                 onClick={()=>void generateCardImage()}
                 title={!AI_READY?'Requires Gemini image API access and verification':undefined}
                 className="flex items-center gap-2 rounded-xl bg-violet-700 px-5 py-3 text-sm font-bold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-45">
