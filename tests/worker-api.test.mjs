@@ -464,3 +464,29 @@ test('Adobe REST create flow uploads DOCX and returns PDF (mocked upstream)', as
     assert.equal(requests.length, 7);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+for (const providerStatus of [400, 401, 403, 429, 503]) {
+  test('Adobe token auth HTTP ' + providerStatus + ' is diagnosed without leaking secrets', async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = async (url) => {
+        if (String(url).includes('/turnstile/v0/siteverify')) {
+          return Response.json({ success: true, hostname: 'toolscresta.com' });
+        }
+        assert.match(String(url), /pdf-services\.adobe\.io\/token/);
+        return Response.json({ error: 'private upstream body with secret data' }, { status: providerStatus });
+      };
+      const form = new FormData();
+      form.append('file', new File([new TextEncoder().encode('%PDF-1.7\nmock')], 'sample.pdf'));
+      form.append('turnstileToken', 'mock-turnstile-token');
+      const response = await worker.fetch(new Request(base + '/api/convert/pdf-to-word', {
+        method: 'POST', headers: { Origin: base, 'CF-Connecting-IP': '198.51.100.' + providerStatus },
+        body: form,
+      }), { ...env, ADOBE_CLIENT_ID: 'test-client', ADOBE_CLIENT_SECRET: 'test-secret', TURNSTILE_SECRET: 'test-secret' });
+      assert.equal(response.status, providerStatus === 429 ? 429 : providerStatus >= 500 ? 502 : 503);
+      const data = await response.json();
+      assert.match(data.error, new RegExp(String(providerStatus)));
+      assert.doesNotMatch(data.error, /private upstream body|test-secret|test-client/);
+    } finally { globalThis.fetch = originalFetch; }
+  });
+}
