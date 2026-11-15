@@ -14,3 +14,8 @@ binding = "ASSETS"
 run_worker_first = ["/api/*"]
 not_found_handling = "single-page-application"
 html_handling = "auto-trailing-slash"
+
+# Cloudflare Workers AI (included in Workers Free plan within daily free Neurons).
+# The binding has no API key. It is required for AI background generation.
+[ai]
+binding = "AI"
