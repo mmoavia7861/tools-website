@@ -33,6 +33,42 @@ test('API only accepts same-origin browser requests', async () => {
   assert.equal(response.status, 403);
 });
 
+test('preview Worker accepts same-origin requests without bypassing configuration checks', async () => {
+  const preview = 'https://toolscresta-preview.example.workers.dev';
+  const response = await worker.fetch(new Request(preview + '/api/cards/generate-background', {
+    method: 'POST',
+    headers: { Origin: preview, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'wedding', prompt: 'Elegant floral wedding invitation', token: 'mock-turnstile-token' })
+  }), env);
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /AI is not enabled/i);
+});
+
+test('preview Worker checks Turnstile against its own hostname, not a hardcoded production domain', async () => {
+  const preview = 'https://toolscresta-preview.example.workers.dev';
+  const originalFetch = globalThis.fetch;
+  let verifiedHostname = preview.replace(/^https:\/\//, '');
+  try {
+    globalThis.fetch = async () => Response.json({ success: true, hostname: verifiedHostname });
+    const makeRequest = (ip) => new Request(preview + '/api/cards/generate-background', {
+      method: 'POST',
+      headers: { Origin: preview, 'Content-Type': 'application/json', 'CF-Connecting-IP': ip },
+      body: JSON.stringify({ kind: 'wedding', prompt: 'Elegant floral wedding invitation', token: 'mock-turnstile-token' })
+    });
+    const secured = { ...env, TURNSTILE_SECRET: 'mock-server-secret',
+      AI: { run: async () => ({ image: 'a'.repeat(320) }) } };
+    const accepted = await worker.fetch(makeRequest('198.51.100.61'), secured);
+    assert.equal(accepted.status, 200);
+    assert.equal((await accepted.json()).success, true);
+    verifiedHostname = 'another-site.example';
+    const rejected = await worker.fetch(makeRequest('198.51.100.62'), secured);
+    assert.equal(rejected.status, 403);
+    assert.match((await rejected.json()).error, /hostname mismatch/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('static routes still delegate to original assets', async () => {
   const response = await worker.fetch(new Request(base + '/'), env);
   assert.equal(response.status, 200);
