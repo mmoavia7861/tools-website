@@ -78,3 +78,42 @@ test('expired or reused Turnstile token advises new verification', async () => {
   assert.equal(result.status, 403);
   assert.match(result.body.error, /expired or already used/i);
 });
+
+test('siteverify subrequest uses Cloudflare-supported redirect mode and Gemini returns real parsed design', async () => {
+  const originalFetch = globalThis.fetch;
+  const destinations = [];
+  try {
+    globalThis.fetch = async (url, options) => {
+      destinations.push(String(url));
+      // In the Cloudflare Workers runtime, redirect:error throws before sending a request.
+      assert.equal(options.redirect, 'manual');
+      if (String(url).includes('/turnstile/v0/siteverify')) {
+        return Response.json({ success: true, hostname: 'toolscresta.com' });
+      }
+      if (String(url).includes('generativelanguage.googleapis.com')) {
+        return Response.json({
+          candidates: [{
+            content: { parts: [{ text: JSON.stringify({
+              headline: 'Test Card', subheading: 'Graphic Designer',
+              primary: '#123D78', accent: '#3A94EA', background: '#EFF7FF',
+              style: 'modern', font: 'sans',
+            }) }] },
+          }],
+        });
+      }
+      throw new Error('Unexpected provider URL');
+    };
+    const response = await worker.fetch(new Request(base + '/api/cards/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': base },
+      body: JSON.stringify(sampleBody),
+    }), { ...env, GEMINI_API_KEY: 'test-only', TURNSTILE_SECRET: 'test-only' });
+    assert.equal(response.status, 200);
+    const json = await response.json();
+    assert.equal(json.success, true);
+    assert.equal(json.design.headline, 'Test Card');
+    assert.equal(destinations.length, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
