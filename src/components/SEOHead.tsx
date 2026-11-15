@@ -47,11 +47,11 @@ export const SEOHead: React.FC<SEOProps> = ({
     canonical.setAttribute('href', fullCanonical);
 
     // JSON-LD structured data
-    let scriptTag = document.getElementById('ranknova-jsonld') as HTMLScriptElement | null;
+    let scriptTag = document.getElementById('toolscresta-jsonld') as HTMLScriptElement | null;
     if (jsonLd) {
       if (!scriptTag) {
         scriptTag = document.createElement('script');
-        scriptTag.id = 'ranknova-jsonld';
+        scriptTag.id = 'toolscresta-jsonld';
         scriptTag.type = 'application/ld+json';
         document.head.appendChild(scriptTag);
       }
