@@ -10,7 +10,7 @@ test('configuration status never exposes API secrets', async () => {
   const response = await worker.fetch(new Request(base + '/api/integrations/status'), env);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'no-store');
-  assert.deepEqual(await response.json(), { success: true, gemini: false, adobe: false, turnstile: false });
+  assert.deepEqual(await response.json(), { success: true, gemini: false, adobe: false, turnstile: false, workersAi: false });
 });
 
 test('Gemini endpoint must not fake an answer without keys', async () => {
@@ -238,4 +238,82 @@ test('Gemini image HTTP 400 INVALID_ARGUMENT remains a configuration error', asy
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('Cloudflare AI background endpoint requires its Worker AI binding', async () => {
+  const response = await worker.fetch(new Request(base + '/api/cards/generate-background', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Origin': base },
+    body: JSON.stringify(sampleBody),
+  }), { ...env, TURNSTILE_SECRET: 'test-secret' });
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /AI is not enabled/);
+});
+
+test('Cloudflare Workers AI status is exposed as a boolean, never a secret', async () => {
+  const response = await worker.fetch(new Request(base + '/api/integrations/status'), {
+    ...env, AI: { run: async () => ({}) }
+  });
+  const body = await response.json();
+  assert.equal(body.workersAi, true);
+  assert.equal(body.turnstile, false);
+  assert.equal(body.gemini, false);
+});
+
+test('Cloudflare AI creates a genuine background without forwarding names or contact details', async () => {
+  const originalFetch = globalThis.fetch;
+  let invocation;
+  try {
+    globalThis.fetch = async (url) => {
+      assert.match(String(url), /turnstile\/v0\/siteverify/);
+      return Response.json({ success: true, hostname: 'toolscresta.com' });
+    };
+    const body = { ...sampleBody,
+      prompt: 'modern blue floral card. Name: Aisha Khan. Phone: +92 300 1234567. Email: aisha@example.com.'
+    };
+    const response = await worker.fetch(new Request(base + '/api/cards/generate-background', {
+      method: 'POST', headers: {
+        'Content-Type': 'application/json', 'Origin': base, 'CF-Connecting-IP': '198.51.100.11'
+      },
+      body: JSON.stringify(body),
+    }), { ...env, TURNSTILE_SECRET: 'test-secret', AI: {
+      run: async (model, input) => {
+        invocation = { model, input };
+        return { image: 'a'.repeat(320) };
+      }
+    } });
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.success, true);
+    assert.equal(result.source, 'cloudflare-workers-ai');
+    assert.match(result.image, /^data:image\/jpeg;base64,/);
+    assert.equal(invocation.model, '@cf/black-forest-labs/flux-1-schnell');
+    assert.equal(invocation.input.steps, 4);
+    assert.match(invocation.input.prompt, /blue.*floral/);
+    assert.doesNotMatch(invocation.input.prompt, /Aisha|1234567|example\.com/i);
+    assert.match(invocation.input.prompt, /NO typography/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Cloudflare AI free allowance exceeded returns actionable 429', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => Response.json({ success: true, hostname: 'toolscresta.com' });
+    const response = await worker.fetch(new Request(base + '/api/cards/generate-background', {
+      method: 'POST', headers: {
+        'Content-Type': 'application/json', 'Origin': base, 'CF-Connecting-IP': '198.51.100.12'
+      },
+      body: JSON.stringify(sampleBody),
+    }), { ...env, TURNSTILE_SECRET: 'test-secret', AI: {
+      run: async () => { throw new Error('Neuron quota exceeded'); }
+    } });
+    assert.equal(response.status, 429);
+    assert.match((await response.json()).error, /daily free allowance/i);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Cloudflare AI rejects non-same-origin requests before generating artwork', async () => {
+  const response = await worker.fetch(new Request(base + '/api/cards/generate-background', {
+    method: 'POST', headers: { Origin: 'https://unknown.example' },
+  }), { ...env, TURNSTILE_SECRET: 'test-secret', AI: { run: async () => ({ image: 'a'.repeat(200) }) } });
+  assert.equal(response.status, 403);
 });
