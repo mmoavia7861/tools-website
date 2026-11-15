@@ -46,17 +46,31 @@ const absoluteUrl = route => origin + base + route.replace(/^\/|\/$/g, '') + (ro
 const navigation = routes.filter(([path]) => !path.startsWith('/blog/')).map(([path, title]) =>
   '<li><a href="' + escapeText(absoluteUrl(path)) + '">' + escapeText(title.split(' | ')[0]) + '</a></li>').join('\n');
 
+// The server-rendered fallback is displayed while the interactive app downloads.
+// Style it independently so slow mobile networks never show an unformatted link list.
+const fallbackStyle = `<style>
+.tc-static{box-sizing:border-box;max-width:1000px;margin:40px auto;padding:24px;font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#0f172a}
+.tc-static *{box-sizing:border-box}
+.tc-static h1{margin:0 0 12px;font-size:clamp(26px,5vw,44px);line-height:1.2;letter-spacing:-.02em}
+.tc-static p{margin:0 0 22px;color:#475569}
+.tc-static nav ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.tc-static nav li{margin:0}
+.tc-static nav a{display:block;padding:14px 16px;background:#fff;color:#1d4ed8;text-decoration:none;font-weight:600;border:1px solid #e2e8f0;border-radius:12px;overflow-wrap:anywhere}
+.tc-static nav a:hover,.tc-static nav a:focus-visible{background:#eff6ff;border-color:#bfdbfe}
+@media(max-width:520px){.tc-static{margin:16px auto;padding:20px 16px}.tc-static nav ul{grid-template-columns:1fr}}
+</style>`;
+
 for (const [route, title, description, introduction] of routes) {
   const loc = absoluteUrl(route);
   // Use real initial content in generated HTML for crawlers and visitors with JS unavailable.
-  const fallback = '<div id="root"><main><h1>' + escapeText(title.split(' | ')[0]) +
+  const fallback = '<div id="root"><main class="tc-static"><h1>' + escapeText(title.split(' | ')[0]) +
     '</h1><p>' + escapeText(introduction) +
     '</p><nav aria-label="ToolsCresta pages"><ul>' + navigation + '</ul></nav></main></div>';
   let html = homeHtml
     .replace(/<title>[\s\S]*?<\/title>/i, '<title>' + escapeText(title) + '</title>')
     .replace(/<meta name="description" content="[^"]*"\s*\/?>/i, '<meta name="description" content="' + escapeText(description) + '" />')
     .replace('<div id="root"></div>', fallback)
-    .replace('</head>', '<link rel="canonical" href="' + escapeText(loc) + '" />\n  </head>');
+    .replace('</head>', fallbackStyle + '\n<link rel="canonical" href="' + escapeText(loc) + '" />\n  </head>');
   if (route === '/') {
     writeFileSync(join(root, 'index.html'), html);
   } else {
