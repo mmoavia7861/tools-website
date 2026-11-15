@@ -7,6 +7,7 @@ test('all three card kinds have local prompt examples and correct output dimensi
     assert.ok(EXAMPLES[kind].length >= 8);
     const draft = blankCard(kind);
     assert.equal(draft.kind, kind);
+    assert.equal(draft.backgroundImageData, '');
     assert.match(draft.primary, /^#[\da-fA-F]{6}$/);
     assert.ok(cardSize(kind).width > 0);
     assert.ok(cardSize(kind).pdfWidth > 0);
@@ -31,11 +32,12 @@ test('local template extracts wedding and birthday names without inventing event
   assert.equal(birthday.date, '');
 });
 test('AI output rejects injected image source, invalid colors and unknown keys', () => {
-  const ai = sanitizeCardDraft({ headline: 'Good', primary: 'url(javascript:alert(1))', accent: '#ABCDEF', imageData: '<svg>', extra: 'evil', date: 123 }, 'wedding');
+  const ai = sanitizeCardDraft({ headline: 'Good', primary: 'url(javascript:alert(1))', accent: '#ABCDEF', imageData: '<svg>', backgroundImageData: 'data:image/svg+xml;base64,malicious', extra: 'evil', date: 123 }, 'wedding');
   assert.equal(ai.headline, 'Good');
   assert.equal(ai.accent, '#ABCDEF');
   assert.equal(ai.primary, blankCard('wedding').primary);
   assert.equal(ai.imageData, '');
+  assert.equal(ai.backgroundImageData, '');
   assert.equal(ai.date, '');
   assert.equal((ai as any).extra, undefined);
 });
