@@ -6,7 +6,6 @@
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 const MAX_JSON_BYTES = 12 * 1024;
 const MAX_ADOBE_WAIT_MS = 90000;
-const ORIGIN = "https://toolscresta.com";
 const ADOBE_BASE = "https://pdf-services.adobe.io";
 const mimeDocx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const rate = new Map();
@@ -87,8 +86,9 @@ async function verifyTurnstile(request, env, token) {
       }
       return { ok: false, status: 403, message: "Cloudflare verification failed. Please complete a new challenge." };
     }
-    if (result.hostname !== "toolscresta.com") {
-      return { ok: false, status: 403, message: "Verification hostname mismatch. Verify the Turnstile widget allows toolscresta.com." };
+    const requestHost = new URL(request.url).hostname;
+    if (result.hostname !== requestHost) {
+      return { ok: false, status: 403, message: "Verification hostname mismatch. Allow the exact site hostname in your Cloudflare Turnstile widget." };
     }
     return { ok: true };
   } catch {
@@ -466,7 +466,7 @@ export default {
     }
     if (request.method !== "POST") return error("Unsupported method.", 405);
     const origin = request.headers.get("Origin");
-    if (origin && origin !== ORIGIN) return error("This API accepts same-origin requests only.", 403);
+    if (origin && origin !== url.origin) return error("This API accepts same-origin requests only.", 403);
     if (path === "/api/cards/generate-background") return handleCloudflareCardBackground(request, env);
     if (path === "/api/cards/generate-image") return handleImageCard(request, env);
     if (path === "/api/assistant/chat" || path === "/api/cards/generate") return handleAi(request, env, path);
