@@ -185,7 +185,9 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
       window.setTimeout(() => URL.revokeObjectURL(url), 30000);
       setNotice(method === 'adobe' ? 'Adobe converted the document. Review the downloaded file before sharing it.' : 'Basic browser conversion completed. Review formatting in the downloaded file.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Conversion failed. Please try another document.');
+      setError(e instanceof Error && e.name === 'AbortError'
+        ? 'Adobe conversion took too long. Try a smaller document or use browser mode.'
+        : e instanceof Error ? e.message : 'Conversion failed. Please try another document.');
     } finally { setBusy(false); }
   };
 
