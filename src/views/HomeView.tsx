@@ -33,7 +33,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'ToolsCresta',
-    url: typeof window !== 'undefined' ? new URL(import.meta.env.BASE_URL, window.location.origin).href : 'https://mmoavia7861.github.io/RankNova/',
+    url: typeof window !== 'undefined' ? new URL(import.meta.env.BASE_URL, window.location.origin).href : 'https://toolscresta.com/',
     description: 'Free, fast, and privacy-first online tools: QR Code Generator, PDF Compressor, and AI Background Remover.',
     publisher: {
       '@type': 'Organization',
