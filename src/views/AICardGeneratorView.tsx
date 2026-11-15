@@ -5,7 +5,7 @@ import { blankCard, cardSize, drawCardCanvas, draftFromPrompt, EXAMPLES, exportC
 
 const API_URL = (import.meta.env.VITE_AI_CARD_API_URL || '').trim().replace(/\/+$/, '');
 const SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim();
-const AI_READY = /^https:\/\//.test(API_URL) && Boolean(SITE_KEY);
+const AI_CAPABLE = Boolean(SITE_KEY);
 const kinds: { kind: CardKind; label: string; description: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { kind: 'visiting', label: 'Visiting Card', description: 'Business and personal cards', icon: CreditCard },
   { kind: 'wedding', label: 'Wedding Card', description: 'Elegant invitations', icon: Heart },
@@ -27,6 +27,17 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [AI_READY, setAiReady] = useState(false);
+  useEffect(() => {
+    if (!AI_CAPABLE) return;
+    let cancelled = false;
+    fetch(API_URL + '/api/integrations/status', { cache: 'no-store' })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => { if (!cancelled) setAiReady(Boolean(data?.gemini && data?.turnstile)); })
+      .catch(() => { if (!cancelled) setAiReady(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileStatus, setTurnstileStatus] = useState('');
   const [activePanel, setActivePanel] = useState<'content'|'design'>('content');
@@ -55,7 +66,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
     applySuggestion();
     window.addEventListener('toolcresta:card-prompt', applySuggestion);
     return () => window.removeEventListener('toolcresta:card-prompt', applySuggestion);
-  }, []);
+  }, [AI_READY]);
 
   const selectKind = (next: CardKind) => {
     setKind(next); setDraft(blankCard(next)); setPrompt(EXAMPLES[next]); setPreviewError(''); setNotice('');
