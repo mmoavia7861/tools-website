@@ -45,8 +45,15 @@ function limitRequests(request, limit, windowMs) {
 async function fetchTimed(url, options, timeoutMs = 12000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try { return await fetch(url, { ...options, signal: controller.signal, redirect: "error" }); }
-  finally { clearTimeout(timeout); }
+  try {
+    // Cloudflare Workers does not implement Request.redirect="error".
+    // Use manual redirects and reject 3xx responses without following them.
+    const response = await fetch(url, { ...options, signal: controller.signal, redirect: "manual" });
+    if (response.status >= 300 && response.status < 400) {
+      throw new Error("Unexpected upstream redirect blocked");
+    }
+    return response;
+  } finally { clearTimeout(timeout); }
 }
 async function verifyTurnstile(request, env, token) {
   // Keep the private secret exclusively on the server. Return actionable
