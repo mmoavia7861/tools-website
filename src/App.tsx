@@ -30,7 +30,6 @@ const DocumentConverterView = React.lazy(() => import('./views/DocumentConverter
 const VideoCompressorView = React.lazy(() => import('./views/VideoCompressorView').then(module => ({ default: module.VideoCompressorView })));
 const AdminView = React.lazy(() => import('./views/AdminView').then(module => ({ default: module.AdminView })));
 import { NotFoundView } from './views/NotFoundView';
-import { testConnection } from './services/firebase';
 
 // Vite BASE_URL is /tools-website/ on GitHub Pages and / on standalone hosting.
 const basePrefix = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -51,11 +50,6 @@ export default function App() {
       setCurrentPath(browserPath());
     };
     window.addEventListener('popstate', onPopState);
-
-    // Mandated by Firebase Skill: Validate connection on boot
-    testConnection().catch(() => {
-      // Handled silently
-    });
 
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
