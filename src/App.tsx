@@ -11,8 +11,8 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { CookieBanner } from './components/CookieBanner';
-import { PointerEffects } from './components/PointerEffects';
-import { ToolAssistant } from './components/ToolAssistant';
+const PointerEffects = React.lazy(() => import('./components/PointerEffects').then(module => ({ default: module.PointerEffects })));
+const ToolAssistant = React.lazy(() => import('./components/ToolAssistant').then(module => ({ default: module.ToolAssistant })));
 import { HomeView } from './views/HomeView';
 const QRGeneratorView = React.lazy(() => import('./views/QRGeneratorView').then(module => ({ default: module.QRGeneratorView })));
 const PDFCompressorView = React.lazy(() => import('./views/PDFCompressorView').then(module => ({ default: module.PDFCompressorView })));
@@ -157,8 +157,13 @@ export default function App() {
       </main>
       <Footer navigate={navigate} />
       <CookieBanner />
-      <PointerEffects />
-      <ToolAssistant navigate={navigate} />
+      {/* These non-critical enhancements load without blocking the initial page. */}
+      <React.Suspense fallback={null}>
+        <PointerEffects />
+      </React.Suspense>
+      <React.Suspense fallback={null}>
+        <ToolAssistant navigate={navigate} />
+      </React.Suspense>
     </div>
   );
 }
