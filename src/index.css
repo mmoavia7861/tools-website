@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ToolCresta pointer ambience: visual-only and safe above interactive tools. */
+/* ToolsCresta pointer ambience: visual-only and safe above interactive tools. */
 .tc-pointer-layer {
   position: fixed;
   inset: 0;
