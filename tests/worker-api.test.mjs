@@ -117,3 +117,60 @@ test('siteverify subrequest uses Cloudflare-supported redirect mode and Gemini r
     globalThis.fetch = originalFetch;
   }
 });
+
+test('Gemini editable card request uses a lower-latency model and minimal thinking', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, options) => {
+      if (String(url).includes('/turnstile/v0/siteverify')) return Response.json({ success: true, hostname: 'toolscresta.com' });
+      assert.match(String(url), /gemini-3\.5-flash-lite:generateContent/);
+      const request = JSON.parse(options.body);
+      assert.equal(request.generationConfig.thinkingConfig.thinkingLevel, 'minimal');
+      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ headline: 'Fast Gemini Card', primary: '#123D78' }) }] } }] });
+    };
+    const response = await worker.fetch(new Request(base + '/api/cards/generate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Origin': base },
+      body: JSON.stringify(sampleBody),
+    }), { ...env, GEMINI_API_KEY: 'test-only', TURNSTILE_SECRET: 'test-only' });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).design.headline, 'Fast Gemini Card');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Gemini image billing denial explains paid-tier requirement without leaking provider response', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => String(url).includes('/turnstile/v0/siteverify')
+      ? Response.json({ success: true, hostname: 'toolscresta.com' })
+      : Response.json({ error: { message: 'private upstream message' } }, { status: 403 });
+    const response = await worker.fetch(new Request(base + '/api/cards/generate-image', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Origin': base },
+      body: JSON.stringify(sampleBody),
+    }), { ...env, GEMINI_API_KEY: 'test-only', TURNSTILE_SECRET: 'test-only' });
+    assert.equal(response.status, 503);
+    const data = await response.json();
+    assert.match(data.error, /paid billing/i);
+    assert.doesNotMatch(data.error, /private upstream message/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Gemini image HTTP 429 is reported as quota or billing failure', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => String(url).includes('/turnstile/v0/siteverify')
+      ? Response.json({ success: true, hostname: 'toolscresta.com' })
+      : Response.json({ error: { message: 'private upstream message' } }, { status: 429 });
+    const response = await worker.fetch(new Request(base + '/api/cards/generate-image', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Origin': base },
+      body: JSON.stringify(sampleBody),
+    }), { ...env, GEMINI_API_KEY: 'test-only', TURNSTILE_SECRET: 'test-only' });
+    assert.equal(response.status, 429);
+    assert.match((await response.json()).error, /quota or billing limit/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
