@@ -105,9 +105,28 @@ async function jsonInput(request) {
 }
 // Never relay raw Google errors: they may include provider internals.
 // Keep actionable HTTP categories and safe error summaries for the UI.
-function geminiProviderError(status, image = false) {
+// Classify provider failures without exposing upstream response bodies or API keys.
+async function geminiProviderErrorFromResponse(response, image = false) {
+  const status = response.status;
+  let providerStatus = "";
+  let providerMessage = "";
+  if (status === 400 || status === 403) {
+    try {
+      // Google returns machine-readable status and explanation. Both are untrusted.
+      const body = await response.json();
+      if (typeof body?.error?.status === "string") providerStatus = body.error.status.slice(0, 70);
+      if (typeof body?.error?.message === "string") providerMessage = body.error.message.slice(0, 500);
+    } catch { /* Generic message below is enough. */ }
+  }
   const label = image ? "Gemini image generation" : "Gemini editable card design";
-  if (status === 400) return { status: 502, message: label + " request was rejected (Google HTTP 400). Please report this API configuration error." };
+  const billingBlocked = providerStatus === "FAILED_PRECONDITION" ||
+    /free.?tier|billing|paid.?tier|not available in your (country|region)/i.test(providerMessage);
+  if (status === 400) {
+    if (billingBlocked) return { status: 503, message: image
+      ? "Gemini image API requires paid billing on the Google AI Studio project. Enable billing for the project tied to this API key."
+      : "Gemini API Free Tier access is restricted for this project or region. Check billing eligibility in Google AI Studio." };
+    return { status: 502, message: label + " request rejected by Google (HTTP 400). Please check model access and request configuration." };
+  }
   if (status === 401) return { status: 503, message: "Gemini API key is invalid or revoked (Google HTTP 401)." };
   if (status === 403) return { status: 503, message: image
     ? "Gemini image generation is unavailable for this API project (Google HTTP 403). Check paid billing and model access in Google AI Studio."
@@ -138,7 +157,7 @@ async function gemini(env, contents, asJson = false) {
     },
     45000,
   );
-  if (!response.ok) throw geminiProviderError(response.status, false);
+  if (!response.ok) throw await geminiProviderErrorFromResponse(response, false);
   const data = await response.json();
   const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("").trim();
   if (!text) throw { status: 502, message: "Gemini returned no usable response." };
@@ -223,6 +242,7 @@ async function handleImageCard(request, env) {
     kind === "wedding" ? "wedding invitation card" : "birthday invitation card";
   const detailedPrompt = "Create ONE professionally designed, printable " + cardType +
     " as a flat, straight-on 2D graphic. Full card visible, no mockup, no hand, no desk, no shadows outside the card. " +
+    "The card itself should have an aspect ratio near " + aspectRatio + ". " +
     "Make composition visually attractive with harmonious typography, spacing, decorative artwork and clear hierarchy. " +
     "Use the user's exact names, dates, venue and contact information when provided; DO NOT invent any missing details. " +
     "Make all text legible and correctly spelled; avoid watermarks and brand logos. User request: " + prompt;
@@ -235,10 +255,9 @@ async function handleImageCard(request, env) {
         headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: detailedPrompt }] }],
-          generationConfig: {
-            responseModalities: ["IMAGE"],
-            responseFormat: { image: { aspectRatio, imageSize: "1K" } }
-          }
+          // Minimal documented GenerateContent payload: the model selects size.
+          // Keeping optional format fields out avoids schema/version mismatches.
+          generationConfig: { responseModalities: ["IMAGE"] }
         })
       }, 55000
     );
@@ -246,7 +265,7 @@ async function handleImageCard(request, env) {
     return error("Gemini image generation timed out. Please try again.", 504);
   }
   if (!response.ok) {
-    const failure = geminiProviderError(response.status, true);
+    const failure = await geminiProviderErrorFromResponse(response, true);
     return error(failure.message, failure.status);
   }
   let data;
