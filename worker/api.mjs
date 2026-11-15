@@ -367,8 +367,12 @@ async function adobeJSON(url, options, clientId, accessToken, timeout = 12000) {
     headers: { "x-api-key": clientId, Authorization: "Bearer " + accessToken,
       ...(options.headers || {}) },
   }, timeout);
-  if (response.status === 429) throw { status: 429, message: "Adobe conversion quota reached. Please retry later." };
-  if (!response.ok) throw { status: 502, message: "Adobe PDF Services rejected a conversion request." };
+  if (response.status === 429) throw { status: 429, message: "Adobe PDF Services quota or rate limit reached. Please try again later." };
+  if (response.status === 401 || response.status === 403) {
+    throw { status: 503, message: "Adobe PDF Services rejected these API credentials or access permissions. Check the Adobe PDF Services project." };
+  }
+  if (response.status >= 500) throw { status: 502, message: "Adobe PDF Services is temporarily unavailable. Please try again later." };
+  if (!response.ok) throw { status: 502, message: "Adobe PDF Services could not process the conversion request. Check the file and operation." };
   return response;
 }
 async function handleAdobe(request, env, mode) {
@@ -421,7 +425,10 @@ async function handleAdobe(request, env, mode) {
     const location = job.headers.get("location");
     if (!safeAdobeApiUrl(location)) return error("Adobe returned an invalid job location.", 502);
     const deadline = Date.now() + MAX_ADOBE_WAIT_MS;
-    while (Date.now() < deadline) {
+    // Workers Free permits 50 external subrequests per invocation. Poll at most
+    // 22 times, preserving room for Siteverify, token, upload and download.
+    let polls = 0;
+    while (Date.now() < deadline && polls++ < 22) {
       const response = await adobeJSON(location, { method: "GET" }, client, auth);
       const status = await response.json();
       if (status.status === "failed") return error("Adobe could not convert this document.", 422);
@@ -441,7 +448,8 @@ async function handleAdobe(request, env, mode) {
           },
         });
       }
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Adobe jobs are asynchronous; fast polling wastes free subrequests.
+      await new Promise((resolve) => setTimeout(resolve, 4000));
     }
     return error("Adobe conversion is still processing. Please try again later.", 504);
   } catch (e) { return error(e?.message || "Adobe service unavailable.", e?.status || 502); }
