@@ -1,4 +1,4 @@
-# Cloudflare preview Worker for the ToolCresta static React website.
+# Cloudflare preview Worker for the ToolsCresta static React website.
 # The production custom domain remains on GitHub Pages until separately tested.
 name = "toolcresta-preview"
 compatibility_date = "2026-11-14"

@@ -20,8 +20,8 @@ try {
   await desktop.goto(base+'admin/');
   assert.ok((await desktop.title()).includes('Admin'));
   await desktop.getByRole('button',{name:'Sign in with Google'}).waitFor();
-  await desktop.getByRole('button',{name:'Open ToolCresta assistant'}).click();
-  await desktop.getByRole('dialog',{name:'ToolCresta card and PDF assistant'}).waitFor();
+  await desktop.getByRole('button',{name:'Open ToolsCresta assistant'}).click();
+  await desktop.getByRole('dialog',{name:'ToolsCresta card and PDF assistant'}).waitFor();
   await desktop.getByLabel('Ask about cards or PDF tools').fill('PDF ko Word mein convert karo');
   await desktop.getByRole('button',{name:'Ask Guide'}).click();
   await desktop.getByRole('button',{name:'PDF to Word kholein'}).click();
@@ -30,13 +30,13 @@ try {
   const mobileContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
   const mobile=await mobileContext.newPage();
   await mobile.goto(base);
-  await mobile.getByRole('button',{name:'Open ToolCresta assistant'}).click();
+  await mobile.getByRole('button',{name:'Open ToolsCresta assistant'}).click();
   await mobile.getByRole('button',{name:'Wedding card design ideas'}).click();
   await mobile.getByRole('button',{name:'Wedding card banayein'}).click();
   assert.ok(mobile.url().includes((process.env.PAGES_BASE_PATH || '/RankNova/') + 'wedding-card-maker/'),'Mobile assistant card navigation failed');
   const prompt=await mobile.locator('#ai-card-prompt').inputValue();
   assert.match(prompt,/Couple: \[both names\]/,'Guide prompt did not reach card maker');
-  assert.equal(await mobile.getByRole('button',{name:'Open ToolCresta assistant'}).count(),1);
+  assert.equal(await mobile.getByRole('button',{name:'Open ToolsCresta assistant'}).count(),1);
   await mobileContext.close();
   console.log('PASS: admin direct entrypoint, desktop PDF guide, mobile wedding card prompt handoff.');
 } finally {

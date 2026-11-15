@@ -50,7 +50,7 @@ try {
   await mobile.emulateMedia({ reducedMotion: 'reduce' });
   assert.equal(await mobile.locator('.tc-pointer-layer').evaluate(el => getComputedStyle(el).display), 'none', 'Reduced-motion setting not respected');
   await mobileContext.close();
-  console.log('PASS: ToolCresta desktop cursor glow, click burst, mobile ambient/tap animation, navigation and reduced motion.');
+  console.log('PASS: ToolsCresta desktop cursor glow, click burst, mobile ambient/tap animation, navigation and reduced motion.');
 } finally {
   await browser?.close();
   server.kill('SIGTERM');
