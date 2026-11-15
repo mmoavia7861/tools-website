@@ -89,7 +89,7 @@ export const AdminView: React.FC = () => {
     } catch (err: unknown) {
       const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
       if (code === 'auth/unauthorized-domain') {
-        setLoginError('Firebase login domain not authorized. Add mmoavia7861.github.io in Firebase Authentication > Settings > Authorized domains.');
+        setLoginError('Firebase sign-in is blocked for this hostname. Add toolscresta.com in Firebase Authentication > Settings > Authorized domains, then try again.');
       } else if (code === 'auth/operation-not-allowed') {
         setLoginError('Google sign-in is disabled. Enable Google provider in Firebase Authentication > Sign-in method.');
       } else if (code === 'auth/popup-blocked') {
