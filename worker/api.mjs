@@ -103,9 +103,26 @@ async function jsonInput(request) {
   try { const data = JSON.parse(text); return data && typeof data === "object" && !Array.isArray(data) ? data : null; }
   catch { return null; }
 }
+// Never relay raw Google errors: they may include provider internals.
+// Keep actionable HTTP categories and safe error summaries for the UI.
+function geminiProviderError(status, image = false) {
+  const label = image ? "Gemini image generation" : "Gemini editable card design";
+  if (status === 400) return { status: 502, message: label + " request was rejected (Google HTTP 400). Please report this API configuration error." };
+  if (status === 401) return { status: 503, message: "Gemini API key is invalid or revoked (Google HTTP 401)." };
+  if (status === 403) return { status: 503, message: image
+    ? "Gemini image generation is unavailable for this API project (Google HTTP 403). Check paid billing and model access in Google AI Studio."
+    : "Gemini model access is denied (Google HTTP 403). Check API key restrictions and project access." };
+  if (status === 404) return { status: 503, message: label + " model is unavailable for this API key (Google HTTP 404). Check model access." };
+  if (status === 429) return { status: 429, message: image
+    ? "Gemini image quota or billing limit reached (Google HTTP 429). Check your project's paid tier and quotas."
+    : "Gemini text quota reached (Google HTTP 429). Check your project rate limits." };
+  if (status === 408 || status === 504) return { status: 504, message: label + " request timed out at Google. Please try later." };
+  if (status >= 500) return { status: 502, message: label + " provider is temporarily unavailable (Google HTTP " + status + ")." };
+  return { status: 502, message: label + " provider returned HTTP " + status + ". Please review Google AI Studio API access." };
+}
 async function gemini(env, contents, asJson = false) {
   const response = await fetchTimed(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
@@ -114,18 +131,14 @@ async function gemini(env, contents, asJson = false) {
         generationConfig: {
           maxOutputTokens: asJson ? 1200 : 600,
           // Card design is a brief structured task; low thinking reduces latency.
-          thinkingConfig: { thinkingLevel: "low" },
+          thinkingConfig: { thinkingLevel: "minimal" },
           ...(asJson ? { responseMimeType: "application/json" } : {}),
         },
       }),
     },
     45000,
   );
-  if (!response.ok) {
-    if (response.status === 429) throw { status: 429, message: "Gemini quota or rate limit reached. Please try later." };
-    if ([401, 403].includes(response.status)) throw { status: 503, message: "Gemini credentials or access are not valid." };
-    throw { status: 502, message: "Gemini provider request failed." };
-  }
+  if (!response.ok) throw geminiProviderError(response.status, false);
   const data = await response.json();
   const text = (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("").trim();
   if (!text) throw { status: 502, message: "Gemini returned no usable response." };
@@ -232,10 +245,10 @@ async function handleImageCard(request, env) {
   } catch {
     return error("Gemini image generation timed out. Please try again.", 504);
   }
-  if (response.status === 429) return error("Gemini image quota reached. Try later.", 429);
-  if ([401, 403].includes(response.status))
-    return error("Gemini image generation requires an authorized paid-tier API project and valid credentials.", 503);
-  if (!response.ok) return error("Gemini image service could not generate this card.", 502);
+  if (!response.ok) {
+    const failure = geminiProviderError(response.status, true);
+    return error(failure.message, failure.status);
+  }
   let data;
   try { data = await response.json(); } catch { return error("Gemini image response was invalid.", 502); }
   const output = (data.candidates?.[0]?.content?.parts || []).find(part =>
