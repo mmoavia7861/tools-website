@@ -49,7 +49,14 @@ async function fetchTimed(url, options, timeoutMs = 12000) {
   finally { clearTimeout(timeout); }
 }
 async function verifyTurnstile(request, env, token) {
-  if (!env.TURNSTILE_SECRET || typeof token !== "string" || token.length < 10 || token.length > 2048) return false;
+  // Keep the private secret exclusively on the server. Return actionable
+  // sanitized errors instead of treating an invalid secret as an expired token.
+  if (!env.TURNSTILE_SECRET) {
+    return { ok: false, status: 503, message: "Turnstile server Secret Key is missing. Configure TURNSTILE_SECRET in Worker Runtime Secrets." };
+  }
+  if (typeof token !== "string" || token.length < 10 || token.length > 2048) {
+    return { ok: false, status: 403, message: "Verification token missing or invalid. Complete a fresh challenge." };
+  }
   try {
     const params = new URLSearchParams({ secret: env.TURNSTILE_SECRET, response: token });
     const ip = request.headers.get("CF-Connecting-IP");
@@ -57,10 +64,28 @@ async function verifyTurnstile(request, env, token) {
     const res = await fetchTimed("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: params,
     });
-    if (!res.ok) return false;
-    const data = await res.json();
-    return data.success === true && data.hostname === "toolscresta.com";
-  } catch { return false; }
+    if (!res.ok) return { ok: false, status: 502, message: "Turnstile verification service unavailable. Please retry." };
+    const result = await res.json();
+    if (result.success !== true) {
+      const codes = Array.isArray(result["error-codes"]) ? result["error-codes"] : [];
+      if (codes.includes("invalid-input-secret") || codes.includes("missing-input-secret")) {
+        return { ok: false, status: 503, message: "Cloudflare Turnstile server Secret Key is incorrect. Replace TURNSTILE_SECRET with the private Secret Key from your ToolsCresta Turnstile widget." };
+      }
+      if (codes.includes("timeout-or-duplicate")) {
+        return { ok: false, status: 403, message: "Verification expired or already used. Complete a new verification and try again." };
+      }
+      if (codes.includes("invalid-input-response") || codes.includes("missing-input-response")) {
+        return { ok: false, status: 403, message: "Verification token rejected. Refresh verification and try again." };
+      }
+      return { ok: false, status: 403, message: "Cloudflare verification failed. Please complete a new challenge." };
+    }
+    if (result.hostname !== "toolscresta.com") {
+      return { ok: false, status: 403, message: "Verification hostname mismatch. Verify the Turnstile widget allows toolscresta.com." };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, status: 502, message: "Could not reach Turnstile verification. Please retry." };
+  }
 }
 async function jsonInput(request) {
   if (!(request.headers.get("Content-Type") || "").includes("application/json")) return null;
@@ -124,7 +149,8 @@ async function handleAi(request, env, path) {
   if (!limitRequests(request, 5, 60000)) return error("Please slow down and try again.", 429);
   const body = await jsonInput(request);
   if (!body) return error("Invalid request.");
-  if (!await verifyTurnstile(request, env, body.token)) return error("Verification expired or invalid. Please try again.", 403);
+  const verification = await verifyTurnstile(request, env, body.token);
+  if (!verification.ok) return error(verification.message, verification.status);
   try {
     if (path === "/api/assistant/chat") {
       const message = clean(body.message, 900);
@@ -160,7 +186,8 @@ async function handleImageCard(request, env) {
   if (!limitRequests(request, 2, 60000)) return error("Too many image requests. Try again later.", 429);
   const body = await jsonInput(request);
   if (!body) return error("Invalid request.", 400);
-  if (!await verifyTurnstile(request, env, body.token)) return error("Verification expired or invalid.", 403);
+  const verification = await verifyTurnstile(request, env, body.token);
+  if (!verification.ok) return error(verification.message, verification.status);
   const kind = body.kind;
   const prompt = clean(body.prompt, 1500);
   if (!["visiting", "wedding", "birthday"].includes(kind) || prompt.length < 8)
@@ -248,7 +275,8 @@ async function handleAdobe(request, env, mode) {
     if (!(file instanceof File) || !file.size || file.size > MAX_PDF_BYTES) return error("Upload a document smaller than 10 MB.", 413);
     const ext = mode === "pdf-to-word" ? ".pdf" : ".docx";
     if (!file.name.toLowerCase().endsWith(ext)) return error("Incorrect document extension.");
-    if (!await verifyTurnstile(request, env, token)) return error("Verification failed or expired.", 403);
+    const verification = await verifyTurnstile(request, env, token);
+    if (!verification.ok) return error(verification.message, verification.status);
     const bytes = await file.arrayBuffer();
     const signature = new Uint8Array(bytes.slice(0, 5));
     const isValid = mode === "pdf-to-word"
