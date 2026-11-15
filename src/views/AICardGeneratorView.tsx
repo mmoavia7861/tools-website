@@ -222,7 +222,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
         signal: controller.signal,
       });
       const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.success || !/^data:image\\/(png|jpeg);base64,/.test(result.image || '')) {
+      if (!response.ok || !result?.success || !/^data:image\/(png|jpeg);base64,/.test(result.image || '')) {
         throw new Error(typeof result?.error === 'string' ? result.error : 'Cloudflare AI did not return a background.');
       }
       if (result.image.length > 8 * 1024 * 1024 + 128) throw new Error('Background image is too large.');
