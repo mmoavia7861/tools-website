@@ -23,6 +23,8 @@ export interface CardDraft {
   style: CardStyle;
   font: CardFont;
   imageData: string;
+  // Independently generated artwork behind editable text. Not the logo/photo.
+  backgroundImageData: string;
 }
 
 export const EXAMPLES: Record<CardKind, string> = {
@@ -52,7 +54,7 @@ export function blankCard(kind: CardKind): CardDraft {
     venue: '', contact: '', email: '', website: '', rsvp: '',
     primary: palette.primary, accent: palette.accent, background: palette.background,
     style: kind === 'wedding' ? 'floral' : kind === 'birthday' ? 'playful' : 'modern',
-    font: kind === 'wedding' ? 'serif' : 'sans', imageData: ''
+    font: kind === 'wedding' ? 'serif' : 'sans', imageData: '', backgroundImageData: ''
   };
 }
 
@@ -70,7 +72,7 @@ export function sanitizeCardDraft(payload: unknown, kind: CardKind): CardDraft {
     background: color(data.background, base.background),
     style: (['modern','classic','floral','playful'] as string[]).includes(String(data.style)) ? data.style as CardStyle : base.style,
     font: data.font === 'serif' ? 'serif' : data.font === 'sans' ? 'sans' : base.font,
-    imageData: ''
+    imageData: '', backgroundImageData: ''
   };
 }
 
@@ -151,7 +153,7 @@ function multiline(ctx: CanvasRenderingContext2D, text: string, x: number, y: nu
 function ellipse(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, rotation: number) {
   ctx.beginPath(); ctx.ellipse(x, y, w, h, rotation, 0, Math.PI * 2); ctx.fill();
 }
-export function drawCardCanvas(canvas: HTMLCanvasElement, draft: CardDraft, image: HTMLImageElement | null = null) {
+export function drawCardCanvas(canvas: HTMLCanvasElement, draft: CardDraft, image: HTMLImageElement | null = null, backgroundImage: HTMLImageElement | null = null) {
   const dims = cardSize(draft.kind);
   canvas.width = dims.width; canvas.height = dims.height;
   const ctx = canvas.getContext('2d');
@@ -161,9 +163,30 @@ export function drawCardCanvas(canvas: HTMLCanvasElement, draft: CardDraft, imag
   const accent = color(draft.accent, '#3A94EA');
   const bg = color(draft.background, '#EFF7FF');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+  if (backgroundImage) {
+    ctx.save();
+    // Fill the printable card without stretching the generated artwork.
+    const scale = Math.max(w / backgroundImage.width, h / backgroundImage.height);
+    const iw = backgroundImage.width * scale, ih = backgroundImage.height * scale;
+    ctx.drawImage(backgroundImage, (w - iw) / 2, (h - ih) / 2, iw, ih);
+    // Keep exact user-entered text legible; never ask image models to spell it.
+    if (draft.kind === 'visiting') {
+      const overlay = ctx.createLinearGradient(0, 0, w, 0);
+      overlay.addColorStop(0, 'rgba(255,255,255,0.95)');
+      overlay.addColorStop(0.65, 'rgba(255,255,255,0.86)');
+      overlay.addColorStop(1, 'rgba(255,255,255,0.38)');
+      ctx.fillStyle = overlay;
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.73)';
+    }
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
   ctx.save();
   // Abstract, print-safe vector decorations, not AI-generated imagery.
-  if (draft.style === 'playful') {
+  if (backgroundImage) {
+    // AI background already contains visual decoration; avoid duplicate vectors.
+  } else if (draft.style === 'playful') {
     const positions = [[125, 140, 36], [w-140, 200, 46], [180, h-230, 25], [w-175, h-300, 33]];
     positions.forEach(([x,y,r], i) => {
       ctx.globalAlpha = 0.38; ctx.fillStyle = i % 2 ? primary : accent;
