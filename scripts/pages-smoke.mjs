@@ -123,7 +123,7 @@ try {
     'Wedding date must not be lost in prompt parsing');
   const weddingDownload = page.waitForEvent('download', { timeout: 25000 });
   await page.getByRole('button', { name: 'PDF', exact: true }).click();
-  assert.match((await weddingDownload).suggestedFilename(), /wedding-card\\.pdf$/i,
+  assert.match((await weddingDownload).suggestedFilename(), /wedding-card\.pdf$/i,
     'Wedding PDF should be a real browser download');
 
   // Browser back/forward/client navigation must not reuse stale wedding state for birthday.
