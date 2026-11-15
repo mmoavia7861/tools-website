@@ -321,6 +321,7 @@ export const AICardGeneratorView: React.FC<{ initialKind?: CardKind }> = ({ init
                 <ImageIcon className="w-4 h-4"/>{aiImageBusy?'Generating image…':'Generate AI Card Image'}
               </button>
             </div>
+            <p className="text-xs text-slate-600">Gemini Editable Design uses the text API (free quota may apply). Generate AI Card Image uses Google’s <strong>paid image API</strong> and requires billing on your Google AI Studio project. The free local template remains available without AI.</p>
             {AI_READY?<div className="space-y-2"><div ref={widgetRef}/><p className="text-xs text-slate-500">{turnstileStatus||'Complete free anti-bot verification to enable Gemini.'}</p></div>
             :<p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 border border-amber-200">
               <Lock className="inline w-3.5 h-3.5 mr-1"/> Gemini API not connected yet. You can still create, edit and download real cards for free using local templates.
