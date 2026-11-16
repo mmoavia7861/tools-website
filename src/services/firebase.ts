@@ -1,8 +1,13 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  browserSessionPersistence,
+  setPersistence,
+  getIdTokenResult,
+  reload,
   signOut,
   onAuthStateChanged,
   type User
@@ -30,7 +35,7 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 // CRITICAL: Initialize Firestore with explicit database ID from config
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
+// Admin authentication uses Firebase email/password only; no Google popup provider.
 
 export enum OperationType {
   CREATE = 'create',
@@ -96,7 +101,13 @@ export async function testConnection(): Promise<boolean> {
 }
 
 export {
-  signInWithPopup,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  browserSessionPersistence,
+  setPersistence,
+  getIdTokenResult,
+  reload,
   signOut,
   onAuthStateChanged,
   doc,
