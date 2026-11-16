@@ -105,11 +105,17 @@ export function AdminOtpChallenge({ user }: { user: User }) {
             <input id="admin-email-otp" type="text" inputMode="numeric" autoComplete="one-time-code"
               pattern="[0-9]{6}" maxLength={6} required
               placeholder="••••••" value={code}
-              onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+              onChange={event => { setCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+              aria-describedby="admin-otp-progress"
               className="w-full rounded-xl border border-slate-300 p-3 text-center text-2xl tracking-[0.45em] focus:border-blue-600 outline-none" />
+            <p id="admin-otp-progress" role="status" className={code.length === 6 ? "text-xs text-emerald-700" : "text-xs text-slate-600"}>
+              {code.length === 6
+                ? "All 6 digits entered. You can verify your code now."
+                : `Enter the full 6-digit code (${code.length}/6 digits entered). The button activates only when all six digits are present.`}
+            </p>
             <button type="submit" disabled={busy || code.length !== 6}
               className="w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white disabled:opacity-50">
-              {busy ? 'Verifying…' : 'Verify code & open admin panel'}
+              {busy ? 'Verifying…' : code.length !== 6 ? `Enter all 6 digits (${code.length}/6)` : 'Verify code & open admin panel'}
             </button>
           </form>
           <button type="button" onClick={() => void sendCode()} disabled={sending || busy}
