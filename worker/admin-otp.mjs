@@ -191,10 +191,77 @@ async function stateCall(env, uid, action, fields) {
   return { status: response.status, body: await response.json() };
 }
 
+// Never log or return the secret itself. Codes are safe troubleshooting hints
+// for an owner who already passed their Firebase password authentication.
+class SignerConfigurationError extends Error {
+  constructor(code) { super("Firebase signing configuration failed"); this.code = code; }
+}
+
+function serviceAccountCredentials(env) {
+  const email = typeof env.FIREBASE_SERVICE_ACCOUNT_EMAIL === "string"
+    ? env.FIREBASE_SERVICE_ACCOUNT_EMAIL.trim() : "";
+  // Sign with a service account belonging to this Firebase project.
+  if (!email.endsWith("@" + PROJECT_ID + ".iam.gserviceaccount.com") ||
+      !/^[a-z][a-z0-9-]*@/.test(email))
+    throw new SignerConfigurationError("SIGNER_EMAIL_PROJECT");
+
+  let source = typeof env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY === "string"
+    ? env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY.trim() : "";
+  if (!source) throw new SignerConfigurationError("SIGNER_KEY_MISSING");
+  // Accept the common Cloudflare secret formats: a raw Google PKCS#8 PEM,
+  // a JSON-escaped PEM string, or a *complete* service-account JSON file.
+  // A JSON key must match the explicitly configured email and project.
+  for (let i = 0; i < 2 && (source.startsWith('"') || source.startsWith("{")); i++) {
+    let parsed;
+    try { parsed = JSON.parse(source); }
+    catch { throw new SignerConfigurationError("SIGNER_JSON_FORMAT"); }
+    if (typeof parsed === "string") { source = parsed.trim(); continue; }
+    if (!parsed || typeof parsed !== "object" ||
+        parsed.type !== "service_account" ||
+        parsed.client_email !== email ||
+        parsed.project_id !== PROJECT_ID ||
+        typeof parsed.private_key !== "string")
+      throw new SignerConfigurationError("SIGNER_JSON_ACCOUNT_MISMATCH");
+    source = parsed.private_key.trim();
+    break;
+  }
+  // Google service-account keys are PKCS#8. Convert literal \n sequences
+  // copied into Cloudflare secrets into real line breaks before parsing.
+  source = source.replace(/\\n/g, "\n").replace(/\r\n/g, "\n");
+  const pem = /^-----BEGIN PRIVATE KEY-----\s*([A-Za-z0-9+\/=\s]+?)\s*-----END PRIVATE KEY-----$/.exec(source);
+  if (!pem) throw new SignerConfigurationError("SIGNER_PEM_FORMAT");
+  const base64 = pem[1].replace(/\s/g, "");
+  if (base64.length < 1000 || base64.length > 16000)
+    throw new SignerConfigurationError("SIGNER_PEM_FORMAT");
+  try {
+    const der = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    return { account: email, der };
+  } catch {
+    throw new SignerConfigurationError("SIGNER_BASE64_INVALID");
+  }
+}
+
+function signerFailure(err) {
+  const code = err instanceof SignerConfigurationError ? err.code : "SIGNER_PKCS8_UNUSABLE";
+  const explanations = {
+    SIGNER_EMAIL_PROJECT: "The service-account email must belong to the configured Firebase project.",
+    SIGNER_KEY_MISSING: "Add the private_key from the Google service-account JSON as a Cloudflare encrypted secret.",
+    SIGNER_JSON_FORMAT: "The secret is not valid JSON or PEM. Paste the complete private_key field, including its BEGIN/END lines.",
+    SIGNER_JSON_ACCOUNT_MISMATCH: "The service-account JSON email/project does not match the configured service-account email/project.",
+    SIGNER_PEM_FORMAT: "The secret must contain the PKCS#8 BEGIN PRIVATE KEY and END PRIVATE KEY lines.",
+    SIGNER_BASE64_INVALID: "The service-account private_key body is not valid base64.",
+    SIGNER_PKCS8_UNUSABLE: "The service-account private key could not be imported or used for RSA signing."
+  };
+  return failed(
+    "Firebase admin token signer is not ready (" + code + "). " +
+    (explanations[code] || explanations.SIGNER_PKCS8_UNUSABLE) +
+    " Check Cloudflare Worker production secrets; never share your key.",
+    503, code
+  );
+}
+
 export async function mintOtpVerifiedCustomToken(env, uid) {
-  const account = env.FIREBASE_SERVICE_ACCOUNT_EMAIL;
-  const keyText = env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, "\n");
-  if (!account.endsWith(".gserviceaccount.com") || !keyText.includes("BEGIN PRIVATE KEY")) throw new Error("Signing key unavailable");
+  const { account, der } = serviceAccountCredentials(env);
   const now = Math.floor(Date.now() / 1000);
   const header = jwtPart({ alg: "RS256", typ: "JWT" });
   const body = jwtPart({
@@ -203,10 +270,15 @@ export async function mintOtpVerifiedCustomToken(env, uid) {
     claims: { toolscresta_otp: true },
   });
   const encoded = header + "." + body;
-  const der = Uint8Array.from(atob(keyText.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "")), c => c.charCodeAt(0));
-  const privateKey = await crypto.subtle.importKey("pkcs8", der,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, new TextEncoder().encode(encoded));
+  let signature;
+  try {
+    const privateKey = await crypto.subtle.importKey("pkcs8", der,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+    signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey,
+      new TextEncoder().encode(encoded));
+  } catch {
+    throw new SignerConfigurationError("SIGNER_PKCS8_UNUSABLE");
+  }
   return encoded + "." + b64urlEncode(signature);
 }
 
@@ -262,6 +334,10 @@ export async function handleAdminOtp(request, env, path) {
   if (!principal) return failed("Fresh verified owner password session required.", 403);
   if (!["/api/admin/otp/send", "/api/admin/otp/verify"].includes(path)) return failed("Not found.", 404);
   if (path === "/api/admin/otp/send") {
+    // Catch malformed signing secrets *before* issuing/sending an email code,
+    // rather than making the owner discover the failure after OTP entry.
+    try { await mintOtpVerifiedCustomToken(env, principal.uid); }
+    catch (err) { return signerFailure(err); }
     const code = randomOtp();
     const hash = await digestOtp(env.OTP_HASH_SECRET, principal.uid, principal.authTime, code);
     const issued = await stateCall(env, principal.uid, "issue", { hash, authTime: principal.authTime });
@@ -286,8 +362,9 @@ export async function handleAdminOtp(request, env, path) {
   let customToken;
   try {
     customToken = await mintOtpVerifiedCustomToken(env, principal.uid);
-  } catch {
-    return failed("Admin token signing is unavailable. Check the Firebase service account configuration. Your email code was not consumed.", 503, "SIGNING_UNAVAILABLE");
+  } catch (err) {
+    // The OTP has not been consumed. Return only a safe category.
+    return signerFailure(err);
   }
   const hash = await digestOtp(env.OTP_HASH_SECRET, principal.uid, principal.authTime, body.code);
   const verified = await stateCall(env, principal.uid, "consume", { hash, authTime: principal.authTime });
