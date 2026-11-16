@@ -174,7 +174,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
                   <p>
                     We store your cookie preference selection in browser local storage. Your browser and service
                     providers may also use storage needed for authentication, security and site operation. We use the Google tag
-                    (GTM-TLK8X39X) to support optional Google Analytics measurement. Analytics storage defaults to denied
+                    (GA4 measurement ID G-MG3M619V4F) to support optional Google Analytics measurement. Analytics storage defaults to denied
                     until you choose to accept analytics. Google may process website usage information according to its
                     privacy terms; we do not intentionally send uploaded file contents, document names or passwords
                     to analytics. You can change your choice through Reset Cookie Preferences in the footer.
