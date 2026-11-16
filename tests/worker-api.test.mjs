@@ -56,7 +56,10 @@ test('configuration status never exposes API secrets', async () => {
   const response = await worker.fetch(new Request(base + '/api/integrations/status'), env);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'no-store');
-  assert.deepEqual(await response.json(), { success: true, gemini: false, adobe: false, turnstile: false, workersAi: false });
+  assert.deepEqual(await response.json(), {
+    success: true, gemini: false, adobe: false, turnstile: false, workersAi: false,
+    turnstileSiteKey: '', pdfServerCompression: false
+  });
 });
 
 test('Gemini endpoint must not fake an answer without keys', async () => {
@@ -270,7 +273,9 @@ test('Gemini image request has a minimal API payload (no optional format fields)
       } }] } }] });
     };
     const response = await worker.fetch(new Request(base + '/api/cards/generate-image', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Origin': base },
+      method: 'POST', headers: {
+        'Content-Type': 'application/json', 'Origin': base, 'CF-Connecting-IP': '198.51.100.61'
+      },
       body: JSON.stringify(sampleBody),
     }), { ...env, GEMINI_API_KEY: 'test-only', TURNSTILE_SECRET: 'test-only' });
     assert.equal(response.status, 200);
@@ -290,7 +295,9 @@ test('Gemini image HTTP 400 FAILED_PRECONDITION gives billing guidance without e
           message: 'Free tier is not supported; sensitive-upstream-info-123'
         } }, { status: 400 });
     const response = await worker.fetch(new Request(base + '/api/cards/generate-image', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Origin': base },
+      method: 'POST', headers: {
+        'Content-Type': 'application/json', 'Origin': base, 'CF-Connecting-IP': '198.51.100.62'
+      },
       body: JSON.stringify(sampleBody),
     }), { ...env, GEMINI_API_KEY: 'test-only', TURNSTILE_SECRET: 'test-only' });
     assert.equal(response.status, 503);
@@ -312,7 +319,9 @@ test('Gemini image HTTP 400 INVALID_ARGUMENT remains a configuration error', asy
           message: 'Bad generationConfig parameters'
         } }, { status: 400 });
     const response = await worker.fetch(new Request(base + '/api/cards/generate-image', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'Origin': base },
+      method: 'POST', headers: {
+        'Content-Type': 'application/json', 'Origin': base, 'CF-Connecting-IP': '198.51.100.63'
+      },
       body: JSON.stringify(sampleBody),
     }), { ...env, GEMINI_API_KEY: 'test-only', TURNSTILE_SECRET: 'test-only' });
     assert.equal(response.status, 502);
@@ -429,7 +438,7 @@ test('Adobe REST export flow uploads a real PDF and downloads DOCX (mocked upstr
       }
       if (String(url) === 'https://pdf-services.adobe.io/operation/exportpdf') {
         assert.equal(JSON.parse(options.body).targetFormat, 'docx');
-        return new Response('', { status: 201, headers: { location: '/operation/exportpdf/test-job/status' } });
+        return new Response('', { status: 201, headers: { location: jobStatus } });
       }
       if (String(url) === jobStatus) {
         return Response.json({ status: 'done', asset: { downloadUri: storage } });
