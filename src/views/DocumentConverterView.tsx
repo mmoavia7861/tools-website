@@ -46,7 +46,9 @@ async function convertLocally(file: File, mode: Mode): Promise<Blob> {
     const doc = new Document({ sections: [{ children: paragraphs }] });
       return await Packer.toBlob(doc);
     } finally {
-      await pdf.destroy();
+      // pdfjs-dist 6 removed PDFDocumentProxy.destroy().
+      // Always terminate the loading task instead, including after a successful export.
+      await loadingTask.destroy();
     }
   }
   if (new Uint8Array(bytes).slice(0, 2).some((n, i) => n !== [80, 75][i])) throw new Error('Invalid DOCX file.');
