@@ -404,7 +404,7 @@ test('Adobe REST export flow uploads a real PDF and downloads DOCX (mocked upstr
   const originalFetch = globalThis.fetch;
   const calls = [];
   const storage = 'https://dcplatformstorageservice-prod-us-east-1.s3-accelerate.amazonaws.com/test-file?X-Amz-Signature=sample';
-  const jobStatus = 'https://pdf-services.adobe.io/operation/exportpdf/test-job/status';
+  const jobStatus = 'https://pdf-services-ue1.adobe.io/operation/exportpdf/test-job/status?requestId=mock';
   try {
     globalThis.fetch = async (url, options) => {
       calls.push({ url: String(url), method: options.method || 'GET' });
@@ -545,7 +545,7 @@ test('Adobe credentials authorization failures return safe configuration errors'
 test('Adobe REST create flow uploads DOCX and returns PDF (mocked upstream)', async () => {
   const originalFetch = globalThis.fetch;
   const storage = 'https://dcplatformstorageservice-prod-us-east-1.s3-accelerate.amazonaws.com/docx?X-Amz-Signature=sample';
-  const statusUrl = 'https://pdf-services.adobe.io/operation/createpdf/test-job/status';
+  const statusUrl = 'https://pdf-services-ew1.adobe.io/operation/createpdf/test-job/status';
   const requests = [];
   try {
     globalThis.fetch = async (url, options) => {
