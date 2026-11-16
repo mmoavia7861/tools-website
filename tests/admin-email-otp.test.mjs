@@ -252,3 +252,37 @@ test('Server provides actual code expiration time after a successful send', asyn
     assert.ok(result.expiresAt > Date.now());
   } finally { globalThis.fetch = originalFetch; }
 });
+
+
+test('A broken Firebase signing key cannot consume a valid one-time code', async () => {
+  const key = await keypair();
+  const { env } = envFor(key);
+  const jwt = await passwordToken(key.pair);
+  const originalFetch = globalThis.fetch;
+  let sentCode = '';
+  try {
+    globalThis.fetch = async (url, options = {}) => {
+      if (String(url).includes('jwk/securetoken@')) return Response.json({ keys: [key.jwk] });
+      if (String(url) === 'https://api.resend.com/emails') {
+        sentCode = /code is: (\d{6})/.exec(JSON.parse(options.body).text)?.[1] || '';
+        return Response.json({ id: 'mailer' });
+      }
+      throw Error('Unexpected upstream URL');
+    };
+    const post = (route, body = {}) => new Request(origin + '/api/admin/otp/' + route, {
+      method: 'POST',
+      headers: { Origin: origin, Authorization: 'Bearer ' + jwt, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    assert.equal((await handleAdminOtp(post('send'), env, '/api/admin/otp/send')).status, 200);
+    assert.match(sentCode, /^\d{6}$/);
+    const validKey = env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY;
+    env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY = 'invalid signing private key';
+    const failed = await handleAdminOtp(post('verify', { code: sentCode }), env, '/api/admin/otp/verify');
+    assert.equal(failed.status, 503);
+    assert.equal((await failed.json()).errorCode, 'SIGNING_UNAVAILABLE');
+    env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY = validKey;
+    const retry = await handleAdminOtp(post('verify', { code: sentCode }), env, '/api/admin/otp/verify');
+    assert.equal(retry.status, 200, 'valid code should remain available after a transient key failure');
+  } finally { globalThis.fetch = originalFetch; }
+});
