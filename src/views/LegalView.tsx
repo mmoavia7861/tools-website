@@ -164,9 +164,12 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
                     obligations; you may ask us to review or delete a submission using the contact page.
                   </p>
                   <p>
-                    Administrator sign-in uses Firebase Authentication with an authorized Gmail address and a separate Firebase password. Account information,
-                    such as an authorized admin's email address and user ID, may be processed by these services.
-                    Google's and Firebase's infrastructure may process ordinary operational logs and security data.
+                    Administrator sign-in uses Firebase Authentication with an authorized Gmail address and a separate Firebase password,
+                    followed by a one-time email security code. If enabled, ToolsCresta sends that code using an email delivery
+                    provider (Resend) and temporarily stores a cryptographic digest and limited rate-limit metadata in
+                    Cloudflare Durable Objects. Codes expire after five minutes. Administrator email address, user ID, and
+                    security-related logs may be processed by these providers under their respective policies.
+                    We do not intentionally send passwords or one-time codes to Google Analytics.
                   </p>
                 </section>
                 <section>
