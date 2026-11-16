@@ -218,7 +218,10 @@ export async function handleAdminOtp(request, env, path) {
 
   if (request.method !== "POST") return failed("Unsupported method.", 405);
   if (!otpConfigured(env)) return failed("Email verification is not configured by the site administrator.", 503);
-  if ((request.headers.get("Origin") || "") !== new URL(request.url).origin)
+  const origin = request.headers.get("Origin");
+  const fetchSite = request.headers.get("Sec-Fetch-Site");
+  if ((origin && origin !== new URL(request.url).origin) ||
+      (!origin && fetchSite && fetchSite !== "same-origin" && fetchSite !== "none"))
     return failed("Same-origin requests only.", 403);
   const size = Number(request.headers.get("Content-Length") || "0");
   if (size > MAX_BODY_BYTES) return failed("Invalid request.", 413);
