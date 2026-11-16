@@ -1,0 +1,41 @@
+name: Admin security and API checks
+
+on:
+  push:
+    paths:
+      - 'worker/**'
+      - 'src/components/AdminOtpChallenge.tsx'
+      - 'src/utils/adminAccess*'
+      - 'src/views/AdminView.tsx'
+      - 'src/services/firebase.ts'
+      - 'firestore.rules'
+      - 'wrangler.production.toml'
+      - 'tests/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/admin-security-ci.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Unit tests, API tests and frontend type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+      - name: Install dependencies without changes
+        run: bun install --frozen-lockfile
+      - name: Type-check frontend
+        run: bun run lint
+      - name: Run owner access tests
+        run: bun run test
+      - name: Run backend and OTP security tests
+        run: bun run test:api
+      - name: Build production assets
+        run: bun run build:production
