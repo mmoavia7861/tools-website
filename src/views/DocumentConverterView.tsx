@@ -16,7 +16,7 @@ async function convertLocally(file: File, mode: Mode): Promise<Blob> {
     const loadingTask = pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true, disableFontFace: true });
     const pdf = await loadingTask.promise;
     try {
-    if (pdf.numPages > 60) throw new Error('This free converter supports up to 60 PDF pages.');
+      if (pdf.numPages > 60) throw new Error('This free converter supports up to 60 PDF pages.');
     const paragraphs: InstanceType<typeof Paragraph>[] = [];
     let characters = 0;
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -40,7 +40,7 @@ async function convertLocally(file: File, mode: Mode): Promise<Blob> {
     }
     if (!characters) throw new Error('No selectable text found. Scanned PDFs require OCR.');
     const doc = new Document({ sections: [{ children: paragraphs }] });
-    return await Packer.toBlob(doc);
+      return await Packer.toBlob(doc);
     } finally {
       await pdf.destroy();
     }
@@ -114,7 +114,7 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
   };
 
   return <section className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
-    <SEOHead title={title + ' | ToolsCresta'} description={toWord ? 'Convert PDF text to editable DOCX privately in your browser without signup or an API key. Scanned PDFs and complex formatting are not supported.' : 'Convert Word DOCX to PDF using browser processing or an optional conversion server. Basic text only; complex formatting and non-Latin scripts are not supported.'} canonicalPath={'/' + mode} />
+    <SEOHead title={title + ' | ToolsCresta'} description={toWord ? 'Convert PDF text to editable DOCX privately in your browser without signup or an API key. Scanned PDFs and complex formatting are not supported.' : 'Convert basic Word DOCX text into PDF privately in your browser without an API key. Basic text only; complex formatting and non-Latin scripts are not supported.'} canonicalPath={'/' + mode} />
     <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
     <p className="mt-3 text-slate-600">{toWord ? 'Extract selectable text from PDFs into editable DOCX. Scanned PDFs, images, tables and precise layouts are not preserved in basic browser mode.' : 'Convert basic DOCX text into PDF. Images, tables, styles and complex layouts are not preserved in basic browser mode; some non-Latin scripts are unsupported.'}</p>
     <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
