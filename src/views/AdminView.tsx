@@ -53,7 +53,6 @@ export const AdminView: React.FC = () => {
   // AdSense configuration states
   const [adsenseEnabled, setAdsenseEnabled] = useState(false);
   const [publisherId, setPublisherId] = useState('ca-pub-XXXXXXXXXXXXXXXX');
-  const [adSavedNotice, setAdSavedNotice] = useState(false);
 
   // Contact messages
   const [messages, setMessages] = useState<any[]>([]);
@@ -293,14 +292,14 @@ export const AdminView: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-2xs">
                   <span className="text-xs text-slate-500 uppercase tracking-wider">Hosting</span>
-                  <p className="text-xl font-bold text-blue-600 mt-1">GitHub Pages</p>
-                  <p className="text-xs text-slate-400 mt-1">Static frontend; no Node server on this domain</p>
+                  <p className="text-xl font-bold text-blue-600 mt-1">{window.location.hostname.endsWith('github.io') ? 'GitHub Pages' : 'Custom domain'}</p>
+                  <p className="text-xs text-slate-400 mt-1">Cloud features require a Cloudflare Worker on this origin</p>
                 </div>
 
                 <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-2xs">
                   <span className="text-xs text-slate-500 uppercase tracking-wider">Backend Uptime</span>
                   <p className="text-xl font-bold text-slate-900 mt-1">
-                    {healthData?.uptimeSeconds ? `${healthData.uptimeSeconds}s` : 'Not connected'}
+                    {healthData?.status === 'ok' ? 'Online' : 'Not connected'}
                   </p>
                   <p className="text-xs text-slate-400 mt-1">No backend health data available on Pages</p>
                 </div>
@@ -308,7 +307,7 @@ export const AdminView: React.FC = () => {
                 <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-2xs">
                   <span className="text-xs text-slate-500 uppercase tracking-wider">Backend Memory</span>
                   <p className="text-xl font-bold text-slate-900 mt-1">
-                    {healthData?.memoryUsageMb ? `${healthData.memoryUsageMb} MB` : 'Not available'}
+                    {'Not exposed'}
                   </p>
                   <p className="text-xs text-slate-400 mt-1">Browser memory depends on the device</p>
                 </div>
@@ -440,23 +439,10 @@ export const AdminView: React.FC = () => {
                   />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAdSavedNotice(true);
-                    setTimeout(() => setAdSavedNotice(false), 3000);
-                  }}
-                  className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition"
-                >
-                  Save AdSense Parameters
-                </button>
-
-                {adSavedNotice && (
-                  <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Ad configuration updated.</span>
-                  </p>
-                )}
+                <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  AdSense configuration is preview-only. These fields are not stored or deployed from this dashboard.
+                  Ad serving remains disabled until a verified owner-only persistence flow and Google approval are configured.
+                </p>
               </div>
             </div>
           )}
@@ -495,9 +481,9 @@ export const AdminView: React.FC = () => {
                   <li>Set the Worker URL and public Turnstile site key as GitHub Actions Variables, then redeploy the frontend.</li>
                 </ol>
                 <div className="mt-4 flex flex-wrap gap-3 text-xs font-semibold">
-                  <a href="https://github.com/mmoavia7861/RankNova/settings/secrets/actions" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Actions Secrets</a>
-                  <a href="https://github.com/mmoavia7861/RankNova/actions/workflows/deploy-card-ai.yml" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Deploy AI Worker</a>
-                  <a href="https://github.com/mmoavia7861/RankNova/settings/variables/actions" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Frontend Variables</a>
+                  <a href="https://github.com/mmoavia7861/tools-website/settings/secrets/actions" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Actions Secrets</a>
+                  <a href="https://github.com/mmoavia7861/tools-website/actions" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Deploy AI Worker</a>
+                  <a href="https://github.com/mmoavia7861/tools-website/settings/variables/actions" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Frontend Variables</a>
                 </div>
               </div>
               <p className="text-xs text-slate-500">
