@@ -42,6 +42,7 @@ async function postOtp(user: User, action: 'send' | 'verify', code?: string): Pr
 
 export function AdminOtpChallenge({ user }: { user: User }) {
   const [code, setCode] = useState('');
+  const [showCode, setShowCode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -146,12 +147,16 @@ export function AdminOtpChallenge({ user }: { user: User }) {
           </p>
           <form onSubmit={verify} className="space-y-4">
             <label htmlFor="admin-email-otp" className="block text-sm font-semibold text-slate-700">Email verification code</label>
-            <input id="admin-email-otp" type="text" inputMode="numeric" autoComplete="one-time-code"
+            <input id="admin-email-otp" type={showCode ? "text" : "password"} inputMode="numeric" autoComplete="one-time-code"
               pattern="[0-9]{6}" maxLength={6} required
               placeholder="••••••" value={code}
               onChange={event => { setCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
               aria-describedby="admin-otp-progress"
               className="w-full rounded-xl border border-slate-300 p-3 text-center text-2xl tracking-[0.45em] focus:border-blue-600 outline-none" />
+            <button type="button" onClick={() => setShowCode(value => !value)}
+              className="text-xs font-medium text-blue-700 hover:underline">
+              {showCode ? "Hide verification code" : "Show verification code"}
+            </button>
             <p id="admin-otp-progress" role="status" className={code.length === 6 ? "text-xs text-emerald-700" : "text-xs text-slate-600"}>
               {code.length === 6
                 ? "All 6 digits entered. You can verify your code now."
