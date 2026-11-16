@@ -1,6 +1,26 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- ToolsCresta Google tag: only this container; do not install duplicate tags. -->
+    <!-- Consent Mode v2 defaults are applied before the Google tag loads. -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ window.dataLayer.push(arguments); }
+      gtag('consent', 'default', {
+        'analytics_storage': 'denied',
+        'ad_storage': 'denied',
+        'ad_user_data': 'denied',
+        'ad_personalization': 'denied'
+      });
+      try {
+        var savedAnalyticsConsent = JSON.parse(localStorage.getItem('toolscresta_privacy_consent') || 'null');
+        if (savedAnalyticsConsent && savedAnalyticsConsent.analytics === true) {
+          gtag('consent', 'update', { 'analytics_storage': 'granted' });
+        }
+      } catch (_) { /* Malformed privacy setting stays denied. */ }
+      gtag('js', new Date());
+    </script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=GTM-TLK8X39X"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Privacy Policy | ToolsCresta</title>
@@ -10,7 +30,7 @@
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563EB'><path d='M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z'/></svg>" />
-    <script type="module" crossorigin src="/tools-website/assets/index-aiSw53H6.js"></script>
+    <script type="module" crossorigin src="/tools-website/assets/index-C6rw8pOQ.js"></script>
     <link rel="modulepreload" crossorigin href="/tools-website/assets/rolldown-runtime-BCiCTKAo.js">
     <link rel="modulepreload" crossorigin href="/tools-website/assets/jsx-runtime-BjLx7v8f.js">
     <link rel="stylesheet" crossorigin href="/tools-website/assets/index-DD4UuVm9.css">
