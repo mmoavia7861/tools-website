@@ -75,8 +75,10 @@ export async function verifyFirebasePasswordIdToken(idToken, options = {}) {
       !Number.isInteger(payload.iat) || payload.iat > now + 30 ||
       payload.iat > payload.exp) return null;
 
-    const keyResponse = await (options.fetchImpl || fetch)(GOOGLE_ID_TOKEN_KEYS, { redirect: "error" });
-    if (!keyResponse.ok) return null;
+    // Cloudflare Workers does not support redirect="error".
+    // Use manual mode and never follow unexpected Google key redirects.
+    const keyResponse = await (options.fetchImpl || fetch)(GOOGLE_ID_TOKEN_KEYS, { redirect: "manual" });
+    if (!keyResponse.ok || keyResponse.status >= 300) return null;
     const keySet = await keyResponse.json();
     const key = keySet.keys?.find(key => key.kid === header.kid && key.kty === "RSA" &&
       (!key.alg || key.alg === "RS256") && (!key.use || key.use === "sig"));
