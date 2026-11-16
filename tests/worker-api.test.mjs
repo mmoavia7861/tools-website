@@ -587,6 +587,28 @@ test('Adobe cloud permits PDF inputs over old 10 MB limit and reaches IMS token 
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test('Adobe cloud accepts Word DOCX files larger than the old 10 MB limit', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('/turnstile/v0/siteverify')) return Response.json({ success: true, hostname: 'toolscresta.com' });
+      if (String(url) === 'https://ims-na1.adobelogin.com/ims/token/v3')
+        return Response.json({ error: 'invalid_client' }, { status: 400 });
+      throw new Error('Unexpected upstream request');
+    };
+    const docxBytes = new Uint8Array(11 * 1024 * 1024);
+    docxBytes.set([0x50, 0x4b, 0x03, 0x04]);
+    const form = new FormData();
+    form.append('file', new File([docxBytes], 'large.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+    form.append('turnstileToken', 'fresh-turnstile');
+    const response = await worker.fetch(new Request(base + '/api/convert/word-to-pdf', {
+      method: 'POST', headers: { Origin: base, 'CF-Connecting-IP': '198.51.100.181' }, body: form
+    }), { ...env, ADOBE_CLIENT_ID: 'test-client', ADOBE_CLIENT_SECRET: 'test-secret', TURNSTILE_SECRET: 'test-turnstile' });
+    assert.equal(response.status, 503);
+    assert.match((await response.json()).error, /invalid_client/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('Adobe requests exceeding 50 MiB are rejected before parsing uploaded data', async () => {
   const payload = new FormData();
   payload.append('file', new File([new TextEncoder().encode('%PDF-1.7\\nmock')], 'demo.pdf'));
