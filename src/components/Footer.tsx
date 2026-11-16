@@ -213,7 +213,11 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
             <button
               type="button"
               onClick={() => {
-                localStorage.removeItem('ranknova_privacy_consent');
+                localStorage.removeItem('toolscresta_privacy_consent');
+                const tag = (window as Window & { gtag?: (...args: unknown[]) => void }).gtag;
+                if (typeof tag === 'function') {
+                  tag('consent', 'update', { analytics_storage: 'denied' });
+                }
                 window.location.reload();
               }}
               className="text-slate-400 hover:text-slate-600 hover:underline"
