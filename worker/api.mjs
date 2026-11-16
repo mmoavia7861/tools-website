@@ -7,6 +7,8 @@ const MAX_PDF_BYTES = 10 * 1024 * 1024;
 const MAX_JSON_BYTES = 12 * 1024;
 const MAX_ADOBE_WAIT_MS = 90000;
 const ADOBE_BASE = "https://pdf-services.adobe.io";
+const ADOBE_IMS_TOKEN_URL = "https://ims-na1.adobelogin.com/ims/token/v3";
+const DEFAULT_ADOBE_OAUTH_SCOPES = "openid,AdobeID,DCAPI,additional_info.projectedProductContext";
 const mimeDocx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const rate = new Map();
 
@@ -402,24 +404,36 @@ async function handleAdobe(request, env, mode) {
     const client = String(env.ADOBE_CLIENT_ID).trim();
     const clientSecret = String(env.ADOBE_CLIENT_SECRET).trim();
     if (!client || !clientSecret) return error("Adobe PDF Services Client ID or Client Secret is empty. Check Cloudflare runtime secrets.", 503);
-    const credentials = new URLSearchParams({ client_id: client, client_secret: clientSecret });
-    const tokenResp = await fetchTimed(ADOBE_BASE + "/token", {
+    // Adobe Developer Console's OAuth Server-to-Server credential uses IMS OAuth
+    // client_credentials, NOT the legacy PDF Services /token form with two fields.
+    // Adobe requires grant_type and comma-separated scopes for every token request.
+    const scope = typeof env.ADOBE_OAUTH_SCOPES === "string" && env.ADOBE_OAUTH_SCOPES.trim()
+      ? env.ADOBE_OAUTH_SCOPES.trim() : DEFAULT_ADOBE_OAUTH_SCOPES;
+    const credentials = new URLSearchParams({
+      grant_type: "client_credentials", client_id: client,
+      client_secret: clientSecret, scope,
+    });
+    const tokenResp = await fetchTimed(ADOBE_IMS_TOKEN_URL, {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: credentials,
     });
     if (!tokenResp.ok) {
-      if ([400, 401].includes(tokenResp.status)) {
-        return error("Adobe PDF Services refused the Client ID and Client Secret (HTTP " + tokenResp.status + "). Verify both belong to the same PDF Services API credential.", 503);
+      // Do not reveal the provider's error body: it may contain private context.
+      if (tokenResp.status === 400) {
+        return error("Adobe OAuth token request rejected (HTTP 400). Check the credential pair and its required OAuth scopes in Adobe Developer Console.", 503);
+      }
+      if (tokenResp.status === 401) {
+        return error("Adobe OAuth credentials not accepted (HTTP 401). Verify the Client ID and Client Secret belong to the same Server-to-Server credential.", 503);
       }
       if (tokenResp.status === 403) {
-        return error("Adobe PDF Services access denied (HTTP 403). Check the Adobe PDF Services API entitlement and credential permissions.", 503);
+        return error("Adobe OAuth access denied (HTTP 403). Check Adobe PDF Services API product-profile permissions.", 503);
       }
       if (tokenResp.status === 429) {
-        return error("Adobe access token rate limit reached (HTTP 429). Try again later.", 429);
+        return error("Adobe OAuth token rate limit reached (HTTP 429). Try again later.", 429);
       }
       if (tokenResp.status >= 500) {
-        return error("Adobe PDF Services authentication is temporarily unavailable (HTTP " + tokenResp.status + ").", 502);
+        return error("Adobe OAuth authentication temporarily unavailable (HTTP " + tokenResp.status + ").", 502);
       }
-      return error("Adobe token endpoint rejected the request (HTTP " + tokenResp.status + "). Verify your PDF Services API credentials.", 502);
+      return error("Adobe OAuth token request failed (HTTP " + tokenResp.status + ").", 502);
     }
     const oauth = await tokenResp.json();
     if (!oauth.access_token) return error("Adobe did not issue an access token. Check the PDF Services API credential.", 502);
