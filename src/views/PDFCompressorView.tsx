@@ -339,7 +339,7 @@ export const PDFCompressorView: React.FC = () => {
                         className="text-blue-600 focus:ring-blue-500"
                       />
                       <Server className="h-4 w-4 text-indigo-600" />
-                      <span>{serverAvailable ? 'Secure Server Worker (Isolated memory, immediate deletion)' : 'Server processing unavailable on GitHub Pages — use private on-device mode'}</span>
+                      <span>{serverAvailable ? 'Secure Server Worker (Isolated memory, immediate deletion)' : 'Server processing is not configured — use private on-device mode'}</span>
                     </label>
                   </div>
                 </div>
