@@ -279,13 +279,18 @@ export async function handleAdminOtp(request, env, path) {
     });
   }
   if (!/^\d{6}$/.test(body.code || "")) return failed("Enter the six-digit verification code.");
+  // Prepare the signed session BEFORE consuming the one-time code. A malformed
+  // or unavailable signing key must never burn a valid OTP and leave the owner
+  // with a misleading "code expired" error on retry. Signing alone grants
+  // nothing: the token is returned ONLY after the one-time code is consumed.
+  let customToken;
+  try {
+    customToken = await mintOtpVerifiedCustomToken(env, principal.uid);
+  } catch {
+    return failed("Admin token signing is unavailable. Check the Firebase service account configuration. Your email code was not consumed.", 503, "SIGNING_UNAVAILABLE");
+  }
   const hash = await digestOtp(env.OTP_HASH_SECRET, principal.uid, principal.authTime, body.code);
   const verified = await stateCall(env, principal.uid, "consume", { hash, authTime: principal.authTime });
   if (!verified.body.success) return failed(verified.body.error, verified.status, verified.body.errorCode);
-  try {
-    const customToken = await mintOtpVerifiedCustomToken(env, principal.uid);
-    return output(200, { success: true, customToken });
-  } catch {
-    return failed("Verified code, but secure session setup failed. Request a fresh code.", 503);
-  }
+  return output(200, { success: true, customToken });
 }
