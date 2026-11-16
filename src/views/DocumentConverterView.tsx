@@ -112,13 +112,13 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
         'error-callback': () => { setTurnstileToken(''); setVerificationStatus('Security check failed. Try again.'); }
       });
     };
-    let script = document.querySelector<HTMLScriptElement>('script[data-ranknova-turnstile]');
+    let script = document.querySelector<HTMLScriptElement>('script[data-toolscresta-turnstile]');
     if (!script) {
       script = document.createElement('script');
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
       script.async = true;
       script.defer = true;
-      script.dataset.ranknovaTurnstile = '1';
+      script.dataset.toolscrestaTurnstile = '1';
       document.head.appendChild(script);
     }
     script.addEventListener('load', renderWidget);
