@@ -164,3 +164,35 @@ test('End-to-end send, verify, replay deny, and untrusted origin deny', async ()
       '/api/admin/otp/verify')).status, 403);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('OTP diagnostic never exposes missing binding names to unauthenticated visitors', async () => {
+  const res = await handleAdminOtp(new Request(origin + '/api/admin/otp/status', {
+    method: 'GET'
+  }), {}, '/api/admin/otp/status');
+  const payload = await res.json();
+  assert.deepEqual(payload, { success: true, configured: false });
+  assert.equal('missing' in payload, false);
+});
+
+test('Only a verified owner password session can see missing binding names (not secret values)', async () => {
+  const key = await keypair();
+  const bearer = await passwordToken(key.pair);
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async url => {
+      if (String(url).includes('jwk/securetoken@')) return Response.json({ keys: [key.jwk] });
+      throw Error('Unexpected request');
+    };
+    const statusRequest = authorization => new Request(origin + '/api/admin/otp/status', {
+      headers: { Authorization: authorization }
+    });
+    const owner = await handleAdminOtp(statusRequest('Bearer ' + bearer), {}, '/api/admin/otp/status');
+    const report = await owner.json();
+    assert.equal(report.configured, false);
+    assert.ok(report.missing.includes('RESEND_API_KEY'));
+    assert.ok(report.missing.includes('ADMIN_OTP'));
+    assert.equal(Object.values(report).some(value => String(value).includes('private_key')), false);
+    const invalid = await handleAdminOtp(statusRequest('Bearer invalid'), {}, '/api/admin/otp/status');
+    assert.equal('missing' in await invalid.json(), false);
+  } finally { globalThis.fetch = originalFetch; }
+});
