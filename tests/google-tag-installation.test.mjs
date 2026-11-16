@@ -7,13 +7,13 @@ const banner = readFileSync(new URL('../src/components/CookieBanner.tsx', import
 const footer = readFileSync(new URL('../src/components/Footer.tsx', import.meta.url), 'utf8');
 
 test('ToolsCresta uses exactly one Google tag from the new analytics setup', () => {
-  assert.equal((html.match(/gtag\/js\?id=GTM-TLK8X39X/g) || []).length, 1);
+  assert.equal((html.match(/gtm\.js\?id=GTM-TLK8X39X/g) || []).length, 1);
   assert.ok(!html.includes('G-QQ1H25LES8'), 'Do not reuse the old Google Analytics stream');
 });
 
 test('Google Consent Mode v2 defaults precede the Google tag loader', () => {
   const def = html.indexOf("gtag('consent', 'default'");
-  const loader = html.indexOf('gtag/js?id=GTM-TLK8X39X');
+  const loader = html.indexOf('gtm.js?id=GTM-TLK8X39X');
   assert.ok(def > -1 && loader > def);
   for (const category of ['analytics_storage', 'ad_storage', 'ad_user_data', 'ad_personalization']) {
     assert.ok(html.includes("'" + category + "': 'denied'"));
