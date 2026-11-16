@@ -6,6 +6,24 @@ const base = 'https://toolscresta.com';
 const configured = { GEMINI_API_KEY: '', ADOBE_CLIENT_ID: '', ADOBE_CLIENT_SECRET: '', TURNSTILE_SECRET: '' };
 const env = { ...configured, ASSETS: { fetch: async () => new Response('static assets served', { status: 200 }) } };
 
+test('health endpoint exposes only minimal operational status', async () => {
+  const response = await worker.fetch(new Request(base + '/api/health'), env);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.status, 'ok');
+  assert.equal(body.service, 'toolscresta-api');
+  assert.equal(JSON.stringify(body).includes('secret'), false);
+});
+
+test('admin provider status does not expose credentials', async () => {
+  const response = await worker.fetch(new Request(base + '/api/admin/status'), env);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.success, true);
+  assert.equal(body.pdfServerCompression, false);
+  assert.equal(JSON.stringify(body).includes('secret'), false);
+});
+
 test('configuration status never exposes API secrets', async () => {
   const response = await worker.fetch(new Request(base + '/api/integrations/status'), env);
   assert.equal(response.status, 200);
