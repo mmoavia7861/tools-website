@@ -97,12 +97,13 @@ use SQLite; this is compatible with Workers Free. Run the source and
 security tests before deployment:
 
 ```sh
-npm ci
-npm run lint
-npm test
-npm run test:api
-npm run build:production
-npx wrangler deploy --config wrangler.production.toml
+# Repository uses Bun with the committed bun.lock file.
+bun install --frozen-lockfile
+bun run lint
+bun run test
+bun run test:api
+bun run build:production
+bunx wrangler deploy --config wrangler.production.toml
 ```
 
 If any test/build fails, **do not deploy**. Deploy this Worker only after its
