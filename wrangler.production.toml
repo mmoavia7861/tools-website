@@ -8,6 +8,11 @@ workers_dev = true
 # Preserve dashboard-configured non-secret runtime variables across Wrangler deployments.
 keep_vars = true
 
+# Public/non-secret Adobe OAuth scope configuration.
+# Keep this in sync with Cloudflare Dashboard > Runtime variables.
+[vars]
+ADOBE_OAUTH_SCOPES = "openid,AdobeID,DCAPI,additional_info.projectedProductContext"
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"
