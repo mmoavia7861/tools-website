@@ -21,8 +21,13 @@ import {
 import { SEOHead } from '../components/SEOHead';
 import {
   auth,
-  googleProvider,
-  signInWithPopup,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  browserSessionPersistence,
+  setPersistence,
+  getIdTokenResult,
+  reload,
   signOut,
   onAuthStateChanged,
   type User,
@@ -33,13 +38,21 @@ import {
   doc
 } from '../services/firebase';
 import { STARTER_BLOG_POSTS, type BlogPostItem } from '../data/initialContent';
-
-const OWNER_EMAIL = 'moaviah760@gmail.com';
+import { OWNER_EMAIL, isOwnerPasswordSession } from '../utils/adminAccess';
 
 export const AdminView: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [loginError, setLoginError] = useState('');
+  const [loginNotice, setLoginNotice] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [verificationBusy, setVerificationBusy] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [authProvider, setAuthProvider] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'blog' | 'ads' | 'ai' | 'messages'>('overview');
 
   // Server health data
@@ -57,12 +70,54 @@ export const AdminView: React.FC = () => {
   // Contact messages
   const [messages, setMessages] = useState<any[]>([]);
 
+  const isOwner = isOwnerPasswordSession(currentUser?.email, emailVerified, authProvider);
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setAuthLoading(false);
+    let cancelled = false;
+    // Existing Google-popup sessions must NOT continue into the admin dashboard.
+    // Only a Firebase email/password token for the verified owner may be used.
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        if (!cancelled) {
+          setCurrentUser(null);
+          setAuthProvider(null);
+          setEmailVerified(false);
+          setAuthLoading(false);
+        }
+        return;
+      }
+      try {
+        const token = await getIdTokenResult(user);
+        if (cancelled) return;
+        if (user.email?.toLowerCase() !== OWNER_EMAIL ||
+            token.signInProvider !== 'password') {
+          await signOut(auth);
+          if (!cancelled) {
+            setCurrentUser(null);
+            setAuthProvider(null);
+            setEmailVerified(false);
+            setLoginError('Sign in using the authorized admin Gmail address and password.');
+          }
+          return;
+        }
+        if (!cancelled) {
+          setCurrentUser(user);
+          setAuthProvider(token.signInProvider);
+          setEmailVerified(user.emailVerified === true);
+        }
+      } catch {
+        await signOut(auth).catch(() => {});
+        if (!cancelled) {
+          setCurrentUser(null);
+          setAuthProvider(null);
+          setEmailVerified(false);
+          setLoginError('Unable to validate the sign-in session. Please try again.');
+        }
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
     });
-    return () => unsubscribe();
+    return () => { cancelled = true; unsubscribe(); };
   }, []);
 
   const fetchStatus = async () => {
@@ -78,34 +133,102 @@ export const AdminView: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchStatus();
-  }, []);
+    if (isOwner) void fetchStatus();
+  }, [isOwner]);
 
-  const handleGoogleLogin = async () => {
+  const handlePasswordLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (loginBusy) return;
     setLoginError('');
+    setLoginNotice('');
+    // UX check only. Firebase Authentication + Firestore Security Rules are the
+    // security boundary; never store admin credentials in this source code.
+    if (loginEmail.trim().toLowerCase() !== OWNER_EMAIL || !loginPassword) {
+      setLoginError('Invalid Gmail address or password.');
+      return;
+    }
+    setLoginBusy(true);
     try {
-      await signInWithPopup(auth, googleProvider);
+      // Session expires when this browser tab/window session ends.
+      await setPersistence(auth, browserSessionPersistence);
+      await signInWithEmailAndPassword(auth, loginEmail.trim().toLowerCase(), loginPassword);
+      setLoginPassword('');
     } catch (err: unknown) {
       const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
-      if (code === 'auth/unauthorized-domain') {
-        setLoginError('Firebase sign-in is blocked for this hostname. Add toolscresta.com in Firebase Authentication > Settings > Authorized domains, then try again.');
-      } else if (code === 'auth/operation-not-allowed') {
-        setLoginError('Google sign-in is disabled. Enable Google provider in Firebase Authentication > Sign-in method.');
-      } else if (code === 'auth/popup-blocked') {
-        setLoginError('Browser blocked the sign-in pop-up. Allow pop-ups for this site and try again.');
-      } else if (code === 'auth/popup-closed-by-user') {
-        setLoginError('Sign-in window was closed. Try again when ready.');
+      if (code === 'auth/operation-not-allowed') {
+        setLoginError('Email/Password sign-in is disabled in Firebase Authentication. Enable that provider in your Firebase project.');
+      } else if (code === 'auth/too-many-requests') {
+        setLoginError('Too many attempts. Please try again later or reset the password.');
+      } else if (code === 'auth/unauthorized-domain') {
+        setLoginError('This site is not an authorized Firebase Authentication domain.');
       } else {
-        setLoginError('Google sign-in failed. Check your Firebase project settings and browser pop-up permissions.');
+        // Generic message prevents email/account enumeration.
+        setLoginError('Invalid Gmail address or password.');
       }
+    } finally {
+      setLoginBusy(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (resetBusy) return;
+    setLoginError('');
+    setLoginNotice('');
+    if (loginEmail.trim().toLowerCase() !== OWNER_EMAIL) {
+      setLoginError('Enter your authorized Gmail address to request a reset link.');
+      return;
+    }
+    setResetBusy(true);
+    try {
+      await sendPasswordResetEmail(auth, OWNER_EMAIL);
+    } catch {
+      // Do not leak whether an account exists or how it was provisioned.
+    } finally {
+      setLoginNotice('If this Gmail address has a password account, Firebase will send a reset email. Check your inbox and spam folder.');
+      setResetBusy(false);
+    }
+  };
+
+  const handleSendVerification = async () => {
+    if (!currentUser || verificationBusy) return;
+    setVerificationBusy(true);
+    setLoginError('');
+    setLoginNotice('');
+    try {
+      await sendEmailVerification(currentUser);
+      setLoginNotice('Verification email sent. Open the link in your Gmail inbox, then return and select Refresh verification.');
+    } catch {
+      setLoginError('Could not send verification email. Check Firebase settings or try later.');
+    } finally {
+      setVerificationBusy(false);
+    }
+  };
+
+  const refreshVerification = async () => {
+    if (!currentUser || verificationBusy) return;
+    setVerificationBusy(true);
+    setLoginError('');
+    try {
+      await reload(currentUser);
+      await currentUser.getIdToken(true);
+      setEmailVerified(currentUser.emailVerified === true);
+      if (!currentUser.emailVerified) {
+        setLoginNotice('Email is not verified yet. Open the verification link in Gmail first.');
+      } else {
+        setLoginNotice('');
+      }
+    } catch {
+      setLoginError('Could not refresh email verification. Please sign in again.');
+    } finally {
+      setVerificationBusy(false);
     }
   };
 
   const handleLogout = async () => {
+    setLoginPassword('');
+    setLoginNotice('');
     await signOut(auth);
   };
-
-  const isOwner = currentUser && currentUser.emailVerified === true && (currentUser.email?.toLowerCase() === OWNER_EMAIL.toLowerCase());
 
   if (authLoading) {
     return (
@@ -116,62 +239,81 @@ export const AdminView: React.FC = () => {
     );
   }
 
-  // Login view if not signed in
+  // Public-facing login has no signup or Google OAuth popup.
   if (!currentUser) {
     return (
       <>
-        <SEOHead
-          title="Admin Authentication | ToolsCresta"
-          description="Owner restricted administration portal."
-          canonicalPath="/admin"
-        />
-        <div className="py-20 bg-[#F8FAFC]">
-          <div className="mx-auto max-w-md px-4 text-center">
-            <div className="rounded-2xl bg-white border border-slate-200/90 shadow-md p-8 space-y-6">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+        <SEOHead title="Admin Sign In | ToolsCresta" description="Private administration login." canonicalPath="/admin" />
+        <div className="py-16 bg-[#F8FAFC] min-h-[70vh]">
+          <div className="mx-auto max-w-md px-4">
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-md p-8 space-y-6">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
                 <Lock className="h-7 w-7" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">ToolsCresta Admin Portal</h1>
-                <p className="mt-2 text-xs text-slate-500">
-                  Protected portal for authorized operators. Sign in with an authorized, verified Google account.
-                </p>
+                <h1 className="text-2xl font-bold text-slate-900">ToolsCresta Admin Login</h1>
+                <p className="mt-2 text-sm text-slate-500">Authorized Gmail and password required. No public account registration.</p>
               </div>
-
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition"
-              >
-                <svg className="h-4 w-4" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-                <span>Sign in with Google</span>
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
+                <div>
+                  <label htmlFor="admin-email" className="block text-sm font-semibold text-slate-700 mb-2">Gmail address</label>
+                  <input id="admin-email" name="email" type="email" required
+                    autoComplete="username" inputMode="email"
+                    value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="you@gmail.com"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100" />
+                </div>
+                <div>
+                  <label htmlFor="admin-password" className="block text-sm font-semibold text-slate-700 mb-2">Password</label>
+                  <div className="relative">
+                    <input id="admin-password" name="password" type={showPassword ? 'text' : 'password'}
+                      required autoComplete="current-password"
+                      value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="Enter admin password"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 pr-20 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100" />
+                    <button type="button" onClick={() => setShowPassword(v => !v)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-xs font-semibold text-slate-600 hover:bg-slate-100">
+                      {showPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                </div>
+                <button type="submit" disabled={loginBusy}
+                  className="w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                  {loginBusy ? 'Signing in…' : 'Secure Admin Login'}
+                </button>
+              </form>
+              <button type="button" disabled={resetBusy} onClick={handlePasswordReset}
+                className="text-sm font-semibold text-blue-600 hover:underline disabled:opacity-50">
+                {resetBusy ? 'Sending reset email…' : 'Forgot your password?'}
               </button>
-
-              {loginError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-left text-xs text-red-700">{loginError}</p>}
-              <div className="pt-2 text-[11px] text-slate-400">
-                Only the configured verified owner account can view this dashboard. Firestore permissions must also be enforced by Firebase rules.
-              </div>
+              {loginError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{loginError}</p>}
+              {loginNotice && <p role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">{loginNotice}</p>}
+              <p className="text-xs text-slate-500">Firebase verifies passwords securely. Admin data access is separately enforced by Firestore Security Rules.</p>
             </div>
           </div>
         </div>
       </>
+    );
+  }
+
+  // A newly created email/password admin needs verified Gmail ownership.
+  if (currentUser.email?.toLowerCase() === OWNER_EMAIL && !emailVerified) {
+    return (
+      <div className="py-20 max-w-md mx-auto px-4">
+        <div className="rounded-2xl border border-amber-200 bg-white p-8 space-y-5 shadow-sm">
+          <Mail className="h-8 w-8 text-amber-600" />
+          <h1 className="text-xl font-bold text-slate-900">Verify your Gmail address</h1>
+          <p className="text-sm text-slate-600">Your password is accepted, but admin access requires email verification. Check {OWNER_EMAIL}.</p>
+          <button type="button" disabled={verificationBusy} onClick={handleSendVerification}
+            className="w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white disabled:opacity-50">Send verification email</button>
+          <button type="button" disabled={verificationBusy} onClick={refreshVerification}
+            className="w-full rounded-xl border border-slate-300 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50">Refresh verification</button>
+          <button type="button" onClick={handleLogout} className="text-sm text-slate-500 hover:underline">Sign out</button>
+          {loginError && <p role="alert" className="text-sm text-red-700">{loginError}</p>}
+          {loginNotice && <p role="status" className="text-sm text-blue-800">{loginNotice}</p>}
+        </div>
+      </div>
     );
   }
 
