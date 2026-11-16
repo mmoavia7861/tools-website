@@ -3,9 +3,10 @@ import { SEOHead } from '../components/SEOHead';
 
 type Mode = 'pdf-to-word' | 'word-to-pdf';
 const MAX_BYTES = 10 * 1024 * 1024;
-const API_URL = (import.meta.env.VITE_CONVERTER_API_URL || '').trim().replace(/\/$/, '');
-const TURNSTILE_SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim();
-const ADOBE_CAPABLE = Boolean(TURNSTILE_SITE_KEY);
+// Cloud APIs are same-origin; Cloudflare routes /api/* while GitHub Pages serves the UI.
+// Fetch the PUBLIC Turnstile site key from the deployed Worker at runtime so that
+// a GitHub Pages rebuild is not required when a widget key is rotated.
+const FALLBACK_TURNSTILE_SITE_KEY = (import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim();
 
 
 async function convertLocally(file: File, mode: Mode): Promise<Blob> {
@@ -99,12 +100,23 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
   const [notice, setNotice] = useState('');
   const [method, setMethod] = useState<'browser' | 'adobe'>('browser');
   const [ADOBE_READY, setAdobeReady] = useState(false);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState(FALLBACK_TURNSTILE_SITE_KEY);
   useEffect(() => {
-    if (!ADOBE_CAPABLE) return;
     let cancelled = false;
-    fetch(API_URL + '/api/integrations/status', { cache: 'no-store' })
-      .then(response => response.ok ? response.json() : null)
-      .then(data => { if (!cancelled) setAdobeReady(Boolean(data?.adobe && data?.turnstile)); })
+    // Never send user files to an arbitrary preview origin. Only same-origin API
+    // requests are permitted by the Worker, and the Turnstile hostname must match.
+    fetch('/api/integrations/status', { cache: 'no-store' })
+      .then(async response => {
+        if (!response.ok || !(response.headers.get('content-type') || '').includes('application/json')) return null;
+        return response.json();
+      })
+      .then(data => {
+        if (cancelled) return;
+        const key = typeof data?.turnstileSiteKey === 'string' && data.turnstileSiteKey.trim()
+          ? data.turnstileSiteKey.trim() : FALLBACK_TURNSTILE_SITE_KEY;
+        setTurnstileSiteKey(key);
+        setAdobeReady(Boolean(data?.adobe && data?.turnstile && key));
+      })
       .catch(() => { if (!cancelled) setAdobeReady(false); });
     return () => { cancelled = true; };
   }, []);
@@ -122,7 +134,7 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
       const widgetApi = (window as any).turnstile;
       if (cancelled || !widgetElementRef.current || !widgetApi?.render || widgetIdRef.current) return;
       widgetIdRef.current = widgetApi.render(widgetElementRef.current, {
-        sitekey: TURNSTILE_SITE_KEY,
+        sitekey: turnstileSiteKey,
         callback: (value: string) => { setTurnstileToken(value); setVerificationStatus('Verification complete.'); },
         'expired-callback': () => { setTurnstileToken(''); setVerificationStatus('Verification expired.'); },
         'error-callback': () => { setTurnstileToken(''); setVerificationStatus('Security check failed. Try again.'); }
@@ -154,7 +166,7 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
       }
       setTurnstileToken('');
     };
-  }, [method, ADOBE_READY]);
+  }, [method, ADOBE_READY, turnstileSiteKey]);
 
   const title = toWord ? 'PDF to Word Converter' : 'Word to PDF Converter';
   const ext = toWord ? '.pdf' : '.docx';
@@ -174,7 +186,7 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
         const controller = new AbortController();
         const timer = window.setTimeout(() => controller.abort(), 120000);
         try {
-          const response = await fetch(API_URL + '/api/convert/' + mode, { method: 'POST', body: form, signal: controller.signal });
+          const response = await fetch('/api/convert/' + mode, { method: 'POST', body: form, signal: controller.signal });
           if (!response.ok) {
             const data = await response.json().catch(() => null);
             throw new Error(typeof data?.error === 'string' ? data.error : response.status === 429 ? 'Conversion limit reached. Please retry later.' : 'Adobe conversion failed.');
@@ -228,7 +240,7 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
         </label>
         <label className="mt-3 flex items-start gap-2 text-sm text-slate-800">
           <input type="radio" name="conversion-method" checked={method === 'adobe'} disabled={!ADOBE_READY} onChange={() => { setMethod('adobe'); setError(''); }} className="mt-1" />
-          <span><strong>Adobe PDF Services cloud conversion</strong><span className="block text-xs text-slate-500">{ADOBE_READY ? 'Adobe processes your file on its servers and may incur API charges. Complete verification to continue.' : 'Cloud mode is unavailable until Adobe credentials, Turnstile and the deployed Worker are configured.'}</span></span>
+          <span><strong>Adobe PDF Services cloud conversion</strong><span className="block text-xs text-slate-500">{ADOBE_READY ? 'Adobe processes your file on its servers. API usage may be billed to the site operator; complete verification to continue.' : 'Cloud mode not connected. Requires Adobe credentials, a valid Turnstile site key, and a production Cloudflare Worker route.'}</span></span>
         </label>
       </fieldset>
       {method === 'adobe' && ADOBE_READY && <>
