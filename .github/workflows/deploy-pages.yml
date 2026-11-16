@@ -23,6 +23,12 @@ on:
       - 'background-remover/**'
       - 'visiting-card-generator/**'
       - 'compress-video/**'
+      - 'pdf-to-word/**'
+      - 'word-to-pdf/**'
+      - 'ai-card-generator/**'
+      - 'wedding-card-maker/**'
+      - 'birthday-card-maker/**'
+      - 'admin/**'
       - 'blog/**'
   workflow_dispatch:
 
@@ -87,12 +93,12 @@ jobs:
           cp -R dist/assets assets
           cp dist/robots.txt robots.txt
           cp dist/sitemap.xml sitemap.xml
-          for route in about contact privacy-policy terms acceptable-use copyright-dmca qr-code-generator compress-pdf image-to-pdf edit-pdf background-remover visiting-card-generator compress-video blog; do
+          for route in about contact privacy-policy terms acceptable-use copyright-dmca qr-code-generator compress-pdf image-to-pdf edit-pdf background-remover visiting-card-generator compress-video pdf-to-word word-to-pdf ai-card-generator wedding-card-maker birthday-card-maker admin blog; do
             rm -rf "$route"
             cp -R "dist/$route" "$route"
           done
           touch .nojekyll
-          git add index.html 404.html assets robots.txt sitemap.xml .nojekyll about contact privacy-policy terms acceptable-use copyright-dmca qr-code-generator compress-pdf image-to-pdf edit-pdf background-remover visiting-card-generator compress-video blog
+          git add index.html 404.html assets robots.txt sitemap.xml .nojekyll about contact privacy-policy terms acceptable-use copyright-dmca qr-code-generator compress-pdf image-to-pdf edit-pdf background-remover visiting-card-generator compress-video pdf-to-word word-to-pdf ai-card-generator wedding-card-maker birthday-card-maker admin blog
           if git diff --cached --quiet; then
             echo 'Production build already present at main/root.'
           else
