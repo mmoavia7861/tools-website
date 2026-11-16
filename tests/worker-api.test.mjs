@@ -514,6 +514,95 @@ test('Adobe REST create flow uploads DOCX and returns PDF (mocked upstream)', as
   } finally { globalThis.fetch = originalFetch; }
 });
 
+
+test('Adobe IMS OAuth invalid_client is diagnosed without exposing upstream data', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('/turnstile/v0/siteverify')) return Response.json({ success: true, hostname: 'toolscresta.com' });
+      if (String(url) === 'https://ims-na1.adobelogin.com/ims/token/v3') {
+        return Response.json({
+          error: 'invalid_client',
+          error_description: 'SECRET-DATA-MUST-NEVER-REACH-USERS'
+        }, { status: 400 });
+      }
+      throw new Error('Unexpected upstream request');
+    };
+    const form = new FormData();
+    form.append('file', new File([new TextEncoder().encode('%PDF-1.7\\nmock')], 'demo.pdf'));
+    form.append('turnstileToken', 'fresh-turnstile');
+    const result = await worker.fetch(new Request(base + '/api/convert/pdf-to-word', {
+      method: 'POST', headers: { Origin: base, 'CF-Connecting-IP': '198.51.100.177' }, body: form
+    }), { ...env, ADOBE_CLIENT_ID: 'test-client', ADOBE_CLIENT_SECRET: 'test-secret', TURNSTILE_SECRET: 'test-turnstile' });
+    assert.equal(result.status, 503);
+    const body = await result.json();
+    assert.match(body.error, /invalid_client/);
+    assert.doesNotMatch(body.error, /SECRET-DATA|test-client|test-secret/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Adobe IMS OAuth invalid_scope explains how to correct Cloudflare scopes', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('/turnstile/v0/siteverify')) return Response.json({ success: true, hostname: 'toolscresta.com' });
+      if (String(url) === 'https://ims-na1.adobelogin.com/ims/token/v3')
+        return Response.json({ error: 'invalid_scope', error_description: 'PRIVATE' }, { status: 400 });
+      throw new Error('Unexpected upstream request');
+    };
+    const form = new FormData();
+    form.append('file', new File([new TextEncoder().encode('%PDF-1.7\\nmock')], 'demo.pdf'));
+    form.append('turnstileToken', 'fresh-turnstile');
+    const result = await worker.fetch(new Request(base + '/api/convert/pdf-to-word', {
+      method: 'POST', headers: { Origin: base, 'CF-Connecting-IP': '198.51.100.178' }, body: form
+    }), { ...env, ADOBE_CLIENT_ID: 'test-client', ADOBE_CLIENT_SECRET: 'test-secret', TURNSTILE_SECRET: 'test-turnstile' });
+    assert.equal(result.status, 503);
+    const body = await result.json();
+    assert.match(body.error, /invalid_scope/);
+    assert.match(body.error, /ADOBE_OAUTH_SCOPES/);
+    assert.doesNotMatch(body.error, /PRIVATE/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Adobe cloud permits PDF inputs over old 10 MB limit and reaches IMS token step', async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('/turnstile/v0/siteverify')) return Response.json({ success: true, hostname: 'toolscresta.com' });
+      if (String(url) === 'https://ims-na1.adobelogin.com/ims/token/v3')
+        return Response.json({ error: 'invalid_client' }, { status: 400 });
+      throw new Error('Unexpected upstream request');
+    };
+    // 11 MiB: previously rejected by the hard-coded 10 MiB limit.
+    const pdfBytes = new Uint8Array(11 * 1024 * 1024);
+    pdfBytes.set(new TextEncoder().encode('%PDF-1.7'));
+    const form = new FormData();
+    form.append('file', new File([pdfBytes], 'large.pdf', { type: 'application/pdf' }));
+    form.append('turnstileToken', 'fresh-turnstile');
+    const response = await worker.fetch(new Request(base + '/api/convert/pdf-to-word', {
+      method: 'POST', headers: { Origin: base, 'CF-Connecting-IP': '198.51.100.179' }, body: form
+    }), { ...env, ADOBE_CLIENT_ID: 'test-client', ADOBE_CLIENT_SECRET: 'test-secret', TURNSTILE_SECRET: 'test-turnstile' });
+    assert.equal(response.status, 503);
+    assert.match((await response.json()).error, /invalid_client/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Adobe requests exceeding 50 MiB are rejected before parsing uploaded data', async () => {
+  const payload = new FormData();
+  payload.append('file', new File([new TextEncoder().encode('%PDF-1.7\\nmock')], 'demo.pdf'));
+  const response = await worker.fetch(new Request(base + '/api/convert/pdf-to-word', {
+    method: 'POST',
+    headers: {
+      Origin: base,
+      'CF-Connecting-IP': '198.51.100.180',
+      'Content-Length': String(51 * 1024 * 1024),
+    },
+    body: payload
+  }), { ...env, ADOBE_CLIENT_ID: 'test-client', ADOBE_CLIENT_SECRET: 'test-secret', TURNSTILE_SECRET: 'test-turnstile' });
+  assert.equal(response.status, 413);
+  assert.match((await response.json()).error, /50 MB/);
+});
+
 for (const providerStatus of [400, 401, 403, 429, 503]) {
   test('Adobe token auth HTTP ' + providerStatus + ' is diagnosed without leaking secrets', async () => {
     const originalFetch = globalThis.fetch;
