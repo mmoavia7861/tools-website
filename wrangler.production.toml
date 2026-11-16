@@ -12,6 +12,8 @@ keep_vars = true
 # Keep this in sync with Cloudflare Dashboard > Runtime variables.
 [vars]
 ADOBE_OAUTH_SCOPES = "openid,AdobeID,DCAPI,additional_info.projectedProductContext"
+# Verified Resend sending address; non-secret, stable across GitHub deploys.
+OTP_FROM_EMAIL = "security@toolscresta.com"
 
 [assets]
 directory = "./dist"
