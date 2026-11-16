@@ -429,7 +429,7 @@ test('Adobe REST export flow uploads a real PDF and downloads DOCX (mocked upstr
       }
       if (String(url) === 'https://pdf-services.adobe.io/operation/exportpdf') {
         assert.equal(JSON.parse(options.body).targetFormat, 'docx');
-        return new Response('', { status: 201, headers: { location: jobStatus } });
+        return new Response('', { status: 201, headers: { location: '/operation/exportpdf/test-job/status' } });
       }
       if (String(url) === jobStatus) {
         return Response.json({ status: 'done', asset: { downloadUri: storage } });
@@ -452,6 +452,72 @@ test('Adobe REST export flow uploads a real PDF and downloads DOCX (mocked upstr
     assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.deepEqual([...new Uint8Array(await response.arrayBuffer())].slice(0,2), [0x50,0x4b]);
     assert.equal(calls.length, 7);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Adobe job HTTP 201 without Location identifies missing header safely', async () => {
+  const originalFetch = globalThis.fetch;
+  const storage = 'https://dcplatformstorageservice-prod-us-east-1.s3-accelerate.amazonaws.com/file?X-Amz-Signature=sample';
+  try {
+    globalThis.fetch = async (url, options = {}) => {
+      const target = String(url);
+      if (target.includes('/turnstile/v0/siteverify'))
+        return Response.json({ success: true, hostname: 'toolscresta.com' });
+      if (target.endsWith('/ims/token/v3'))
+        return Response.json({ access_token: 'mock-access-token' });
+      if (target.endsWith('/assets'))
+        return Response.json({ assetID: 'urn:aaid:AS:UE1:test', uploadUri: storage });
+      if (target === storage && options.method === 'PUT')
+        return new Response('', { status: 200 });
+      if (target.endsWith('/operation/exportpdf'))
+        return new Response('', { status: 201 });
+      throw new Error('Unexpected upstream request');
+    };
+    const form = new FormData();
+    form.append('file', new File([new TextEncoder().encode('%PDF-1.7\\nmock')], 'demo.pdf'));
+    form.append('turnstileToken', 'fresh-token-abc');
+    const resp = await worker.fetch(new Request(base + '/api/convert/pdf-to-word', {
+      method: 'POST', headers: { Origin: base, 'CF-Connecting-IP': '198.51.100.222' }, body: form
+    }), { ...env, ADOBE_CLIENT_ID: 'client', ADOBE_CLIENT_SECRET: 'secret', TURNSTILE_SECRET: 'secret' });
+    assert.equal(resp.status, 502);
+    const body = await resp.json();
+    assert.match(body.error, /did not send a Location header/);
+    assert.match(body.error, /Job HTTP 201; missing/);
+    assert.doesNotMatch(body.error, /mock-access-token|X-Amz-Signature/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Adobe rejects untrusted job Location without fetching it or exposing its URL', async () => {
+  const originalFetch = globalThis.fetch;
+  const storage = 'https://dcplatformstorageservice-prod-us-east-1.s3-accelerate.amazonaws.com/file?X-Amz-Signature=sample';
+  let fetchedUntrusted = false;
+  try {
+    globalThis.fetch = async (url, options = {}) => {
+      const target = String(url);
+      if (target.includes('untrusted.example')) { fetchedUntrusted = true; throw new Error('Unsafe request'); }
+      if (target.includes('/turnstile/v0/siteverify'))
+        return Response.json({ success: true, hostname: 'toolscresta.com' });
+      if (target.endsWith('/ims/token/v3'))
+        return Response.json({ access_token: 'mock-access-token' });
+      if (target.endsWith('/assets'))
+        return Response.json({ assetID: 'urn:aaid:AS:UE1:test', uploadUri: storage });
+      if (target === storage && options.method === 'PUT')
+        return new Response('', { status: 200 });
+      if (target.endsWith('/operation/exportpdf'))
+        return new Response('', { status: 201, headers: { location: 'https://untrusted.example/operation/exportpdf/secret/status' } });
+      throw new Error('Unexpected upstream request');
+    };
+    const form = new FormData();
+    form.append('file', new File([new TextEncoder().encode('%PDF-1.7\\nmock')], 'demo.pdf'));
+    form.append('turnstileToken', 'fresh-token-xyz');
+    const resp = await worker.fetch(new Request(base + '/api/convert/pdf-to-word', {
+      method: 'POST', headers: { Origin: base, 'CF-Connecting-IP': '198.51.100.223' }, body: form
+    }), { ...env, ADOBE_CLIENT_ID: 'client', ADOBE_CLIENT_SECRET: 'secret', TURNSTILE_SECRET: 'secret' });
+    assert.equal(resp.status, 502);
+    const body = await resp.json();
+    assert.match(body.error, /untrusted/);
+    assert.doesNotMatch(body.error, /untrusted\\.example|secret\\/status/);
+    assert.equal(fetchedUntrusted, false);
   } finally { globalThis.fetch = originalFetch; }
 });
 
