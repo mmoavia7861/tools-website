@@ -1,6 +1,26 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- ToolsCresta Google tag: only this container; do not install duplicate tags. -->
+    <!-- Consent Mode v2 defaults are applied before the Google tag loads. -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ window.dataLayer.push(arguments); }
+      gtag('consent', 'default', {
+        'analytics_storage': 'denied',
+        'ad_storage': 'denied',
+        'ad_user_data': 'denied',
+        'ad_personalization': 'denied'
+      });
+      try {
+        var savedAnalyticsConsent = JSON.parse(localStorage.getItem('toolscresta_privacy_consent') || 'null');
+        if (savedAnalyticsConsent && savedAnalyticsConsent.analytics === true) {
+          gtag('consent', 'update', { 'analytics_storage': 'granted' });
+        }
+      } catch (_) { /* Malformed privacy setting stays denied. */ }
+      gtag('js', new Date());
+    </script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=GTM-TLK8X39X"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ToolsCresta — Free Online QR, PDF, Video &amp; Image Tools</title>
