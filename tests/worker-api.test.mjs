@@ -522,7 +522,7 @@ for (const providerStatus of [400, 401, 403, 429, 503]) {
         if (String(url).includes('/turnstile/v0/siteverify')) {
           return Response.json({ success: true, hostname: 'toolscresta.com' });
         }
-        assert.match(String(url), /pdf-services\.adobe\.io\/token/);
+        assert.match(String(url), /ims-na1\.adobelogin\.com\/ims\/token\/v3/);
         return Response.json({ error: 'private upstream body with secret data' }, { status: providerStatus });
       };
       const form = new FormData();
