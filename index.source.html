@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- ToolsCresta Google tag: only this container; do not install duplicate tags. -->
+    <!-- ToolsCresta GA4 tag: exactly one direct Analytics destination. -->
     <!-- Consent Mode v2 defaults are applied before the Google tag loads. -->
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -19,8 +19,11 @@
         }
       } catch (_) { /* Malformed privacy setting stays denied. */ }
       gtag('js', new Date());
+      // GA4 Web stream shown in Analytics > Admin > Data streams.
+      // Keep a single destination; Enhanced Measurement handles SPA history changes.
+      gtag('config', 'G-MG3M619V4F');
     </script>
-    <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-TLK8X39X"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-MG3M619V4F"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ToolsCresta — Free Online QR, PDF, Video &amp; Image Tools</title>
