@@ -31,7 +31,9 @@ function output(status, body) {
     },
   });
 }
-function failed(message, status = 400) { return output(status, { success: false, error: message }); }
+function failed(message, status = 400, errorCode) {
+  return output(status, { success: false, error: message, ...(errorCode ? { errorCode } : {}) });
+}
 
 // Return only the *names* of missing runtime bindings. NEVER expose secrets.
 function otpMissingConfiguration(env) {
@@ -140,26 +142,30 @@ export class AdminOtpState {
         }
         // Store a hash, never the code. One active challenge per owner/session.
         await storage.put("sendHistory", [...sent, now]);
+        const expiresAt = now + MAX_CODE_AGE_MS;
         await storage.put("challenge", { hash: input.hash, authTime: input.authTime,
-          uid: input.uid, attempts: 0, expiresAt: now + MAX_CODE_AGE_MS });
-        return output(200, { success: true });
+          uid: input.uid, attempts: 0, expiresAt });
+        return output(200, { success: true, expiresAt });
       }
       if (action === "consume") {
         const lockedUntil = await storage.get("lockedUntil") || 0;
         if (lockedUntil > now) return failed("Too many code attempts. Try later.", 429);
         const challenge = await storage.get("challenge");
-        if (!challenge || challenge.expiresAt < now ||
-          challenge.authTime !== input.authTime || challenge.uid !== input.uid) {
-          return failed("Code expired or unavailable. Request a new code.", 403);
+        if (!challenge) return failed("No active verification code for this login. Request a new code.", 403, "CODE_UNAVAILABLE");
+        if (challenge.expiresAt <= now) {
+          await storage.delete("challenge");
+          return failed("This verification code has expired. Request a new code.", 403, "CODE_EXPIRED");
         }
-        if (challenge.attempts >= 5) return failed("Too many code attempts.", 429);
+        if (challenge.authTime !== input.authTime || challenge.uid !== input.uid)
+          return failed("Your password session changed. Sign in again to request a fresh code.", 403, "SESSION_CHANGED");
+        if (challenge.attempts >= 5) return failed("Too many code attempts.", 429, "CODE_LOCKED");
         if (!timingSafeEqual(challenge.hash, input.hash)) {
           challenge.attempts += 1;
           if (challenge.attempts >= 5) {
             await storage.delete("challenge");
             await storage.put("lockedUntil", now + 15 * 60 * 1000);
           } else await storage.put("challenge", challenge);
-          return failed("Invalid verification code.", 403);
+          return failed("Invalid verification code.", 403, "CODE_INVALID");
         }
         await storage.delete("challenge");
         return output(200, { success: true });
@@ -266,12 +272,16 @@ export async function handleAdminOtp(request, env, path) {
       await stateCall(env, principal.uid, "cancel", { authTime: principal.authTime });
       return failed("Email service could not send the code. Check the verified sender domain and provider configuration.", 502);
     }
-    return output(200, { success: true, message: "Verification code sent to the authorized Gmail address." });
+    return output(200, {
+      success: true,
+      message: "Verification code sent to the authorized Gmail address.",
+      expiresAt: issued.body.expiresAt
+    });
   }
   if (!/^\d{6}$/.test(body.code || "")) return failed("Enter the six-digit verification code.");
   const hash = await digestOtp(env.OTP_HASH_SECRET, principal.uid, principal.authTime, body.code);
   const verified = await stateCall(env, principal.uid, "consume", { hash, authTime: principal.authTime });
-  if (!verified.body.success) return failed(verified.body.error, verified.status);
+  if (!verified.body.success) return failed(verified.body.error, verified.status, verified.body.errorCode);
   try {
     const customToken = await mintOtpVerifiedCustomToken(env, principal.uid);
     return output(200, { success: true, customToken });
