@@ -27,3 +27,7 @@ jobs:
         run: npm run test:api
       - name: Production build
         run: npm run build:production
+      - name: Install Chromium for converter smoke tests
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end free PDF/Word conversion smoke tests
+        run: node tests/converter-browser-smoke.mjs
