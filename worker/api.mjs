@@ -350,12 +350,31 @@ async function handleImageCard(request, env) {
   });
 }
 
-function safeAdobeApiUrl(input) {
+/**
+ * Resolve Adobe's asynchronous job-polling Location header.
+ * Accepts documented HTTPS URLs and same-origin relative /operation/... paths.
+ * Never use an arbitrary upstream URL with our Adobe bearer token (SSRF guard).
+ * Returns a safe classification only; never echoes the original URL publicly.
+ */
+function resolveAdobeJobLocation(input, operation) {
+  if (typeof input !== "string" || !input.trim()) return { reason: "missing" };
+  const value = input.trim();
+  if (value.length > 2048 || /[\\\\\s\u0000-\u001f\u007f]/.test(value))
+    return { reason: "invalid_format" };
+  let u;
   try {
-    const u = new URL(input);
-    return u.protocol === "https:" && u.hostname === "pdf-services.adobe.io" &&
-      u.pathname.startsWith("/operation/") && !u.username && !u.password;
-  } catch { return false; }
+    if (value.startsWith("/operation/")) u = new URL(value, ADOBE_BASE);
+    else if (value.startsWith("operation/")) u = new URL("/" + value, ADOBE_BASE);
+    else if (value.startsWith("https://")) u = new URL(value);
+    else return { reason: "invalid_format" };
+  } catch { return { reason: "invalid_format" }; }
+  if (u.origin !== ADOBE_BASE || u.username || u.password || u.search || u.hash)
+    return { reason: "untrusted_origin_or_query" };
+  if (!["exportpdf", "createpdf"].includes(operation)) return { reason: "invalid_operation" };
+  // A specific job status URL, not just an /operation/* URL, is required.
+  const expected = new RegExp("^/operation/" + operation + "/[a-zA-Z0-9._:%-]{1,256}/status/?$");
+  if (!expected.test(u.pathname)) return { reason: "unexpected_path" };
+  return { url: u.href };
 }
 function safeAdobeStorageUrl(input) {
   try {
@@ -474,14 +493,23 @@ async function handleAdobe(request, env, mode) {
         ? { assetID: asset.assetID, targetFormat: "docx" }
         : { assetID: asset.assetID }),
     }, client, auth);
-    const location = job.headers.get("location");
-    if (!safeAdobeApiUrl(location)) return error("Adobe returned an invalid job location.", 502);
+    const location = resolveAdobeJobLocation(job.headers.get("location"), op);
+    if (!location.url) {
+      // Only a non-sensitive category and the job HTTP status are surfaced.
+      // NEVER echo Adobe's raw Location header, which may contain tokens.
+      const detail = location.reason === "missing"
+        ? "Adobe did not send a Location header for this conversion job."
+        : location.reason === "unexpected_path"
+          ? "Adobe returned an unexpected job-status path."
+          : "Adobe returned an untrusted or malformed job-status URL.";
+      return error(detail + " (Job HTTP " + job.status + "; " + location.reason + "). Please retry, or check Cloudflare Worker logs.", 502);
+    }
     const deadline = Date.now() + MAX_ADOBE_WAIT_MS;
     // Workers Free permits 50 external subrequests per invocation. Poll at most
     // 22 times, preserving room for Siteverify, token, upload and download.
     let polls = 0;
     while (Date.now() < deadline && polls++ < 22) {
-      const response = await adobeJSON(location, { method: "GET" }, client, auth);
+      const response = await adobeJSON(location.url, { method: "GET" }, client, auth);
       const status = await response.json();
       if (status.status === "failed") return error("Adobe could not convert this document.", 422);
       if (status.status === "done") {
