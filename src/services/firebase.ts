@@ -9,7 +9,7 @@ import {
   getIdTokenResult,
   reload,
   signOut,
-  onAuthStateChanged,
+  onIdTokenChanged,
   type User
 } from 'firebase/auth';
 import {
@@ -109,7 +109,7 @@ export {
   getIdTokenResult,
   reload,
   signOut,
-  onAuthStateChanged,
+  onIdTokenChanged,
   getDocFromServer,
   doc,
   collection,
