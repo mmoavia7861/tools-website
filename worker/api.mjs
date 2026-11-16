@@ -480,7 +480,14 @@ export default {
       return env.ASSETS.fetch(request);
     }
     if (request.method === "GET" && path === "/api/integrations/status") {
-      return reply({ success: true, ...available(env) });
+      return reply({ success: true, ...available(env), pdfServerCompression: false });
+    }
+    if (request.method === "GET" && path === "/api/health") {
+      return reply({ success: true, status: "ok", service: "toolscresta-api" });
+    }
+    if (request.method === "GET" && path === "/api/admin/status") {
+      const providers = available(env);
+      return reply({ success: true, aiProvider: { name: providers.gemini ? "Gemini" : providers.workersAi ? "Cloudflare Workers AI" : "Not configured", isConfigured: providers.gemini || providers.workersAi }, providers, pdfServerCompression: false });
     }
     if (request.method !== "POST") return error("Unsupported method.", 405);
     const origin = request.headers.get("Origin");
