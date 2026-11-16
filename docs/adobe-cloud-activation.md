@@ -11,7 +11,7 @@ The PDF to Word and Word to PDF pages have TWO independent modes:
 - Readiness endpoint: https://toolscresta.com/api/integrations/status
 - Backend: worker/api.mjs deployed using the EXISTING wrangler.production.toml.
 - Turnstile validation requires the hostname to be exactly toolscresta.com.
-- Adobe PDF Services authenticates at https://pdf-services.adobe.io/token and uses assets, operations, async polling, and signed upload/download URLs.
+- Adobe OAuth Server-to-Server credentials authenticate at https://ims-na1.adobelogin.com/ims/token/v3 using grant_type=client_credentials and comma-separated scopes. The resulting bearer token is then used for Adobe PDF Services assets, operations, async polling, and signed upload/download URLs.
 
 ## Production activation
 
@@ -28,6 +28,7 @@ The PDF to Word and Word to PDF pages have TWO independent modes:
    `npx wrangler secret put TURNSTILE_SITE_KEY --config wrangler.production.toml`
 
    TURNSTILE_SITE_KEY is PUBLIC, but setting it as a Worker secret avoids a separate public build-time configuration. Never put TURNSTILE_SECRET into the Site Key field.
+   If your Adobe Developer Console lists OAuth Server-to-Server scopes such as `openid,AdobeID,DCAPI,additional_info.projectedProductContext`, the Worker uses these by default. For a different credential scope set, configure optional `ADOBE_OAUTH_SCOPES` (comma-separated, *non-secret*) in Cloudflare. Never paste an access token into `ADOBE_CLIENT_SECRET`.
 4. **Do not attach a competing Worker route.** Existing production Worker deployment/domain mapping must be checked before making Cloudflare routing changes.
    - If the site is already hosted on the production Worker, make sure its /api/* paths run worker/api.mjs.
    - If the site is still hosted externally, configure a proxied Cloudflare route for `toolscresta.com/api/*` to the appropriate Worker, without changing the public website's root routing.
@@ -48,13 +49,14 @@ The PDF to Word and Word to PDF pages have TWO independent modes:
 
 - Adobe mode disabled: /api/integrations/status unavailable, returns HTML instead of JSON, or required runtime credentials/site key are missing.
 - Verification 403: token expired/used, wrong Turnstile secret, or Turnstile widget hostname mismatch.
-- Adobe token 400/401/403: check Client ID, Client Secret, account entitlement; never log or return the secret.
+- Adobe IMS OAuth 400/401/403: verify Client ID, matching Client Secret, Server-to-Server scopes and product profile. The legacy /token API is not used for this credential; never log or return the secret.
 - Adobe 429: provider quota reached; cannot be bypassed by the frontend.
 - Adobe upload/download 502: inspect Worker logs for status category and signed S3 host compatibility (do NOT log signed URLs or document contents).
 - Cloudflare API calls 404: confirm the real domain routes /api/* to worker/api.mjs.
 - Never replace Adobe output with mock data or misleading "conversion succeeded" UI.
 
 References:
+- https://developer.adobe.com/developer-console/docs/guides/authentication/ServerToServerAuthentication/ims
 - https://developer.adobe.com/document-services/docs/overview/pdf-services-api/gettingstarted
 - https://developer.adobe.com/document-services/docs/overview/pdf-services-api/howtos/export-pdf
 - https://developer.adobe.com/document-services/docs/overview/pdf-services-api/howtos/create-pdf
