@@ -516,7 +516,7 @@ test('Adobe rejects untrusted job Location without fetching it or exposing its U
     assert.equal(resp.status, 502);
     const body = await resp.json();
     assert.match(body.error, /untrusted/);
-    assert.doesNotMatch(body.error, /untrusted\\.example|secret\\/status/);
+    assert.doesNotMatch(body.error, /untrusted\.example|secret\/status/);
     assert.equal(fetchedUntrusted, false);
   } finally { globalThis.fetch = originalFetch; }
 });
