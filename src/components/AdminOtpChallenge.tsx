@@ -5,6 +5,21 @@ import { auth } from '../services/firebase';
 
 type OtpReply = { success?: boolean; error?: string; message?: string; customToken?: string };
 
+async function checkOtpConfiguration(user: User): Promise<string[]> {
+  try {
+    const response = await fetch('/api/admin/otp/status', {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { 'Authorization': 'Bearer ' + await user.getIdToken() },
+      cache: 'no-store'
+    });
+    if (!response.ok) return [];
+    const report = await response.json() as { configured?: boolean; missing?: unknown };
+    return Array.isArray(report.missing) ?
+      report.missing.filter((item): item is string => typeof item === 'string') : [];
+  } catch { return []; }
+}
+
 async function postOtp(user: User, action: 'send' | 'verify', code?: string): Promise<OtpReply> {
   const token = await user.getIdToken();
   const response = await fetch('/api/admin/otp/' + action, {
@@ -37,7 +52,11 @@ export function AdminOtpChallenge({ user }: { user: User }) {
       setSent(true);
       setNotice(result.message || 'Verification code sent. Check your Gmail inbox.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to send verification code.');
+      const reason = err instanceof Error ? err.message : 'Unable to send verification code.';
+      const missing = await checkOtpConfiguration(user);
+      setError(missing.length
+        ? 'Cloudflare OTP configuration incomplete. Missing or invalid setting names: ' + missing.join(', ') + '. No secret values are displayed.'
+        : reason);
     } finally {
       setSending(false);
     }
