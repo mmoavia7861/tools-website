@@ -24,3 +24,19 @@ html_handling = "auto-trailing-slash"
 # The binding has no API key. It is required for AI background generation.
 [ai]
 binding = "AI"
+
+# Owner-only admin email OTP, stateful one-time codes and strict rate limiting.
+# SQLite-backed Durable Objects are available on Cloudflare Workers Free.
+[[durable_objects.bindings]]
+name = "ADMIN_OTP"
+class_name = "AdminOtpState"
+
+[[migrations]]
+tag = "toolscresta-admin-otp-v1"
+new_sqlite_classes = ["AdminOtpState"]
+
+# These values are RUNTIME SECRETS and must never enter git or [vars]:
+#   RESEND_API_KEY, OTP_HASH_SECRET,
+#   FIREBASE_SERVICE_ACCOUNT_EMAIL, FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY
+# Non-secret runtime variable (from an email address on a verified sending domain):
+#   OTP_FROM_EMAIL = security@toolscresta.com
