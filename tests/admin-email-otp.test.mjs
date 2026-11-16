@@ -55,7 +55,7 @@ function envFor(key) {
       RESEND_API_KEY: 're_TEST_BUT_LONG_ENOUGH',
       OTP_FROM_EMAIL: 'security@toolscresta.com',
       OTP_HASH_SECRET: 'a-long-independent-otp-hmac-server-secret-0123456789',
-      FIREBASE_SERVICE_ACCOUNT_EMAIL: 'otp@example.iam.gserviceaccount.com',
+      FIREBASE_SERVICE_ACCOUNT_EMAIL: 'toolscresta-otp-signer@gen-lang-client-0295520231.iam.gserviceaccount.com',
       FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY: key.pem,
       ADMIN_OTP: { idFromName: uid => uid, get: () => fake },
     },
@@ -280,9 +280,74 @@ test('A broken Firebase signing key cannot consume a valid one-time code', async
     env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY = 'invalid signing private key';
     const failed = await handleAdminOtp(post('verify', { code: sentCode }), env, '/api/admin/otp/verify');
     assert.equal(failed.status, 503);
-    assert.equal((await failed.json()).errorCode, 'SIGNING_UNAVAILABLE');
+    assert.equal((await failed.json()).errorCode, 'SIGNER_PEM_FORMAT');
     env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY = validKey;
     const retry = await handleAdminOtp(post('verify', { code: sentCode }), env, '/api/admin/otp/verify');
     assert.equal(retry.status, 200, 'valid code should remain available after a transient key failure');
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+
+test('Cloudflare secret formats: raw PEM, escaped newlines, JSON-escaped PEM and service-account JSON', async () => {
+  const key = await keypair();
+  const { env } = envFor(key);
+  const variants = [
+    key.pem,
+    key.pem.replace(/\n/g, '\\n'),
+    JSON.stringify(key.pem),
+    JSON.stringify({
+      type: 'service_account', project_id: project,
+      client_email: env.FIREBASE_SERVICE_ACCOUNT_EMAIL,
+      private_key: key.pem
+    })
+  ];
+  for (const secret of variants) {
+    env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY = secret;
+    const token = await mintOtpVerifiedCustomToken(env, 'existing-owner-uid');
+    const [header, payload, signature] = token.split('.');
+    assert.equal(JSON.parse(Buffer.from(payload, 'base64url').toString()).uid, 'existing-owner-uid');
+    assert.equal(await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key.pair.publicKey,
+      Buffer.from(signature, 'base64url'), new TextEncoder().encode(header + '.' + payload)), true);
+  }
+});
+
+test('Reject wrong project and mismatched service-account JSON without emitting secret text', async () => {
+  const key = await keypair();
+  const { env } = envFor(key);
+  env.FIREBASE_SERVICE_ACCOUNT_EMAIL = 'otp@other-project.iam.gserviceaccount.com';
+  await assert.rejects(mintOtpVerifiedCustomToken(env, 'owner'));
+  env.FIREBASE_SERVICE_ACCOUNT_EMAIL = 'toolscresta-otp-signer@' + project + '.iam.gserviceaccount.com';
+  env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY = JSON.stringify({
+    type: 'service_account', project_id: project,
+    client_email: 'different@' + project + '.iam.gserviceaccount.com',
+    private_key: key.pem
+  });
+  await assert.rejects(mintOtpVerifiedCustomToken(env, 'owner'));
+});
+
+test('Do not issue any OTP or call Resend if signer is malformed', async () => {
+  const key = await keypair();
+  const { env, fake } = envFor(key);
+  env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY = 'not a private key';
+  const jwt = await passwordToken(key.pair);
+  const originalFetch = globalThis.fetch;
+  let mailSent = false;
+  try {
+    globalThis.fetch = async url => {
+      if (String(url).includes('jwk/securetoken@')) return Response.json({ keys: [key.jwk] });
+      if (String(url) === 'https://api.resend.com/emails') { mailSent = true; return Response.json({ id: 'fail' }); }
+      throw Error('Unexpected upstream request');
+    };
+    const response = await handleAdminOtp(new Request(origin + '/api/admin/otp/send', {
+      method: 'POST',
+      headers: { Origin: origin, Authorization: 'Bearer ' + jwt, 'Content-Type': 'application/json' },
+      body: '{}'
+    }), env, '/api/admin/otp/send');
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.errorCode, 'SIGNER_PEM_FORMAT');
+    assert.equal(body.error.includes('not a private key'), false);
+    assert.equal(fake.map.has('challenge'), false);
+    assert.equal(mailSent, false);
   } finally { globalThis.fetch = originalFetch; }
 });
