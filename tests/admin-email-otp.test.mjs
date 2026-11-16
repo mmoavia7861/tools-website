@@ -196,3 +196,57 @@ test('Only a verified owner password session can see missing binding names (not 
     assert.equal('missing' in await invalid.json(), false);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+
+test('Six-digit OTP expiry is reported separately from lost or changed login challenges', async () => {
+  const state = fakeDurableObject();
+  const call = async (action, hash, authTime = 123) => {
+    const r = await state.fetch(new Request('https://internal/command', {
+      method: 'POST',
+      body: JSON.stringify({ uid: 'owner', action, hash, authTime })
+    }));
+    return { status: r.status, data: await r.json() };
+  };
+  const original = await call('issue', 'a'.repeat(43));
+  assert.equal(original.status, 200);
+  assert.ok(original.data.expiresAt > Date.now());
+  assert.ok(original.data.expiresAt <= Date.now() + 5 * 60 * 1000);
+  const changedSession = await call('consume', 'a'.repeat(43), 124);
+  assert.equal(changedSession.data.errorCode, 'SESSION_CHANGED');
+  // An immediate consume for the matching session still works.
+  assert.equal((await call('consume', 'a'.repeat(43))).status, 200);
+  const used = await call('consume', 'a'.repeat(43));
+  assert.equal(used.data.errorCode, 'CODE_UNAVAILABLE');
+  // Build an expired challenge without actually waiting five minutes.
+  state.map.set('sendHistory', []);
+  assert.equal((await call('issue', 'b'.repeat(43))).status, 200);
+  const stale = state.map.get('challenge');
+  stale.expiresAt = Date.now() - 1000;
+  state.map.set('challenge', stale);
+  const expired = await call('consume', 'b'.repeat(43));
+  assert.equal(expired.data.errorCode, 'CODE_EXPIRED');
+  assert.equal(state.map.has('challenge'), false);
+});
+
+test('Server provides actual code expiration time after a successful send', async () => {
+  const key = await keypair();
+  const { env } = envFor(key);
+  const jwt = await passwordToken(key.pair);
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async url => {
+      if (String(url).includes('jwk/securetoken@')) return Response.json({ keys: [key.jwk] });
+      if (String(url) === 'https://api.resend.com/emails') return Response.json({ id: 'mail-id' });
+      throw Error('Unexpected fetch ' + String(url));
+    };
+    const response = await handleAdminOtp(new Request(origin + '/api/admin/otp/send', {
+      method: 'POST',
+      headers: { Origin: origin, Authorization: 'Bearer ' + jwt, 'Content-Type': 'application/json' },
+      body: '{}'
+    }), env, '/api/admin/otp/send');
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.success, true);
+    assert.ok(result.expiresAt > Date.now());
+  } finally { globalThis.fetch = originalFetch; }
+});
