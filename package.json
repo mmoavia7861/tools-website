@@ -12,7 +12,7 @@
     "lint": "tsc --noEmit",
     "test": "tsx --test src/utils/*.test.ts",
     "build:production": "node scripts/build-production.mjs",
-    "test:api": "node --test tests/worker-api.test.mjs"
+    "test:api": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
