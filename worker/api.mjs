@@ -394,6 +394,9 @@ function resolveAdobeJobLocation(input, operation) {
   return { url: url.href };
 }
 
+// Export pure validator for security-focused regression tests.
+export { resolveAdobeJobLocation };
+
 function safeAdobeStorageUrl(input) {
   try {
     const u = new URL(input);
