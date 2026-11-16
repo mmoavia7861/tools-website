@@ -411,9 +411,12 @@ test('Adobe REST export flow uploads a real PDF and downloads DOCX (mocked upstr
       if (String(url).includes('/turnstile/v0/siteverify')) {
         return Response.json({ success: true, hostname: 'toolscresta.com' });
       }
-      if (String(url) === 'https://pdf-services.adobe.io/token') {
+      if (String(url) === 'https://ims-na1.adobelogin.com/ims/token/v3') {
         assert.match(String(options.body), /client_id=test-client/);
         assert.match(String(options.body), /client_secret=test-secret/);
+        const fields = new URLSearchParams(String(options.body));
+        assert.equal(fields.get('grant_type'), 'client_credentials');
+        assert.equal(fields.get('scope'), 'openid,AdobeID,DCAPI,additional_info.projectedProductContext');
         return Response.json({ access_token: 'mock-access-token' });
       }
       if (String(url) === 'https://pdf-services.adobe.io/assets') {
@@ -456,7 +459,7 @@ test('Adobe credentials authorization failures return safe configuration errors'
   try {
     globalThis.fetch = async (url) => String(url).includes('/turnstile/v0/siteverify')
       ? Response.json({ success: true, hostname: 'toolscresta.com' })
-      : String(url).endsWith('/token')
+      : String(url).endsWith('/ims/token/v3')
         ? Response.json({ access_token: 'mock' })
         : new Response('Upstream private error', { status: 403 });
     const body = new FormData();
@@ -481,7 +484,7 @@ test('Adobe REST create flow uploads DOCX and returns PDF (mocked upstream)', as
     globalThis.fetch = async (url, options) => {
       requests.push({ url: String(url), method: options.method || 'GET' });
       if (String(url).includes('/turnstile/v0/siteverify')) return Response.json({ success: true, hostname: 'toolscresta.com' });
-      if (String(url).endsWith('/token')) return Response.json({ access_token: 'mock-token' });
+      if (String(url).endsWith('/ims/token/v3')) return Response.json({ access_token: 'mock-token' });
       if (String(url).endsWith('/assets')) return Response.json({ assetID: 'urn:aaid:AS:UE1:test-docx', uploadUri: storage });
       if (String(url) === storage && options.method === 'PUT') {
         assert.equal(options.headers['Content-Type'], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
