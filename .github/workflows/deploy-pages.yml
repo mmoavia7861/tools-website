@@ -54,9 +54,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          MODE=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type // "legacy"')
+          PAGES_JSON=$(gh api "repos/${GITHUB_REPOSITORY}/pages")
+          MODE=$(printf '%s' "$PAGES_JSON" | jq -r '.build_type // "legacy"')
+          DOMAIN=$(printf '%s' "$PAGES_JSON" | jq -r '.cname // ""')
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
-          echo "Pages mode: $MODE"
+          echo "Pages mode: $MODE; configured domain: ${DOMAIN:-none}"
+          if [ -n "$DOMAIN" ]; then
+            # A configured custom domain is hosted at /, not /tools-website/.
+            echo "site_origin=https://$DOMAIN" >> "$GITHUB_OUTPUT"
+            echo "site_base=/" >> "$GITHUB_OUTPUT"
+          else
+            echo "site_origin=https://${GITHUB_REPOSITORY_OWNER}.github.io" >> "$GITHUB_OUTPUT"
+            echo "site_base=/tools-website/" >> "$GITHUB_OUTPUT"
+          fi
           if [ "$MODE" != "legacy" ] && [ "$MODE" != "workflow" ]; then
             echo "::error::Unexpected Pages mode: $MODE"
             exit 1
@@ -67,15 +77,28 @@ jobs:
           node-version: '24'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build real React site for /tools-website/
+      - name: Build React site and canonical sitemap for configured domain
         env:
           GITHUB_PAGES: 'true'
+          TOOLCRESTA_SITE_ORIGIN: ${{ steps.pages.outputs.site_origin }}
+          TOOLCRESTA_PAGES_BASE: ${{ steps.pages.outputs.site_base }}
         run: |
           cp index.source.html index.html
           npm run build
           node scripts/prepare-pages-seo.mjs
           test -d dist/assets
-          grep -q '/tools-website/assets/' dist/index.html
+          test -f dist/sitemap.xml
+          test -f dist/robots.txt
+          test -f dist/pdf-to-word/index.html
+          test -f dist/word-to-pdf/index.html
+          grep -Fq "${TOOLCRESTA_PAGES_BASE}assets/" dist/index.html
+          grep -Fq "<loc>${TOOLCRESTA_SITE_ORIGIN}${TOOLCRESTA_PAGES_BASE}pdf-to-word/</loc>" dist/sitemap.xml
+          grep -Fq "<loc>${TOOLCRESTA_SITE_ORIGIN}${TOOLCRESTA_PAGES_BASE}word-to-pdf/</loc>" dist/sitemap.xml
+          grep -Fq "Sitemap: ${TOOLCRESTA_SITE_ORIGIN}${TOOLCRESTA_PAGES_BASE}sitemap.xml" dist/robots.txt
+          if grep -Fq '<loc>' dist/sitemap.xml && grep -Fq '/admin/' dist/sitemap.xml; then
+            echo "::error::Private admin URL must never be indexed"
+            exit 1
+          fi
           if grep -q 'src/main.tsx' dist/index.html; then
             echo "::error::Vite generated HTML still references uncompiled TSX"
             exit 1
