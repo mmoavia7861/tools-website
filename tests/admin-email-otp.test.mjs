@@ -42,7 +42,9 @@ function fakeDurableObject() {
   };
   const state = { storage, blockConcurrencyWhile: fn => fn() };
   const handler = new AdminOtpState(state);
-  return { fetch: request => handler.fetch(request), map };
+  // The real Durable Object stub receives (URL, init); normalize that to
+  // a Request so our tests exercise the same path as Cloudflare production.
+  return { fetch: (input, init) => handler.fetch(input instanceof Request ? input : new Request(input, init)), map };
 }
 
 function envFor(key) {
