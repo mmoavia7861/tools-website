@@ -164,7 +164,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
                     obligations; you may ask us to review or delete a submission using the contact page.
                   </p>
                   <p>
-                    Administrator sign-in uses Firebase Authentication and Google sign-in. Account information,
+                    Administrator sign-in uses Firebase Authentication with an authorized Gmail address and a separate Firebase password. Account information,
                     such as an authorized admin's email address and user ID, may be processed by these services.
                     Google's and Firebase's infrastructure may process ordinary operational logs and security data.
                   </p>
@@ -173,8 +173,11 @@ export const LegalView: React.FC<LegalViewProps> = ({ docType, navigate }) => {
                   <h2 className="text-lg font-bold text-slate-900">4. Cookies, Local Storage and Ads</h2>
                   <p>
                     We store your cookie preference selection in browser local storage. Your browser and service
-                    providers may also use storage needed for authentication, security and site operation. Choosing
-                    an analytics preference does not, by itself, mean an analytics service is enabled.
+                    providers may also use storage needed for authentication, security and site operation. We use the Google tag
+                    (GTM-TLK8X39X) to support optional Google Analytics measurement. Analytics storage defaults to denied
+                    until you choose to accept analytics. Google may process website usage information according to its
+                    privacy terms; we do not intentionally send uploaded file contents, document names or passwords
+                    to analytics. You can change your choice through Reset Cookie Preferences in the footer.
                   </p>
                   <p>
                     Advertising is not activated by default in the current site. If Google AdSense or other advertising
