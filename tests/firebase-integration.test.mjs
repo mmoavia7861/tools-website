@@ -19,11 +19,13 @@ test('Firebase client uses the configured named database, not the default databa
   assert.equal(cli.firestore[0].rules, 'firestore.rules');
 });
 
-test('Firebase owner login and database access require verified password sign-in', () => {
+test('Admin access requires verified Gmail/password plus a server-issued email OTP token', () => {
   assert.match(admin, /signInWithEmailAndPassword\(auth,/);
-  assert.match(admin, /isOwnerPasswordSession/);
+  assert.match(admin, /isOwnerOtpSession/);
+  assert.match(admin, /AdminOtpChallenge/);
   assert.match(rules, /request\.auth\.token\.email_verified == true/);
-  assert.match(rules, /request\.auth\.token\.firebase\.sign_in_provider == 'password'/);
+  assert.match(rules, /request\.auth\.token\.firebase\.sign_in_provider == 'custom'/);
+  assert.match(rules, /request\.auth\.token\.toolscresta_otp == true/);
   assert.match(rules, /match \/admins\/\{adminId\} \{\s*allow read, write: if false;/);
   assert.doesNotMatch(rules, /exists\(\/databases\/\$\(database\)\/documents\/admins\//);
 });
