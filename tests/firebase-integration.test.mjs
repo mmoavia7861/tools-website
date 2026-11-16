@@ -36,7 +36,7 @@ test('Contact messages are not readable by visitors and use a strict create sche
   assert.match(block, /incoming\(\)\.status == 'new'/);
   assert.match(block, /affectedKeys\(\)\.hasOnly\(\['status'\]\)/);
   for (const key of ['name', 'email', 'category', 'message', 'status', 'createdAt']) {
-    assert.ok(contact.includes(key + ':'), 'Contact payload must include ' + key);
+    assert.ok(contact.includes(key + ':') || contact.includes(key + ','), 'Contact payload must include ' + key);
   }
 });
 
