@@ -29,7 +29,7 @@ import {
   getIdTokenResult,
   reload,
   signOut,
-  onAuthStateChanged,
+  onIdTokenChanged,
   type User,
   db,
   collection,
@@ -95,7 +95,7 @@ export const AdminView: React.FC = () => {
     let cancelled = false;
     // Password-only sessions may receive an OTP, but NEVER read admin data.
     // Only the OTP-verified custom provider gets admin privileges.
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onIdTokenChanged(auth, async (user) => {
       if (!user) {
         if (!cancelled) {
           setCurrentUser(null);
