@@ -12,13 +12,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Admin security MUST be enforced server-side. A Google OAuth login,
-    // a different Gmail account, or an unverified email can never be admin.
+    // Admin data requires Firebase password + fresh EMAIL OTP.
+    // The Worker issues a signed Firebase CUSTOM token with toolscresta_otp
+    // only after it validates the original owner's password session AND a
+    // single-use email code. Password-only tokens MUST NEVER read admin data.
     function isOwnerEmail() {
       return isSignedIn()
         && request.auth.token.email == 'moaviah760@gmail.com'
         && request.auth.token.email_verified == true
-        && request.auth.token.firebase.sign_in_provider == 'password';
+        && request.auth.token.firebase.sign_in_provider == 'custom'
+        && request.auth.token.toolscresta_otp == true;
     }
 
     function isAdmin() {
