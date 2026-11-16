@@ -33,13 +33,20 @@ function output(status, body) {
 }
 function failed(message, status = 400) { return output(status, { success: false, error: message }); }
 
+// Return only the *names* of missing runtime bindings. NEVER expose secrets.
+function otpMissingConfiguration(env) {
+  const checks = {
+    ADMIN_OTP: typeof env.ADMIN_OTP?.idFromName === "function" && typeof env.ADMIN_OTP?.get === "function",
+    RESEND_API_KEY: typeof env.RESEND_API_KEY === "string" && env.RESEND_API_KEY.length > 10,
+    OTP_FROM_EMAIL: typeof env.OTP_FROM_EMAIL === "string" && /^[^@\s]+@toolscresta\.com$/i.test(env.OTP_FROM_EMAIL),
+    OTP_HASH_SECRET: typeof env.OTP_HASH_SECRET === "string" && env.OTP_HASH_SECRET.length >= 32,
+    FIREBASE_SERVICE_ACCOUNT_EMAIL: typeof env.FIREBASE_SERVICE_ACCOUNT_EMAIL === "string",
+    FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY: typeof env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY === "string"
+  };
+  return Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
+}
 export function otpConfigured(env) {
-  return Boolean(env.ADMIN_OTP?.idFromName && env.ADMIN_OTP?.get &&
-    typeof env.RESEND_API_KEY === "string" && env.RESEND_API_KEY.length > 10 &&
-    typeof env.OTP_FROM_EMAIL === "string" && /^[^@\s]+@toolscresta\.com$/i.test(env.OTP_FROM_EMAIL) &&
-    typeof env.OTP_HASH_SECRET === "string" && env.OTP_HASH_SECRET.length >= 32 &&
-    typeof env.FIREBASE_SERVICE_ACCOUNT_EMAIL === "string" &&
-    typeof env.FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY === "string");
+  return otpMissingConfiguration(env).length === 0;
 }
 function b64urlEncode(bytes) {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -213,8 +220,18 @@ async function sendOtpEmail(env, code) {
 }
 
 export async function handleAdminOtp(request, env, path) {
-  if (request.method === "GET" && path === "/api/admin/otp/status")
-    return output(200, { success: true, configured: otpConfigured(env) });
+  if (request.method === "GET" && path === "/api/admin/otp/status") {
+    const configured = otpConfigured(env);
+    // Public status reveals only readiness. A freshly authenticated, verified
+    // owner PASSWORD session may also see the missing variable names.
+    const bearer = request.headers.get("Authorization") || "";
+    if (configured || !bearer.startsWith("Bearer ")) {
+      return output(200, { success: true, configured });
+    }
+    const principal = await verifyFirebasePasswordIdToken(bearer.slice(7));
+    if (!principal) return output(200, { success: true, configured });
+    return output(200, { success: true, configured, missing: otpMissingConfiguration(env) });
+  }
 
   if (request.method !== "POST") return failed("Unsupported method.", 405);
   if (!otpConfigured(env)) return failed("Email verification is not configured by the site administrator.", 503);
