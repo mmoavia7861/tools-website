@@ -110,6 +110,7 @@ export {
   reload,
   signOut,
   onAuthStateChanged,
+  getDocFromServer,
   doc,
   collection,
   getDocs,
