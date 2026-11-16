@@ -356,26 +356,44 @@ async function handleImageCard(request, env) {
  * Never use an arbitrary upstream URL with our Adobe bearer token (SSRF guard).
  * Returns a safe classification only; never echoes the original URL publicly.
  */
+// Adobe documents three official PDF Services REST hosts. Jobs created via
+// pdf-services.adobe.io may be returned for polling on a regional host.
+const ADOBE_JOB_HOSTS = new Set([
+  "pdf-services.adobe.io",
+  "pdf-services-ue1.adobe.io",
+  "pdf-services-ew1.adobe.io",
+]);
+
 function resolveAdobeJobLocation(input, operation) {
   if (typeof input !== "string" || !input.trim()) return { reason: "missing" };
   const value = input.trim();
-  if (value.length > 2048 || /[\\\\\s\u0000-\u001f\u007f]/.test(value))
+  if (value.length > 2048 || /[\u0000-\u001f\u007f\\]/.test(value))
     return { reason: "invalid_format" };
-  let u;
+  if (!["exportpdf", "createpdf"].includes(operation))
+    return { reason: "invalid_operation" };
+
+  let url;
   try {
-    if (value.startsWith("/operation/")) u = new URL(value, ADOBE_BASE);
-    else if (value.startsWith("operation/")) u = new URL("/" + value, ADOBE_BASE);
-    else if (value.startsWith("https://")) u = new URL(value);
-    else return { reason: "invalid_format" };
+    if (value.startsWith("/operation/")) url = new URL(value, ADOBE_BASE);
+    else if (value.startsWith("operation/")) url = new URL("/" + value, ADOBE_BASE);
+    else url = new URL(value);
   } catch { return { reason: "invalid_format" }; }
-  if (u.origin !== ADOBE_BASE || u.username || u.password || u.search || u.hash)
-    return { reason: "untrusted_origin_or_query" };
-  if (!["exportpdf", "createpdf"].includes(operation)) return { reason: "invalid_operation" };
-  // A specific job status URL, not just an /operation/* URL, is required.
-  const expected = new RegExp("^/operation/" + operation + "/[a-zA-Z0-9._:%-]{1,256}/status/?$");
-  if (!expected.test(u.pathname)) return { reason: "unexpected_path" };
-  return { url: u.href };
+
+  // Never send the user's Adobe bearer token to a hostname outside Adobe's
+  // published regional PDF Services hosts. HTTPS and job-path checks are mandatory.
+  if (url.protocol !== "https:" || !ADOBE_JOB_HOSTS.has(url.hostname) ||
+      url.port || url.username || url.password || url.hash)
+    return { reason: "untrusted_origin" };
+
+  const expected = new RegExp("^/operation/" + operation + "/[A-Za-z0-9._~%-]{1,256}/status/?$");
+  if (!expected.test(url.pathname)) return { reason: "unexpected_path" };
+
+  // A harmless query string returned by Adobe is valid on Adobe's own host.
+  // Keep it for polling, but reject oversized control data.
+  if (url.search.length > 1024) return { reason: "invalid_query" };
+  return { url: url.href };
 }
+
 function safeAdobeStorageUrl(input) {
   try {
     const u = new URL(input);
@@ -501,7 +519,9 @@ async function handleAdobe(request, env, mode) {
         ? "Adobe did not send a Location header for this conversion job."
         : location.reason === "unexpected_path"
           ? "Adobe returned an unexpected job-status path."
-          : "Adobe returned an untrusted or malformed job-status URL.";
+          : location.reason === "untrusted_origin"
+            ? "Adobe returned a job URL from a host outside its documented regional API hosts."
+            : "Adobe returned a malformed job-status URL.";
       return error(detail + " (Job HTTP " + job.status + "; " + location.reason + "). Please retry, or check Cloudflare Worker logs.", 502);
     }
     const deadline = Date.now() + MAX_ADOBE_WAIT_MS;
