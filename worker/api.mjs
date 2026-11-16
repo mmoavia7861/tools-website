@@ -480,7 +480,12 @@ export default {
       return env.ASSETS.fetch(request);
     }
     if (request.method === "GET" && path === "/api/integrations/status") {
-      return reply({ success: true, ...available(env), pdfServerCompression: false });
+      const configured = available(env);
+      // Turnstile Site Key is explicitly PUBLIC; never expose TURNSTILE_SECRET,
+      // Adobe credentials, or provider access tokens in status responses.
+      const turnstileSiteKey = typeof env.TURNSTILE_SITE_KEY === "string"
+        ? env.TURNSTILE_SITE_KEY.trim() : "";
+      return reply({ success: true, ...configured, turnstileSiteKey, pdfServerCompression: false });
     }
     if (request.method === "GET" && path === "/api/health") {
       return reply({ success: true, status: "ok", service: "toolscresta-api" });
