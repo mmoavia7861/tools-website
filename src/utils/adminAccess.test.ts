@@ -1,13 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { OWNER_EMAIL, isOwnerPasswordSession } from './adminAccess';
+import { OWNER_EMAIL, isOwnerOtpSession } from './adminAccess';
 
-test('only verified owner with Firebase password session is an admin', () => {
-  assert.equal(isOwnerPasswordSession(OWNER_EMAIL, true, 'password'), true);
-  assert.equal(isOwnerPasswordSession(OWNER_EMAIL.toUpperCase(), true, 'password'), true);
-  assert.equal(isOwnerPasswordSession(OWNER_EMAIL, true, 'google.com'), false);
-  assert.equal(isOwnerPasswordSession(OWNER_EMAIL, false, 'password'), false);
-  assert.equal(isOwnerPasswordSession('other@gmail.com', true, 'password'), false);
-  assert.equal(isOwnerPasswordSession(null, true, 'password'), false);
-  assert.equal(isOwnerPasswordSession(OWNER_EMAIL, true, null), false);
+test('only the verified owner with server-verified email OTP has admin access', () => {
+  assert.equal(isOwnerOtpSession(OWNER_EMAIL, true, 'custom', true), true);
+  assert.equal(isOwnerOtpSession(OWNER_EMAIL.toUpperCase(), true, 'custom', true), true);
+  assert.equal(isOwnerOtpSession(OWNER_EMAIL, true, 'password', true), false);
+  assert.equal(isOwnerOtpSession(OWNER_EMAIL, true, 'password', false), false);
+  assert.equal(isOwnerOtpSession(OWNER_EMAIL, true, 'custom', false), false);
+  assert.equal(isOwnerOtpSession(OWNER_EMAIL, true, 'google.com', true), false);
+  assert.equal(isOwnerOtpSession(OWNER_EMAIL, false, 'custom', true), false);
+  assert.equal(isOwnerOtpSession('other@gmail.com', true, 'custom', true), false);
+  assert.equal(isOwnerOtpSession(null, true, 'custom', true), false);
 });
