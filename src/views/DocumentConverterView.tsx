@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { SEOHead } from '../components/SEOHead';
 
 type Mode = 'pdf-to-word' | 'word-to-pdf';
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 50 * 1024 * 1024;
 // Cloud APIs are same-origin; Cloudflare routes /api/* while GitHub Pages serves the UI.
 // Fetch the PUBLIC Turnstile site key from the deployed Worker at runtime so that
 // a GitHub Pages rebuild is not required when a widget key is rotated.
@@ -184,7 +184,7 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
         form.append('file', file);
         form.append('turnstileToken', turnstileToken);
         const controller = new AbortController();
-        const timer = window.setTimeout(() => controller.abort(), 120000);
+        const timer = window.setTimeout(() => controller.abort(), 240000);
         try {
           const response = await fetch('/api/convert/' + mode, { method: 'POST', body: form, signal: controller.signal });
           if (!response.ok) {
@@ -214,7 +214,7 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
       window.setTimeout(() => URL.revokeObjectURL(url), 30000);
       setNotice(method === 'adobe' ? 'Adobe conversion completed. Review the downloaded document before sharing it.' : 'Free browser conversion completed. Review the downloaded file for formatting differences.');
     } catch (e) {
-      setError(e instanceof Error && e.name === 'AbortError' ? 'Adobe cloud conversion timed out. Try browser mode or a smaller file.' : e instanceof Error ? e.message : 'Conversion failed. Please try another document.');
+      setError(e instanceof Error && e.name === 'AbortError' ? 'Adobe cloud conversion timed out. Try browser mode or a smaller file; large documents can require more processing time.' : e instanceof Error ? e.message : 'Conversion failed. Please try another document.');
     } finally { setBusy(false); }
   };
 
@@ -223,12 +223,12 @@ export const DocumentConverterView: React.FC<{ mode: Mode }> = ({ mode }) => {
     <h1 className="text-3xl font-bold text-slate-900">{title}</h1>
     <p className="mt-3 text-slate-600">{toWord ? 'Extract selectable text from PDFs into editable DOCX. Scanned PDFs, images, tables and precise layouts are not preserved in basic browser mode.' : 'Convert basic DOCX text into PDF. Images, tables, styles and complex layouts are not preserved in basic browser mode; some non-Latin scripts are unsupported.'}</p>
     <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <label htmlFor="document-upload" className="block text-sm font-semibold text-slate-900">Select {ext.toUpperCase()} file (maximum 10 MB)</label>
+      <label htmlFor="document-upload" className="block text-sm font-semibold text-slate-900">Select {ext.toUpperCase()} file (maximum 50 MB)</label>
       <input id="document-upload" className="mt-3 block w-full text-sm" type="file" accept={toWord ? '.pdf,application/pdf' : '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document'} onChange={e => {
         setError(''); setNotice(''); const selected = e.target.files?.[0] || null;
         if (!selected) { setFile(null); return; }
         if (!selected.name.toLowerCase().endsWith(ext) || selected.size > MAX_BYTES || selected.size === 0) {
-          setFile(null); setError('Choose a valid ' + ext + ' file smaller than 10 MB.'); return;
+          setFile(null); setError('Choose a valid ' + ext + ' file up to 50 MB.'); return;
         }
         setFile(selected);
       }} />
