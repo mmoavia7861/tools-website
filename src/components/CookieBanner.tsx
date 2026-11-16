@@ -92,7 +92,7 @@ export const CookieBanner: React.FC = () => {
                   onClick={handleAcceptAll}
                   className="rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition"
                 >
-                  Accept All
+                  Accept Analytics
                 </button>
                 <button
                   type="button"
