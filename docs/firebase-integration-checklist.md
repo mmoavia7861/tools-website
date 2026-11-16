@@ -1,3 +1,5 @@
+> **Email OTP migration (Nov 16, 2026):** This file documents the older password-only phase. New admin access requires a server-verified six-digit email code and Worker-signed Firebase custom token. See [admin-email-otp-setup.md](./admin-email-otp-setup.md) for the current authoritative deployment procedure. Do **not** publish the new Firestore rules without also configuring OTP delivery and signing; otherwise admin access will be blocked.
+
 # ToolsCresta Firebase deployment and verification
 
 Status: repository client code, admin inbox, and Firestore rules have been updated.
