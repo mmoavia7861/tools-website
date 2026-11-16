@@ -49,7 +49,13 @@ The PDF to Word and Word to PDF pages have TWO independent modes:
 
 - Adobe mode disabled: /api/integrations/status unavailable, returns HTML instead of JSON, or required runtime credentials/site key are missing.
 - Verification 403: token expired/used, wrong Turnstile secret, or Turnstile widget hostname mismatch.
-- Adobe IMS OAuth 400/401/403: verify Client ID, matching Client Secret, Server-to-Server scopes and product profile. The legacy /token API is not used for this credential; never log or return the secret.
+- Adobe IMS OAuth 400 now provides a SAFE classified error when Adobe returns `invalid_client`, `invalid_scope`, `invalid_request`, `unauthorized_client` or `invalid_grant`; raw Adobe response bodies and credentials are never shown.
+  - `invalid_client`: click **Generate access token** in Adobe Developer Console. If Console succeeds but ToolsCresta fails, both Cloudflare runtime secrets must be replaced using the *same* Adobe OAuth Server-to-Server credential; a saved secret might be stale or a different application's secret.
+  - `invalid_scope`: compare requested scopes with your credential's exact **Scopes** field and set optional Cloudflare variable `ADOBE_OAUTH_SCOPES` to that comma-separated list (e.g., `openid,AdobeID,DCAPI,additional_info.projectedProductContext`).
+  - `invalid_request`: check grant_type, URL encoding, and Server-to-Server project type.
+  - If Adobe only reports HTTP 400 without a recognized code, test Console's access-token generator and contact Adobe support with the *request correlation ID*, not your secret.
+- Upload size: PDF to Word and Word to PDF accept input documents up to **50 MiB** in both browser and Adobe cloud modes. Adobe documents a 100 MB file-size limit and Cloudflare's standard Free/Pro zone upload limit is 100 MB; individual conversions can still fail due to browser memory, Workers Free 128 MB memory, quota, or document complexity.
+- For 50 MiB Cloudflare uploads, the Worker inspects only the first 5 bytes and streams the File to Adobe S3 rather than copying the entire file again. This minimizes Worker memory duplication but does not remove the provider limits.
 - Adobe 429: provider quota reached; cannot be bypassed by the frontend.
 - Adobe upload/download 502: inspect Worker logs for status category and signed S3 host compatibility (do NOT log signed URLs or document contents).
 - Cloudflare API calls 404: confirm the real domain routes /api/* to worker/api.mjs.
