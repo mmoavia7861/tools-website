@@ -27,7 +27,7 @@ export const PDFCompressorView: React.FC = () => {
   const [preset, setPreset] = useState<CompressionPreset>('balanced');
   const [processingMode, setProcessingMode] = useState<'on-device' | 'server'>('on-device');
   // GitHub Pages hosts static files and cannot serve /api/compress-pdf.
-  const serverAvailable = !window.location.hostname.endsWith('github.io');
+  const serverAvailable = false; // No /api/compress-pdf handler exists on any deployed origin yet. Do not offer a broken upload path.
 
   // Execution states
   const [isProcessing, setIsProcessing] = useState(false);
@@ -82,7 +82,7 @@ export const PDFCompressorView: React.FC = () => {
     setCompressionResult(null);
 
     try {
-      if (processingMode === 'on-device') {
+      if (processingMode === 'on-device' || !serverAvailable) {
         setProgress(40);
         // On-device optimization
         const result = await optimizePdfLocally(fileBuffer, preset);
