@@ -1,3 +1,6 @@
+import { AdminOtpState, handleAdminOtp } from "./admin-otp.mjs";
+export { AdminOtpState };
+
 /**
  * ToolsCresta API gateway: same-origin Cloudflare Worker.
  * Secrets are Worker bindings, never client-side build variables.
@@ -575,6 +578,9 @@ export default {
     if (request.method === "GET" && path === "/api/health") {
       return reply({ success: true, status: "ok", service: "toolscresta-api" });
     }
+    // OTP endpoints are available only through the same-origin API gateway.
+    // The server verifies a freshly signed-in Firebase password ID token.
+    if (path.startsWith("/api/admin/otp/")) return handleAdminOtp(request, env, path);
     if (request.method === "GET" && path === "/api/admin/status") {
       const providers = available(env);
       return reply({ success: true, aiProvider: { name: providers.gemini ? "Gemini" : providers.workersAi ? "Cloudflare Workers AI" : "Not configured", isConfigured: providers.gemini || providers.workersAi }, providers, pdfServerCompression: false });
