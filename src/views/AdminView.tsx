@@ -42,7 +42,8 @@ import {
   testConnection
 } from '../services/firebase';
 import { STARTER_BLOG_POSTS, type BlogPostItem } from '../data/initialContent';
-import { OWNER_EMAIL, isOwnerPasswordSession } from '../utils/adminAccess';
+import { OWNER_EMAIL, isOwnerOtpSession } from '../utils/adminAccess';
+import { AdminOtpChallenge } from '../components/AdminOtpChallenge';
 
 export const AdminView: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -57,6 +58,7 @@ export const AdminView: React.FC = () => {
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [authProvider, setAuthProvider] = useState<string | null>(null);
+  const [otpVerified, setOtpVerified] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'blog' | 'ads' | 'ai' | 'messages'>('overview');
 
   // Server health data
@@ -87,17 +89,18 @@ export const AdminView: React.FC = () => {
   const [messageUpdating, setMessageUpdating] = useState('');
   const [firestoreConnected, setFirestoreConnected] = useState<boolean | null>(null);
 
-  const isOwner = isOwnerPasswordSession(currentUser?.email, emailVerified, authProvider);
+  const isOwner = isOwnerOtpSession(currentUser?.email, emailVerified, authProvider, otpVerified);
 
   useEffect(() => {
     let cancelled = false;
-    // Existing Google-popup sessions must NOT continue into the admin dashboard.
-    // Only a Firebase email/password token for the verified owner may be used.
+    // Password-only sessions may receive an OTP, but NEVER read admin data.
+    // Only the OTP-verified custom provider gets admin privileges.
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         if (!cancelled) {
           setCurrentUser(null);
           setAuthProvider(null);
+          setOtpVerified(false);
           setEmailVerified(false);
           setAuthLoading(false);
         }
@@ -106,12 +109,15 @@ export const AdminView: React.FC = () => {
       try {
         const token = await getIdTokenResult(user);
         if (cancelled) return;
+        const signedByOtpService = token.signInProvider === 'custom' &&
+          token.claims.toolscresta_otp === true;
         if (user.email?.toLowerCase() !== OWNER_EMAIL ||
-            token.signInProvider !== 'password') {
+            (token.signInProvider !== 'password' && !signedByOtpService)) {
           await signOut(auth);
           if (!cancelled) {
             setCurrentUser(null);
             setAuthProvider(null);
+            setOtpVerified(false);
             setEmailVerified(false);
             setLoginError('Sign in using the authorized admin Gmail address and password.');
           }
@@ -120,6 +126,7 @@ export const AdminView: React.FC = () => {
         if (!cancelled) {
           setCurrentUser(user);
           setAuthProvider(token.signInProvider);
+          setOtpVerified(signedByOtpService);
           setEmailVerified(user.emailVerified === true);
         }
       } catch {
@@ -127,6 +134,7 @@ export const AdminView: React.FC = () => {
         if (!cancelled) {
           setCurrentUser(null);
           setAuthProvider(null);
+          setOtpVerified(false);
           setEmailVerified(false);
           setLoginError('Unable to validate the sign-in session. Please try again.');
         }
@@ -329,7 +337,7 @@ export const AdminView: React.FC = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">ToolsCresta Admin Login</h1>
-                <p className="mt-2 text-sm text-slate-500">Authorized Gmail and password required. No public account registration.</p>
+                <p className="mt-2 text-sm text-slate-500">Authorized Gmail + password, followed by an email verification code. No public registration.</p>
               </div>
               <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div>
@@ -366,7 +374,7 @@ export const AdminView: React.FC = () => {
               </button>
               {loginError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{loginError}</p>}
               {loginNotice && <p role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">{loginNotice}</p>}
-              <p className="text-xs text-slate-500">Firebase verifies passwords securely. Admin data access is separately enforced by Firestore Security Rules.</p>
+              <p className="text-xs text-slate-500">Firebase verifies your password. Server-verified email OTP is required before admin permissions are granted.</p>
             </div>
           </div>
         </div>
@@ -392,6 +400,12 @@ export const AdminView: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // A correct password alone is intentionally insufficient for admin access.
+  // This screen asks the trusted Worker to send/verify a one-time email code.
+  if (authProvider === 'password' && currentUser.email?.toLowerCase() === OWNER_EMAIL) {
+    return <AdminOtpChallenge user={currentUser} />;
   }
 
   // Not authorized state
