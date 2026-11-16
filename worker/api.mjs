@@ -3,7 +3,8 @@
  * Secrets are Worker bindings, never client-side build variables.
  * All protected requests are validated with Cloudflare Turnstile Siteverify.
  */
-const MAX_PDF_BYTES = 10 * 1024 * 1024;
+const MAX_PDF_BYTES = 50 * 1024 * 1024;
+const ADOBE_UPLOAD_MULTIPART_OVERHEAD = 128 * 1024;
 const MAX_JSON_BYTES = 12 * 1024;
 const MAX_ADOBE_WAIT_MS = 90000;
 const ADOBE_BASE = "https://pdf-services.adobe.io";
@@ -377,23 +378,54 @@ async function adobeJSON(url, options, clientId, accessToken, timeout = 12000) {
   if (!response.ok) throw { status: 502, message: "Adobe PDF Services could not process the conversion request. Check the file and operation." };
   return response;
 }
+
+/**
+ * Adobe IMS OAuth errors are JSON objects such as {"error":"invalid_scope"}.
+ * Return only allowlisted OAuth error codes and advice; NEVER expose provider
+ * descriptions, upstream bodies, credentials, tokens, or request payloads.
+ */
+async function adobeOAuthFailure(response) {
+  let code = "";
+  try {
+    const body = await response.json();
+    const candidate = typeof body?.error === "string" ? body.error
+      : typeof body?.error?.code === "string" ? body.error.code
+      : typeof body?.error_code === "string" ? body.error_code : "";
+    const allowed = ["invalid_client", "invalid_scope", "invalid_request",
+      "unauthorized_client", "invalid_grant"];
+    if (allowed.includes(candidate)) code = candidate;
+  } catch { /* Generic safe response if Adobe did not return JSON */ }
+  if (response.status === 429) return { status: 429, message: "Adobe OAuth rate limit reached (HTTP 429). Try again later." };
+  if (response.status >= 500) return { status: 502, message: "Adobe OAuth service temporarily unavailable (HTTP " + response.status + ")." };
+  if (code === "invalid_client") return { status: 503, message: "Adobe OAuth invalid_client (HTTP " + response.status + "): Client ID/Secret mismatch, revoked or wrong credential. If Generate Access Token works in Adobe Console, update both Cloudflare secrets from that SAME credential." };
+  if (code === "invalid_scope") return { status: 503, message: "Adobe OAuth invalid_scope (HTTP " + response.status + "): Requested scopes differ from this credential. Check the scopes in Adobe Console and update ADOBE_OAUTH_SCOPES on the Cloudflare Worker." };
+  if (code === "invalid_request") return { status: 503, message: "Adobe OAuth invalid_request (HTTP " + response.status + "): IMS rejected a required request parameter. Review Server-to-Server credential settings." };
+  if (code === "unauthorized_client") return { status: 503, message: "Adobe OAuth unauthorized_client (HTTP " + response.status + "): This Adobe credential cannot use the client_credentials grant. Check its Server-to-Server configuration." };
+  if (code === "invalid_grant") return { status: 503, message: "Adobe OAuth invalid_grant (HTTP " + response.status + "): Adobe rejected this grant. Verify the credential and its allowed permissions." };
+  if (response.status === 401) return { status: 503, message: "Adobe IMS OAuth HTTP 401: Client ID or Client Secret is not authorized." };
+  if (response.status === 403) return { status: 503, message: "Adobe IMS OAuth HTTP 403: Check PDF Services product-profile access." };
+  if (response.status === 400) return { status: 503, message: "Adobe IMS OAuth HTTP 400: Adobe did not return a recognized OAuth code. In Adobe Developer Console test Generate Access Token, then verify Cloudflare Client ID, Secret and scopes." };
+  return { status: 502, message: "Adobe IMS OAuth failed (HTTP " + response.status + ")." };
+}
+
 async function handleAdobe(request, env, mode) {
   if (!env.ADOBE_CLIENT_ID || !env.ADOBE_CLIENT_SECRET || !env.TURNSTILE_SECRET) return error("Adobe PDF Services is not configured yet.", 503);
   if (!limitRequests(request, 2, 60000)) return error("Conversion limit reached. Try again shortly.", 429);
   const len = Number(request.headers.get("Content-Length") || "0");
-  if (len > MAX_PDF_BYTES + 50000) return error("File exceeds the 10 MB limit.", 413);
+  if (len > MAX_PDF_BYTES + ADOBE_UPLOAD_MULTIPART_OVERHEAD) return error("File exceeds the 50 MB limit.", 413);
   if (!(request.headers.get("Content-Type") || "").startsWith("multipart/form-data")) return error("Expected a file upload.");
   try {
     const form = await request.formData();
     const file = form.get("file");
     const token = form.get("turnstileToken");
-    if (!(file instanceof File) || !file.size || file.size > MAX_PDF_BYTES) return error("Upload a document smaller than 10 MB.", 413);
+    if (!(file instanceof File) || !file.size || file.size > MAX_PDF_BYTES) return error("Upload a document up to 50 MB.", 413);
     const ext = mode === "pdf-to-word" ? ".pdf" : ".docx";
     if (!file.name.toLowerCase().endsWith(ext)) return error("Incorrect document extension.");
     const verification = await verifyTurnstile(request, env, token);
     if (!verification.ok) return error(verification.message, verification.status);
-    const bytes = await file.arrayBuffer();
-    const signature = new Uint8Array(bytes.slice(0, 5));
+    // Only inspect the first 5 bytes. Reading the entire 50 MB file into an
+    // ArrayBuffer would unnecessarily double memory use in the 128 MB Worker.
+    const signature = new Uint8Array(await file.slice(0, 5).arrayBuffer());
     const isValid = mode === "pdf-to-word"
       ? String.fromCharCode(...signature) === "%PDF-"
       : signature[0] === 0x50 && signature[1] === 0x4b;
@@ -417,23 +449,8 @@ async function handleAdobe(request, env, mode) {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: credentials,
     });
     if (!tokenResp.ok) {
-      // Do not reveal the provider's error body: it may contain private context.
-      if (tokenResp.status === 400) {
-        return error("Adobe OAuth token request rejected (HTTP 400). Check the credential pair and its required OAuth scopes in Adobe Developer Console.", 503);
-      }
-      if (tokenResp.status === 401) {
-        return error("Adobe OAuth credentials not accepted (HTTP 401). Verify the Client ID and Client Secret belong to the same Server-to-Server credential.", 503);
-      }
-      if (tokenResp.status === 403) {
-        return error("Adobe OAuth access denied (HTTP 403). Check Adobe PDF Services API product-profile permissions.", 503);
-      }
-      if (tokenResp.status === 429) {
-        return error("Adobe OAuth token rate limit reached (HTTP 429). Try again later.", 429);
-      }
-      if (tokenResp.status >= 500) {
-        return error("Adobe OAuth authentication temporarily unavailable (HTTP " + tokenResp.status + ").", 502);
-      }
-      return error("Adobe OAuth token request failed (HTTP " + tokenResp.status + ").", 502);
+      const failure = await adobeOAuthFailure(tokenResp);
+      return error(failure.message, failure.status);
     }
     const oauth = await tokenResp.json();
     if (!oauth.access_token) return error("Adobe did not issue an access token. Check the PDF Services API credential.", 502);
@@ -444,8 +461,10 @@ async function handleAdobe(request, env, mode) {
     const asset = await createAsset.json();
     if (!asset.assetID || !safeAdobeStorageUrl(asset.uploadUri)) return error("Adobe provided an unexpected upload location.", 502);
     const uploaded = await fetchTimed(asset.uploadUri, {
-      method: "PUT", headers: { "Content-Type": mediaType }, body: bytes,
-    }, 30000);
+      // Stream the already validated File to Adobe S3 without creating
+      // another full 50 MB copy in the Cloudflare Worker.
+      method: "PUT", headers: { "Content-Type": mediaType }, body: file.stream(), duplex: "half",
+    }, 90000);
     if (!uploaded.ok) return error("Adobe file upload failed.", 502);
     const op = mode === "pdf-to-word" ? "exportpdf" : "createpdf";
     const job = await adobeJSON(ADOBE_BASE + "/operation/" + op, {
