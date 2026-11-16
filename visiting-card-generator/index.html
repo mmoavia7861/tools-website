@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- ToolsCresta Google tag: only this container; do not install duplicate tags. -->
+    <!-- ToolsCresta GA4 tag: exactly one direct Analytics destination. -->
     <!-- Consent Mode v2 defaults are applied before the Google tag loads. -->
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -19,8 +19,11 @@
         }
       } catch (_) { /* Malformed privacy setting stays denied. */ }
       gtag('js', new Date());
+      // GA4 Web stream shown in Analytics > Admin > Data streams.
+      // Keep a single destination; Enhanced Measurement handles SPA history changes.
+      gtag('config', 'G-MG3M619V4F');
     </script>
-    <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-TLK8X39X"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-MG3M619V4F"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Visiting Card Maker | ToolsCresta</title>
@@ -30,7 +33,7 @@
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563EB'><path d='M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z'/></svg>" />
-    <script type="module" crossorigin src="/tools-website/assets/index-C6rw8pOQ.js"></script>
+    <script type="module" crossorigin src="/tools-website/assets/index-Ag0phvQ7.js"></script>
     <link rel="modulepreload" crossorigin href="/tools-website/assets/rolldown-runtime-BCiCTKAo.js">
     <link rel="modulepreload" crossorigin href="/tools-website/assets/jsx-runtime-BjLx7v8f.js">
     <link rel="stylesheet" crossorigin href="/tools-website/assets/index-DD4UuVm9.css">
