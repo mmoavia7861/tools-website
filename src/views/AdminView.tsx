@@ -34,8 +34,12 @@ import {
   db,
   collection,
   getDocs,
-  setDoc,
-  doc
+  updateDoc,
+  query,
+  orderBy,
+  limit,
+  doc,
+  testConnection
 } from '../services/firebase';
 import { STARTER_BLOG_POSTS, type BlogPostItem } from '../data/initialContent';
 import { OWNER_EMAIL, isOwnerPasswordSession } from '../utils/adminAccess';
@@ -67,8 +71,21 @@ export const AdminView: React.FC = () => {
   const [adsenseEnabled, setAdsenseEnabled] = useState(false);
   const [publisherId, setPublisherId] = useState('ca-pub-XXXXXXXXXXXXXXXX');
 
-  // Contact messages
-  const [messages, setMessages] = useState<any[]>([]);
+  // Only the verified Firebase owner can see saved support inquiries.
+  type ContactMessage = {
+    id: string;
+    name: string;
+    email: string;
+    category: string;
+    message: string;
+    status: 'new' | 'read' | 'resolved';
+    createdAt: string;
+  };
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState('');
+  const [messageUpdating, setMessageUpdating] = useState('');
+  const [firestoreConnected, setFirestoreConnected] = useState<boolean | null>(null);
 
   const isOwner = isOwnerPasswordSession(currentUser?.email, emailVerified, authProvider);
 
@@ -133,8 +150,68 @@ export const AdminView: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isOwner) void fetchStatus();
+    if (!isOwner) {
+      setFirestoreConnected(null);
+      setMessages([]);
+      return;
+    }
+    let cancelled = false;
+    void fetchStatus();
+    void testConnection().then(connected => {
+      if (!cancelled) setFirestoreConnected(connected);
+    });
+    return () => { cancelled = true; };
   }, [isOwner]);
+
+  const loadMessages = async () => {
+    if (!isOwner) return;
+    setMessagesError('');
+    setMessagesLoading(true);
+    try {
+      const results = await getDocs(query(
+        collection(db, 'contact_messages'),
+        orderBy('createdAt', 'desc'),
+        limit(50)
+      ));
+      const records: ContactMessage[] = results.docs.map(result => {
+        const value = result.data();
+        return {
+          id: result.id,
+          name: typeof value.name === 'string' ? value.name : '',
+          email: typeof value.email === 'string' ? value.email : '',
+          category: typeof value.category === 'string' ? value.category : '',
+          message: typeof value.message === 'string' ? value.message : '',
+          status: value.status === 'resolved' || value.status === 'read' ? value.status : 'new',
+          createdAt: typeof value.createdAt === 'string' ? value.createdAt : ''
+        };
+      });
+      setMessages(records);
+      setFirestoreConnected(true);
+    } catch {
+      setMessagesError('Unable to read inquiries from Firebase. Check the named Firestore database and deployed owner-only security rules.');
+      setFirestoreConnected(false);
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
+  const updateMessageStatus = async (messageId: string, status: 'read' | 'resolved') => {
+    if (!isOwner || messageUpdating) return;
+    setMessagesError('');
+    setMessageUpdating(messageId);
+    try {
+      await updateDoc(doc(db, 'contact_messages', messageId), { status });
+      setMessages(current => current.map(message => message.id === messageId ? { ...message, status } : message));
+    } catch {
+      setMessagesError('Could not update this inquiry. Verify Firestore rules and try again.');
+    } finally {
+      setMessageUpdating('');
+    }
+  };
+
+  useEffect(() => {
+    if (isOwner && activeTab === 'messages') void loadMessages();
+  }, [isOwner, activeTab]);
 
   const handlePasswordLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -426,7 +503,64 @@ export const AdminView: React.FC = () => {
               <Brain className="h-4 w-4" />
               <span>AI Assistant Setup</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('messages')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition ${
+                activeTab === 'messages' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <Mail className="h-4 w-4" />
+              <span>Contact Inbox</span>
+            </button>
           </div>
+
+          {/* Only the verified owner can read private Firestore inquiries. */}
+          {activeTab === 'messages' && (
+            <div className="rounded-2xl bg-white border border-slate-200 p-6 space-y-5">
+              <div className="flex flex-wrap gap-3 items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Contact Inbox</h2>
+                  <p className="mt-1 text-xs text-slate-500">Latest 50 inquiries stored in Firebase Firestore. Visible only to the verified admin.</p>
+                </div>
+                <button type="button" onClick={() => void loadMessages()} disabled={messagesLoading}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">
+                  <RefreshCw className="inline h-4 w-4 mr-1" /> {messagesLoading ? 'Loading…' : 'Refresh'}
+                </button>
+              </div>
+              {messagesError && <p role="alert" className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{messagesError}</p>}
+              {messagesLoading && <p role="status" className="text-sm text-slate-500">Loading saved contact messages…</p>}
+              {!messagesLoading && !messagesError && messages.length === 0 && (
+                <p className="rounded-xl bg-slate-50 p-6 text-sm text-slate-600">No saved inquiries in this Firestore database yet.</p>
+              )}
+              <div className="space-y-3">
+                {messages.map(message => (
+                  <article key={message.id} className="rounded-xl border border-slate-200 p-4 space-y-3">
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">{message.name || 'Unnamed visitor'}</h3>
+                        <p className="text-xs text-slate-600 break-all">{message.email}</p>
+                      </div>
+                      <div className="text-right text-xs text-slate-500">
+                        <p>{message.category}</p>
+                        <p>{message.createdAt ? new Date(message.createdAt).toLocaleString() : 'No timestamp'}</p>
+                        <p className="font-semibold capitalize">{message.status}</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-800 whitespace-pre-wrap break-words">{message.message}</p>
+                    <div className="flex gap-2">
+                      <button type="button" disabled={messageUpdating === message.id || message.status !== 'new'}
+                        onClick={() => void updateMessageStatus(message.id, 'read')}
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-40">Mark read</button>
+                      <button type="button" disabled={messageUpdating === message.id || message.status === 'resolved'}
+                        onClick={() => void updateMessageStatus(message.id, 'resolved')}
+                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-40">Resolve</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* TAB 1: OVERVIEW & SYSTEM */}
           {activeTab === 'overview' && (
@@ -447,11 +581,11 @@ export const AdminView: React.FC = () => {
                 </div>
 
                 <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-2xs">
-                  <span className="text-xs text-slate-500 uppercase tracking-wider">Backend Memory</span>
-                  <p className="text-xl font-bold text-slate-900 mt-1">
-                    {'Not exposed'}
+                  <span className="text-xs text-slate-500 uppercase tracking-wider">Firebase Firestore</span>
+                  <p className={`text-lg font-bold mt-1 ${firestoreConnected === true ? 'text-emerald-700' : firestoreConnected === false ? 'text-amber-700' : 'text-slate-900'}`}>
+                    {firestoreConnected === null ? 'Checking…' : firestoreConnected ? 'Connected' : 'Check connection'}
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">Browser memory depends on the device</p>
+                  <p className="text-xs text-slate-400 mt-1">Read-only connection test against the configured database</p>
                 </div>
 
                 <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-2xs">
