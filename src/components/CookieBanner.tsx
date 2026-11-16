@@ -7,34 +7,43 @@ export const CookieBanner: React.FC = () => {
   const [analyticsConsent, setAnalyticsConsent] = useState(false);
 
   useEffect(() => {
-    const consent = localStorage.getItem('ranknova_privacy_consent');
-    if (!consent) {
+    // This brand uses a new consent record; older RankNova preferences are not
+    // silently treated as consent to ToolsCresta Google Analytics tracking.
+    try {
+      const saved = JSON.parse(localStorage.getItem('toolscresta_privacy_consent') || 'null');
+      if (!saved || typeof saved.analytics !== 'boolean') {
+        setIsVisible(true);
+      } else {
+        setAnalyticsConsent(saved.analytics);
+      }
+    } catch {
       setIsVisible(true);
     }
   }, []);
 
-  const handleAcceptAll = () => {
-    localStorage.setItem(
-      'ranknova_privacy_consent',
-      JSON.stringify({ essential: true, analytics: true, timestamp: new Date().toISOString() })
-    );
+  const applyAnalyticsChoice = (allowed: boolean) => {
+    const consent = { essential: true, analytics: allowed, timestamp: new Date().toISOString() };
+    localStorage.setItem('toolscresta_privacy_consent', JSON.stringify(consent));
+    // Consent Mode v2 is initialized as denied in index.source.html before
+    // gtag.js. Only analytics_storage is granted by analytics consent.
+    const tag = (window as Window & { gtag?: (...args: unknown[]) => void }).gtag;
+    if (typeof tag === 'function') {
+      tag('consent', 'update', { analytics_storage: allowed ? 'granted' : 'denied' });
+    }
+    setAnalyticsConsent(allowed);
     setIsVisible(false);
+  };
+
+  const handleAcceptAll = () => {
+    applyAnalyticsChoice(true);
   };
 
   const handleEssentialOnly = () => {
-    localStorage.setItem(
-      'ranknova_privacy_consent',
-      JSON.stringify({ essential: true, analytics: false, timestamp: new Date().toISOString() })
-    );
-    setIsVisible(false);
+    applyAnalyticsChoice(false);
   };
 
   const handleSaveCustom = () => {
-    localStorage.setItem(
-      'ranknova_privacy_consent',
-      JSON.stringify({ essential: true, analytics: analyticsConsent, timestamp: new Date().toISOString() })
-    );
-    setIsVisible(false);
+    applyAnalyticsChoice(analyticsConsent);
     setShowPreferences(false);
   };
 
@@ -54,7 +63,7 @@ export const CookieBanner: React.FC = () => {
           <h3 className="text-sm font-semibold text-slate-900">Your Privacy is Protected</h3>
           <p className="mt-1 text-xs text-slate-600 leading-relaxed">
             ToolsCresta uses browser processing where supported. Optional cloud features may send files to processing services.
-            We use strictly essential storage to deliver tool functionality.
+            Optional Google Analytics traffic measurement runs according to your analytics choice. Advertising consent is not requested here.
           </p>
 
           {showPreferences && (
@@ -64,7 +73,7 @@ export const CookieBanner: React.FC = () => {
                 <input type="checkbox" checked disabled className="rounded text-blue-600 focus:ring-blue-500" />
               </label>
               <label className="flex items-center justify-between text-slate-700 cursor-pointer">
-                <span>Anonymous Performance Analytics</span>
+                <span>Google Analytics (optional)</span>
                 <input
                   type="checkbox"
                   checked={analyticsConsent}
