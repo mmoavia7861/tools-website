@@ -24,6 +24,34 @@ test('admin provider status does not expose credentials', async () => {
   assert.equal(JSON.stringify(body).includes('secret'), false);
 });
 
+test('Adobe mode exposes only the public runtime Turnstile site key', async () => {
+  const testEnv = {
+    ...env,
+    ADOBE_CLIENT_ID: 'private-adobe-client',
+    ADOBE_CLIENT_SECRET: 'private-adobe-secret',
+    TURNSTILE_SECRET: 'private-turnstile-secret',
+    TURNSTILE_SITE_KEY: '0x4AAAAAA_PUBLIC_SITE_KEY'
+  };
+  const response = await worker.fetch(new Request(base + '/api/integrations/status'), testEnv);
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.adobe, true);
+  assert.equal(data.turnstile, true);
+  assert.equal(data.turnstileSiteKey, testEnv.TURNSTILE_SITE_KEY);
+  const body = JSON.stringify(data);
+  assert.ok(!body.includes(testEnv.ADOBE_CLIENT_ID));
+  assert.ok(!body.includes(testEnv.ADOBE_CLIENT_SECRET));
+  assert.ok(!body.includes(testEnv.TURNSTILE_SECRET));
+  assert.ok(!body.includes('access_token'));
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+});
+
+test('Adobe site-key status is empty when no public key is configured', async () => {
+  const response = await worker.fetch(new Request(base + '/api/integrations/status'), env);
+  const data = await response.json();
+  assert.equal(data.turnstileSiteKey, '');
+});
+
 test('configuration status never exposes API secrets', async () => {
   const response = await worker.fetch(new Request(base + '/api/integrations/status'), env);
   assert.equal(response.status, 200);
