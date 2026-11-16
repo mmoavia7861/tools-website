@@ -74,16 +74,24 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Contact form submissions
+    // Public visitors may CREATE a contact inquiry, but never read messages.
+    // Limit writable fields so visitors cannot inject admin flags or private
+    // settings into an arbitrary document. Only the owner can update status.
     match /contact_messages/{messageId} {
       allow get, list: if isAdmin();
       allow create: if isValidId(messageId) &&
+        incoming().keys().hasOnly(['name', 'email', 'category', 'message', 'status', 'createdAt']) &&
+        incoming().keys().hasAll(['name', 'email', 'category', 'message', 'status', 'createdAt']) &&
         incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 120 &&
         incoming().email is string && incoming().email.size() > 3 && incoming().email.size() <= 256 &&
         incoming().message is string && incoming().message.size() > 0 && incoming().message.size() <= 5000 &&
         incoming().category in ['General question', 'Tool issue', 'Privacy request', 'Copyright/DMCA', 'Security report'] &&
+        incoming().createdAt is string && incoming().createdAt.size() >= 20 && incoming().createdAt.size() <= 35 &&
         incoming().status == 'new';
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+        incoming().status in ['new', 'read', 'resolved'];
+      allow delete: if isAdmin();
     }
 
     // Admin settings
