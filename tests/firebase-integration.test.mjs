@@ -51,3 +51,10 @@ test('Admin inbox reads saved Firestore messages only for authenticated owner', 
   assert.match(admin, /updateDoc\(doc\(db,\s*'contact_messages',\s*messageId\),\s*\{\s*status\s*\}\)/);
   assert.match(admin, /testConnection\(\)/);
 });
+
+test('Admin UI reacts to ID token provider changes even when Firebase UID is unchanged', () => {
+  assert.match(service, /onIdTokenChanged/);
+  assert.match(admin, /onIdTokenChanged\(auth,/);
+  assert.match(admin, /token\.signInProvider === 'custom'/);
+  assert.match(admin, /token\.claims\.toolscresta_otp === true/);
+});
