@@ -3,7 +3,14 @@ import type { User } from 'firebase/auth';
 import { signInWithCustomToken, signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
-type OtpReply = { success?: boolean; error?: string; message?: string; customToken?: string };
+type OtpReply = {
+  success?: boolean;
+  error?: string;
+  errorCode?: string;
+  message?: string;
+  customToken?: string;
+  expiresAt?: number;
+};
 
 async function checkOtpConfiguration(user: User): Promise<string[]> {
   try {
@@ -40,7 +47,25 @@ export function AdminOtpChallenge({ user }: { user: User }) {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
   const requestedOnMount = useRef(false);
+
+  useEffect(() => {
+    if (expiresAt === null) {
+      setSecondsRemaining(null);
+      return;
+    }
+    const tick = () => setSecondsRemaining(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [expiresAt]);
+
+  const expired = sent && secondsRemaining === 0;
+  const readableTime = secondsRemaining !== null
+    ? `${Math.floor(secondsRemaining / 60)}:${String(secondsRemaining % 60).padStart(2, '0')}`
+    : null;
 
   const sendCode = useCallback(async () => {
     if (sending || busy) return;
@@ -49,7 +74,14 @@ export function AdminOtpChallenge({ user }: { user: User }) {
     setNotice('');
     try {
       const result = await postOtp(user, 'send');
+      setCode('');
       setSent(true);
+      // Backend returns the actual expiry; local countdown is informational only.
+      // The Durable Object remains the authority for code expiration.
+      const deadline = typeof result.expiresAt === 'number' && Number.isFinite(result.expiresAt)
+        ? result.expiresAt : Date.now() + 5 * 60 * 1000;
+      setExpiresAt(deadline);
+      setSecondsRemaining(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
       setNotice(result.message || 'Verification code sent. Check your Gmail inbox.');
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'Unable to send verification code.';
@@ -73,7 +105,12 @@ export function AdminOtpChallenge({ user }: { user: User }) {
   const verify = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busy || !/^\d{6}$/.test(code)) {
-      setError('Please enter the six-digit code from your email.');
+      setError('Please enter all six digits from your email.');
+      return;
+    }
+    if (expired) {
+      setError('Your code has expired. Request a new email code.');
+      setCode('');
       return;
     }
     setBusy(true);
@@ -86,7 +123,14 @@ export function AdminOtpChallenge({ user }: { user: User }) {
       await signInWithCustomToken(auth, result.customToken);
       setCode('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid or expired code.');
+      const message = err instanceof Error ? err.message : 'Unable to verify the email code.';
+      if (/expired|unavailable|session changed|no active verification code/i.test(message)) {
+        setCode('');
+        setExpiresAt(null);
+        setSent(false);
+        setNotice('');
+      }
+      setError(message);
     } finally { setBusy(false); }
   };
 
@@ -113,14 +157,19 @@ export function AdminOtpChallenge({ user }: { user: User }) {
                 ? "All 6 digits entered. You can verify your code now."
                 : `Enter the full 6-digit code (${code.length}/6 digits entered). The button activates only when all six digits are present.`}
             </p>
-            <button type="submit" disabled={busy || code.length !== 6}
+            <button type="submit" disabled={busy || code.length !== 6 || expired}
               className="w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white disabled:opacity-50">
-              {busy ? 'Verifying…' : code.length !== 6 ? `Enter all 6 digits (${code.length}/6)` : 'Verify code & open admin panel'}
+              {busy ? 'Verifying…' : expired ? 'Code expired — request a new code' : code.length !== 6 ? `Enter all 6 digits (${code.length}/6)` : 'Verify code & open admin panel'}
             </button>
           </form>
+          {sent && <p className={expired ? "text-sm font-semibold text-amber-800" : "text-sm text-slate-700"} role="status">
+            {expired
+              ? 'This code is no longer valid. Request a new one before verifying.'
+              : `Code expires in ${readableTime ?? '5:00'} (5-minute validity). Only the newest email code works.`}
+          </p>}
           <button type="button" onClick={() => void sendCode()} disabled={sending || busy}
             className="text-sm font-semibold text-blue-600 hover:underline disabled:opacity-50">
-            {sending ? 'Sending verification code…' : sent ? 'Resend code (60-second cooldown)' : 'Send verification code'}
+            {sending ? 'Sending verification code…' : sent ? 'Request a new code (60-second resend limit)' : 'Send verification code'}
           </button>
           {notice && <p role="status" className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-900">{notice}</p>}
           {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
