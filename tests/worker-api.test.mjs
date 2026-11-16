@@ -424,6 +424,7 @@ test('Adobe REST export flow uploads a real PDF and downloads DOCX (mocked upstr
       }
       if (String(url) === storage && options.method === 'PUT') {
         assert.equal(options.headers['Content-Type'], 'application/pdf');
+        assert.ok(options.body instanceof File, 'Upload must use a sized File body, not a full ArrayBuffer');
         return new Response('', { status: 200 });
       }
       if (String(url) === 'https://pdf-services.adobe.io/operation/exportpdf') {
@@ -488,6 +489,7 @@ test('Adobe REST create flow uploads DOCX and returns PDF (mocked upstream)', as
       if (String(url).endsWith('/assets')) return Response.json({ assetID: 'urn:aaid:AS:UE1:test-docx', uploadUri: storage });
       if (String(url) === storage && options.method === 'PUT') {
         assert.equal(options.headers['Content-Type'], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        assert.ok(options.body instanceof File, 'Upload must use a sized File body, not a full ArrayBuffer');
         return new Response('', { status: 200 });
       }
       if (String(url).endsWith('/operation/createpdf')) {
