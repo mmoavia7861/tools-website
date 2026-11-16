@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-ranknova-c6bc0a00-49ea-4084-aede-e1345d18a608",
+      "rules": "firestore.rules"
+    }
+  ]
+}
