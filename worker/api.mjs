@@ -461,9 +461,10 @@ async function handleAdobe(request, env, mode) {
     const asset = await createAsset.json();
     if (!asset.assetID || !safeAdobeStorageUrl(asset.uploadUri)) return error("Adobe provided an unexpected upload location.", 502);
     const uploaded = await fetchTimed(asset.uploadUri, {
-      // Stream the already validated File to Adobe S3 without creating
-      // another full 50 MB copy in the Cloudflare Worker.
-      method: "PUT", headers: { "Content-Type": mediaType }, body: file.stream(), duplex: "half",
+      // Upload the validated File/Blob directly: fetch can stream its contents
+      // without another full ArrayBuffer allocation and knows the Blob length
+      // for Adobe's presigned S3 upload (unlike an unknown-length stream).
+      method: "PUT", headers: { "Content-Type": mediaType }, body: file,
     }, 90000);
     if (!uploaded.ok) return error("Adobe file upload failed.", 502);
     const op = mode === "pdf-to-word" ? "exportpdf" : "createpdf";
