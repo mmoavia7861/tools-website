@@ -1,8 +1,9 @@
 import React from 'react';
+import { usePublicBlogPosts } from '../services/blogContent';
 import { ArrowLeft, Clock, User, Calendar, ShieldCheck } from 'lucide-react';
 import { SEOHead } from '../components/SEOHead';
 import { AdSlot } from '../components/AdSlot';
-import { STARTER_BLOG_POSTS } from '../data/initialContent';
+
 
 interface BlogPostViewProps {
   slug: string;
@@ -10,7 +11,8 @@ interface BlogPostViewProps {
 }
 
 export const BlogPostView: React.FC<BlogPostViewProps> = ({ slug, navigate }) => {
-  const post = STARTER_BLOG_POSTS.find((p) => p.slug === slug);
+  const { posts } = usePublicBlogPosts();
+  const post = posts.find((p) => p.slug === slug);
 
   if (!post) {
     return (
