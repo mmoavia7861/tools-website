@@ -36,6 +36,7 @@ import {
   collection,
   getDocs,
   updateDoc,
+  deleteDoc,
   query,
   orderBy,
   limit,
@@ -91,9 +92,17 @@ export const AdminView: React.FC = () => {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messagesError, setMessagesError] = useState('');
   const [messageUpdating, setMessageUpdating] = useState('');
+  const [inboxSearch, setInboxSearch] = useState('');
+  const [inboxFilter, setInboxFilter] = useState<'all' | 'new' | 'read' | 'resolved'>('all');
   const [firestoreConnected, setFirestoreConnected] = useState<boolean | null>(null);
 
   const isOwner = isOwnerOtpSession(currentUser?.email, emailVerified, authProvider, otpVerified);
+  const filteredMessages = messages.filter(message => {
+    const matchesStatus = inboxFilter === 'all' || message.status === inboxFilter;
+    const q = inboxSearch.trim().toLowerCase();
+    return matchesStatus && (!q ||
+      [message.name, message.email, message.category, message.message].some(value => value.toLowerCase().includes(q)));
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -183,7 +192,7 @@ export const AdminView: React.FC = () => {
       const results = await getDocs(query(
         collection(db, 'contact_messages'),
         orderBy('createdAt', 'desc'),
-        limit(50)
+        limit(100)
       ));
       const records: ContactMessage[] = results.docs.map(result => {
         const value = result.data();
@@ -219,6 +228,16 @@ export const AdminView: React.FC = () => {
     } finally {
       setMessageUpdating('');
     }
+  };
+
+  const deleteMessage = async (messageId: string) => {
+    if (!isOwner || messageUpdating || !window.confirm('Permanently delete this saved inquiry?')) return;
+    setMessageUpdating(messageId); setMessagesError('');
+    try {
+      await deleteDoc(doc(db, 'contact_messages', messageId));
+      setMessages(current => current.filter(message => message.id !== messageId));
+    } catch { setMessagesError('Could not delete inquiry. Check Firestore rules.'); }
+    finally { setMessageUpdating(''); }
   };
 
   useEffect(() => {
@@ -547,20 +566,35 @@ export const AdminView: React.FC = () => {
               <div className="flex flex-wrap gap-3 items-center justify-between">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Contact Inbox</h2>
-                  <p className="mt-1 text-xs text-slate-500">Latest 50 inquiries stored in Firebase Firestore. Visible only to the verified admin.</p>
+                  <p className="mt-1 text-xs text-slate-500">Latest 100 inquiries stored in Firebase Firestore. Visible only to the verified admin.</p>
                 </div>
                 <button type="button" onClick={() => void loadMessages()} disabled={messagesLoading}
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">
                   <RefreshCw className="inline h-4 w-4 mr-1" /> {messagesLoading ? 'Loading…' : 'Refresh'}
                 </button>
               </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs font-semibold text-slate-700">Search inquiries
+                  <input value={inboxSearch} onChange={e => setInboxSearch(e.target.value)}
+                    placeholder="Search name, email or question"
+                    className="mt-1 block w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">Status
+                  <select value={inboxFilter} onChange={e => setInboxFilter(e.target.value as 'all' | 'new' | 'read' | 'resolved')}
+                    className="mt-1 block w-full rounded-lg border border-slate-300 p-2.5 text-sm">
+                    <option value="all">All inquiries</option><option value="new">New</option>
+                    <option value="read">Read</option><option value="resolved">Resolved</option>
+                  </select>
+                </label>
+              </div>
+              <p className="text-xs text-slate-500">Showing {filteredMessages.length} of {messages.length} inquiries · {messages.filter(m => m.status === 'new').length} new. Private chats are not automatically collected.</p>
               {messagesError && <p role="alert" className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{messagesError}</p>}
               {messagesLoading && <p role="status" className="text-sm text-slate-500">Loading saved contact messages…</p>}
               {!messagesLoading && !messagesError && messages.length === 0 && (
                 <p className="rounded-xl bg-slate-50 p-6 text-sm text-slate-600">No saved inquiries in this Firestore database yet.</p>
               )}
               <div className="space-y-3">
-                {messages.map(message => (
+                {filteredMessages.map(message => (
                   <article key={message.id} className="rounded-xl border border-slate-200 p-4 space-y-3">
                     <div className="flex flex-wrap justify-between gap-2">
                       <div>
@@ -574,13 +608,18 @@ export const AdminView: React.FC = () => {
                       </div>
                     </div>
                     <p className="text-sm text-slate-800 whitespace-pre-wrap break-words">{message.message}</p>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button type="button" disabled={messageUpdating === message.id || message.status !== 'new'}
                         onClick={() => void updateMessageStatus(message.id, 'read')}
                         className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-40">Mark read</button>
                       <button type="button" disabled={messageUpdating === message.id || message.status === 'resolved'}
                         onClick={() => void updateMessageStatus(message.id, 'resolved')}
                         className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-40">Resolve</button>
+                      <a href={`mailto:${encodeURIComponent(message.email)}?subject=${encodeURIComponent('ToolsCresta support: ' + message.category)}`}
+                        className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700">Reply by email</a>
+                      <button type="button" disabled={messageUpdating === message.id}
+                        onClick={() => void deleteMessage(message.id)}
+                        className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-40">Delete</button>
                     </div>
                   </article>
                 ))}
