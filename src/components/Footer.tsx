@@ -49,7 +49,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate, tools }) => {
                   onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate(tool.path); } }}
                   className="text-slate-600 hover:text-blue-600 transition">{tool.title}</a>
               </li>)}
-            </ul>       </ul>
+            </ul>
           </div>
 
           {/* Company & Resources */}
