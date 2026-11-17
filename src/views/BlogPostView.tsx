@@ -11,8 +11,10 @@ interface BlogPostViewProps {
 }
 
 export const BlogPostView: React.FC<BlogPostViewProps> = ({ slug, navigate }) => {
-  const { posts } = usePublicBlogPosts();
+  const { posts, loading } = usePublicBlogPosts();
   const post = posts.find((p) => p.slug === slug);
+
+  if (loading) return <div role="status" className="py-20 text-center text-slate-600">Loading article…</div>;
 
   if (!post) {
     return (
