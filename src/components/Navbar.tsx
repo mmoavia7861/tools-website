@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
+import { INSTALLED_TOOLS } from '../data/toolCatalog';
+import type { ToolEntry } from '../data/toolCatalog';
 import { Menu, X, QrCode, FileText, Sparkles, CreditCard, Video, Lock, ArrowRight } from 'lucide-react';
 
 interface NavbarProps {
   currentPath: string;
   navigate: (path: string) => void;
+  tools: ToolEntry[];
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate, tools }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const available = new Map(tools.map(tool => [tool.path, tool]));
   const navItems = [
     { label: 'QR Generator', path: '/qr-code-generator', icon: QrCode },
     { label: 'PDF Editor', path: '/edit-pdf', icon: FileText },
@@ -19,7 +23,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
     { label: 'AI Cards', path: '/ai-card-generator', icon: Sparkles },
     { label: 'Blog', path: '/blog' },
     { label: 'About', path: '/about' },
-  ];
+  ].filter(item => !INSTALLED_TOOLS.some(tool => tool.path === item.path) || available.has(item.path))
+   .map(item => ({ ...item, label: available.get(item.path)?.title || item.label }));
 
   const handleNav = (path: string) => {
     navigate(path);
@@ -93,7 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, navigate }) => {
 
           <button
             type="button"
-            onClick={() => handleNav('/qr-code-generator')}
+            onClick={() => handleNav(tools[0]?.path || '/')}
             className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition"
           >
             <span>Free Tools</span>
