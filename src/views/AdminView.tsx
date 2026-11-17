@@ -16,7 +16,8 @@ import {
   Eye,
   Plus,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Edit3
 } from 'lucide-react';
 import { SEOHead } from '../components/SEOHead';
 import {
@@ -44,6 +45,9 @@ import {
 import { STARTER_BLOG_POSTS, type BlogPostItem } from '../data/initialContent';
 import { OWNER_EMAIL, isOwnerOtpSession } from '../utils/adminAccess';
 import { AdminOtpChallenge } from '../components/AdminOtpChallenge';
+import { AdminToolManager } from '../components/AdminToolManager';
+import { AdminHomeManager } from '../components/AdminHomeManager';
+import { AdminBlogManager } from '../components/AdminBlogManager';
 
 export const AdminView: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -59,7 +63,7 @@ export const AdminView: React.FC = () => {
   const [emailVerified, setEmailVerified] = useState(false);
   const [authProvider, setAuthProvider] = useState<string | null>(null);
   const [otpVerified, setOtpVerified] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'blog' | 'ads' | 'ai' | 'messages'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'tools' | 'homepage' | 'blog' | 'ads' | 'ai' | 'messages'>('overview');
 
   // Server health data
   const [healthData, setHealthData] = useState<any>(null);
@@ -485,6 +489,14 @@ export const AdminView: React.FC = () => {
               <span>System & Providers</span>
             </button>
 
+            <button type="button" onClick={() => setActiveTab('tools')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold ${activeTab === 'tools' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}>
+              <Plus className="h-4 w-4" /> Tool Manager
+            </button>
+            <button type="button" onClick={() => setActiveTab('homepage')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold ${activeTab === 'homepage' ? 'bg-blue-600 text-white' : 'bg-white text-slate-700 border border-slate-200'}`}>
+              <Edit3 className="h-4 w-4" /> Website Content
+            </button>
             <button
               type="button"
               onClick={() => setActiveTab('blog')}
@@ -638,48 +650,9 @@ export const AdminView: React.FC = () => {
             </div>
           )}
 
-          {/* TAB 2: BLOG CMS */}
-          {activeTab === 'blog' && (
-            <div className="rounded-2xl bg-white border border-slate-200 p-6 space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">Blog Article Content Management</h2>
-                  <p className="text-xs text-slate-500">Current article status is read-only. Live publishing requires an authenticated content backend and site-side data integration.</p>
-                </div>
-              </div>
-
-              <div className="divide-y divide-slate-100 border rounded-xl overflow-hidden">
-                {blogPosts.map((post) => (
-                  <div key={post.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                            post.published ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {post.published ? 'Published' : 'Draft'}
-                        </span>
-                        <span className="text-xs text-slate-400 font-mono">/{post.slug}</span>
-                      </div>
-                      <h3 className="text-sm font-bold text-slate-900 mt-1">{post.title}</h3>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled
-                        title="Publishing is unavailable until the blog is connected to an owner-authorized content store."
-                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                      >
-                        {post.published ? 'Published (read-only)' : 'Draft (read-only)'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {activeTab === 'tools' && <AdminToolManager />}
+          {activeTab === 'homepage' && <AdminHomeManager />}
+          {activeTab === 'blog' && <AdminBlogManager />}
 
           {/* TAB 3: ADSENSE SETTINGS */}
           {activeTab === 'ads' && (
