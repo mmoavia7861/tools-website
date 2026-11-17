@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { SEOHead } from '../components/SEOHead';
 import { AdSlot } from '../components/AdSlot';
-import { FAQ_ITEMS, HOME_BLOG_PREVIEWS } from '../data/homeContent';
+import { FAQ_ITEMS } from '../data/homeContent';
+import { usePublicBlogPosts } from '../services/blogContent';
 import type { ToolEntry } from '../data/toolCatalog';
 import { usePublicHomeSettings } from '../services/siteContent';
 
@@ -27,6 +28,7 @@ interface HomeViewProps {
 
 export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
   const home = usePublicHomeSettings();
+  const { posts: blogPosts } = usePublicBlogPosts();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const toggleFaq = (index: number) => {
@@ -38,7 +40,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
     '@type': 'WebSite',
     name: 'ToolsCresta',
     url: typeof window !== 'undefined' ? new URL(import.meta.env.BASE_URL, window.location.origin).href : 'https://toolscresta.com/',
-    description: 'Free, fast, and privacy-first online tools: QR Code Generator, PDF Compressor, and AI Background Remover.',
+    description: home.description,
     publisher: {
       '@type': 'Organization',
       name: 'ToolsCresta'
@@ -48,8 +50,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
   return (
     <>
       <SEOHead
-        title="ToolsCresta — Free QR Code, PDF Compression & Background Removal Tools"
-        description="Create QR codes, compress PDF files, and remove image backgrounds online with ToolsCresta. Fast, simple tools designed with privacy and security in mind."
+        title={`${home.headline} ${home.highlight} | ToolsCresta`}
+        description={home.description}
         canonicalPath="/"
         jsonLd={jsonLd}
       />
@@ -74,7 +76,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <button
               type="button"
-              onClick={() => navigate('/qr-code-generator')}
+              onClick={() => document.getElementById('all-tools-heading')?.scrollIntoView({ behavior: 'smooth' })}
               className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-base font-medium text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 transition"
             >
               <span>Explore Free Tools</span>
@@ -332,7 +334,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {HOME_BLOG_PREVIEWS.map((post) => (
+            {blogPosts.slice(0, 3).map((post) => (
               <article
                 key={post.id}
                 className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-6 hover:bg-white hover:shadow-md transition duration-200"
