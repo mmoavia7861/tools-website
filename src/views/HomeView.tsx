@@ -17,12 +17,16 @@ import {
 import { SEOHead } from '../components/SEOHead';
 import { AdSlot } from '../components/AdSlot';
 import { FAQ_ITEMS, HOME_BLOG_PREVIEWS } from '../data/homeContent';
+import type { ToolEntry } from '../data/toolCatalog';
+import { usePublicHomeSettings } from '../services/siteContent';
 
 interface HomeViewProps {
   navigate: (path: string) => void;
+  tools: ToolEntry[];
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
+export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
+  const home = usePublicHomeSettings();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const toggleFaq = (index: number) => {
@@ -55,17 +59,16 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-3.5 py-1 text-xs font-semibold text-blue-700 shadow-xs mb-6">
             <ShieldCheck className="h-4 w-4" />
-            <span>Browser-first tools • Server conversion clearly labelled</span>
+            <span>{home.announcement}</span>
           </div>
 
           <h1 className="text-4xl font-extrabold tracking-tight text-[#0F172A] sm:text-5xl md:text-6xl max-w-4xl mx-auto leading-tight">
-            Free Online Tools. <br />
-            <span className="text-blue-600">Fast, Secure, Private.</span>
+            {home.headline} <br />
+            <span className="text-blue-600">{home.highlight}</span>
           </h1>
 
           <p className="mt-5 max-w-2xl mx-auto text-base sm:text-lg text-slate-600 leading-relaxed">
-            Create QR codes, compress PDFs, and remove image backgrounds with simple tools built for speed and strict privacy.
-            Browser-first utilities and optional server-side document conversion. Check each tool for privacy details.
+            {home.description}
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
@@ -126,20 +129,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
           <h2 id="all-tools-heading" className="text-2xl font-bold text-slate-900 mb-2">Browse all online tools</h2>
           <p className="text-sm text-slate-600 mb-5">Choose a tool to open its dedicated page. Features depend on your browser and device.</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {[
-              { title: 'Compress PDF', path: '/compress-pdf' },
-              { title: 'AI Background Remover', path: '/background-remover' },
-              { title: 'Image to PDF', path: '/image-to-pdf' },
-              { title: 'Edit PDF', path: '/edit-pdf' },
-              { title: 'QR Code Generator', path: '/qr-code-generator' },
-              { title: 'Visiting Card Maker', path: '/visiting-card-generator' },
-              { title: 'AI Card & Invitation Maker', path: '/ai-card-generator' },
-              { title: 'Wedding Card Maker', path: '/wedding-card-maker' },
-              { title: 'Birthday Card Maker', path: '/birthday-card-maker' },
-              { title: 'Video Compressor', path: '/compress-video' },
-              { title: 'PDF to Word', path: '/pdf-to-word' },
-              { title: 'Word to PDF', path: '/word-to-pdf' }
-            ].map(tool => (
+            {tools.map(tool => (
               <button key={tool.path} type="button" onClick={() => navigate(tool.path)}
                 className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left text-sm font-semibold text-blue-700 hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
                 {tool.title} <span aria-hidden="true">→</span>
@@ -149,7 +139,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
         </div>
       </section>
 
-      {/* Main Tools Section - EXACTLY THREE TOOLS */}
+      {/* Admin-featured tools */}
       <section className="py-16 md:py-20 bg-[#F8FAFC]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
@@ -162,236 +152,24 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate }) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Tool 1: QR Code Generator */}
-            <div className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition duration-200">
-              <div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600 mb-4">
-                  <QrCode className="h-5 w-5" />
+            {tools.filter(tool => tool.featured).map(tool => (
+              <article key={tool.id} className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition">
+                <div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600 mb-4">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">{tool.title}</h3>
+                  <p className="mt-2 text-sm text-slate-600 leading-relaxed">{tool.description}</p>
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">QR Code Generator</h3>
-                <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Generate clean QR codes for URLs, text, Wi-Fi, and vCards. Customize colors and margin, then export SVG or high-res PNG.
-                </p>
-                <ul className="mt-4 space-y-1.5 text-xs text-slate-500">
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Pure client-side encoding</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Crisp vector SVG & PNG export</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="mt-6 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => navigate('/qr-code-generator')}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 transition"
-                >
-                  <span>Launch QR Tool</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
+                <button type="button" onClick={() => navigate(tool.path)}
+                  className="mt-6 w-full flex justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+                  Open tool <ArrowRight className="h-4 w-4" />
                 </button>
-              </div>
-            </div>
-
-            {/* Tool 2: PDF Compressor */}
-            <div className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition duration-200">
-              <div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 mb-4">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">PDF Compressor</h3>
-                <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Reduce PDF document size using object stream compaction and duplicate font pruning. Reports honest before/after metrics.
-                </p>
-                <ul className="mt-4 space-y-1.5 text-xs text-slate-500">
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>On-device processing first</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Honest reduction percentages</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="mt-6 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => navigate('/compress-pdf')}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 transition"
-                >
-                  <span>Launch Compressor</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Tool 3: Image to PDF Converter */}
-            <div className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition duration-200">
-              <div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 mb-4">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">Images to PDF</h3>
-                <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Convert JPG, PNG, and WebP images into a single formatted PDF document. Drag to reorder pages with customizable A4/Letter margins.
-                </p>
-                <ul className="mt-4 space-y-1.5 text-xs text-slate-500">
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>100% on-device conversion</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Custom page sizes & margins</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="mt-6 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => navigate('/image-to-pdf')}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 transition"
-                >
-                  <span>Convert Images</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Tool 4: PDF Editor & Signer */}
-            <div className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition duration-200">
-              <div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600 mb-4">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">PDF Editor & Signer</h3>
-                <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Open any PDF to rearrange or rotate pages, add custom words and text boxes, and insert drawn or typed calligraphy signatures directly on documents.
-                </p>
-                <ul className="mt-4 space-y-1.5 text-xs text-slate-500">
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Add words, fonts & highlights</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Draw, type, or upload signatures</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="mt-6 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => navigate('/edit-pdf')}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 transition"
-                >
-                  <span>Launch PDF Editor</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Tool 5: Video Compressor */}
-            <div className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition duration-200">
-              <div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 text-rose-600 mb-4">
-                  <Video className="h-5 w-5" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">Video Compressor</h3>
-                <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Shrink MP4, WebM, and MOV video file sizes for Discord, WhatsApp, or email attachments. Tune bitrate and downscale resolution with on-device hardware acceleration.
-                </p>
-                <ul className="mt-4 space-y-1.5 text-xs text-slate-500">
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Presets for Discord (under 25MB) &amp; WhatsApp</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>100% on-device private encoding</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="mt-6 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => navigate('/compress-video')}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 transition"
-                >
-                  <span>Launch Video Compressor</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Tool 6: AI Background Remover */}
-            <div className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition duration-200">
-              <div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-50 text-purple-600 mb-4">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">AI Background Remover</h3>
-                <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Isolate foreground subjects from portraits and product shots. Export transparent PNGs or solid-color flattened JPEGs.
-                </p>
-                <ul className="mt-4 space-y-1.5 text-xs text-slate-500">
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>32-bit transparent PNG alpha</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Before / after split comparison</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="mt-6 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => navigate('/background-remover')}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 transition"
-                >
-                  <span>Launch Remover</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Tool 7: Visiting Card Maker */}
-            <div className="flex flex-col justify-between rounded-2xl bg-white border border-slate-200/90 p-6 shadow-xs hover:shadow-md hover:border-blue-300 transition duration-200">
-              <div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600 mb-4">
-                  <CreditCard className="h-5 w-5" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">Visiting Card Maker</h3>
-                <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Design professional business and visiting cards with front & back layouts, contact vCard QR codes, custom themes, and 300 DPI print-ready PDF export.
-                </p>
-                <ul className="mt-4 space-y-1.5 text-xs text-slate-500">
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Front & Back 3.5" × 2" layouts</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Scannable vCard QR & 300 DPI PDF</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="mt-6 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => navigate('/visiting-card-generator')}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 transition"
-                >
-                  <span>Design Visiting Card</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
+              </article>
+            ))}
+            {tools.every(tool => !tool.featured) && (
+              <p className="col-span-full text-center text-sm text-slate-600">Browse the tool directory above for all available utilities.</p>
+            )}
           </div>
         </div>
       </section>
