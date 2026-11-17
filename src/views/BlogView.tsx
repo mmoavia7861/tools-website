@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BookOpen, Clock, ArrowRight, User, Search } from 'lucide-react';
 import { SEOHead } from '../components/SEOHead';
 import { AdSlot } from '../components/AdSlot';
-import { STARTER_BLOG_POSTS, type BlogPostItem } from '../data/initialContent';
+import { usePublicBlogPosts } from '../services/blogContent';
 
 interface BlogViewProps {
   navigate: (path: string) => void;
@@ -10,8 +10,9 @@ interface BlogViewProps {
 
 export const BlogView: React.FC<BlogViewProps> = ({ navigate }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const { posts, error: feedError } = usePublicBlogPosts();
 
-  const filteredPosts = STARTER_BLOG_POSTS.filter(
+  const filteredPosts = posts.filter(
     (post) =>
       post.published &&
       (post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -54,6 +55,7 @@ export const BlogView: React.FC<BlogViewProps> = ({ navigate }) => {
             </div>
           </div>
 
+          {feedError && <p role="alert" className="mb-5 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">The blog feed is temporarily unavailable. Please try again later.</p>}
           {/* Posts Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {filteredPosts.map((post) => (
