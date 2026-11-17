@@ -168,6 +168,17 @@ export const ToolAssistant: React.FC<{ navigate: (path: string) => void }> = ({ 
     }
   };
 
+  // Visitor must opt in before a chat question is transferred to Contact.
+  // We do not automatically collect private assistant conversations.
+  const sendQuestionToSupport = () => {
+    const latest = question.trim() || [...messages].reverse().find(message => message.role === 'user')?.text || '';
+    if (!latest) { setError('Type a question first, then choose Send to support.'); return; }
+    try { sessionStorage.setItem('toolscresta:support-draft', latest.slice(0, 900)); }
+    catch { setError('Could not prepare the support message. Please open Contact instead.'); return; }
+    setOpen(false);
+    navigate('/contact');
+  };
+
   const openTool = (advice: AssistantAdvice) => {
     if (!advice.toolPath) return;
     if (advice.cardKind && advice.cardPrompt) {
@@ -279,6 +290,13 @@ export const ToolAssistant: React.FC<{ navigate: (path: string) => void }> = ({ 
                 </button>
               </div>
             )}
+            <button type="button" onClick={sendQuestionToSupport}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+              Send this question to ToolsCresta support (optional)
+            </button>
+            <p className="text-[10px] text-slate-500">
+              Your chat stays private unless you choose to open the Contact form and submit your message. You can edit it before sending.
+            </p>
             {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
             <p className="flex items-start gap-1 text-[10px] leading-relaxed text-slate-400">
               <FileText className="mt-0.5 h-3 w-3 shrink-0" /> Guide file content nahi dekhta aur documents automatically upload nahi karta.
