@@ -31,22 +31,25 @@ export function usePublicBlogPosts(): { posts: BlogPostItem[]; managed: boolean;
   const [posts, setPosts] = useState<BlogPostItem[]>(STARTER_BLOG_POSTS.filter(p => p.published));
   const [managed, setManaged] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [feedLoading, setFeedLoading] = useState(false);
   const [error, setError] = useState(false);
   useEffect(() => onSnapshot(doc(db, 'site_content', 'blog_state'), snapshot => {
-    setManaged(snapshot.exists() && snapshot.data()?.managed === true);
+    const isManaged = snapshot.exists() && snapshot.data()?.managed === true;
+    if (isManaged) setFeedLoading(true);
+    setManaged(isManaged);
     setLoading(false);
   }, () => { setError(true); setLoading(false); }), []);
   useEffect(() => {
-    if (!managed) { setPosts(STARTER_BLOG_POSTS.filter(p => p.published)); return; }
+    if (!managed) { setPosts(STARTER_BLOG_POSTS.filter(p => p.published)); setFeedLoading(false); return; }
     // Firestore security rules require this filter for public list queries.
     return onSnapshot(query(collection(db, 'blog_posts'), where('published', '==', true)),
       snapshot => {
         setPosts(snapshot.docs.map(doc => readBlogPost(doc.data(), doc.id)).filter((post): post is BlogPostItem => post !== null)
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-        setError(false);
+        setError(false); setFeedLoading(false);
       },
-      () => { setPosts([]); setError(true); }
+      () => { setPosts([]); setError(true); setFeedLoading(false); }
     );
   }, [managed]);
-  return { posts, managed, error, loading };
+  return { posts, managed, error, loading: loading || feedLoading };
 }
