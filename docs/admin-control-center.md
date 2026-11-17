@@ -28,13 +28,23 @@ Firebase project `gen-lang-client-0295520231`. Use the **named Firestore databas
 ## Safe production activation
 1. Confirm Cloudflare Worker has an **active** production deployment on `toolscresta.com`, not merely a Ready build.
 2. Confirm Gmail/password + 6-digit OTP can open the existing Admin Dashboard; **do not lock yourself out** by publishing stricter rules first.
-3. Deploy this repository's `firestore.rules` to the named Firestore database using the Firebase console/CLI and the authorized project. The repository copy **does not** change production rules until you publish it.
-4. Reload Admin, open Tool Manager, rename a low-risk installed tool, Save changes, and verify the public homepage/nav/footer update in a separate signed-out session. Revert the rename.
-5. Temporarily hide a low-risk tool and verify its direct in-app route is unavailable. Restore it.
-6. Edit homepage announcement and verify the public change.
-7. Activate Blog CMS, confirm starter-post migration, save a draft, publish, then unpublish and confirm public visibility changes.
-8. Submit a Contact test inquiry through the public form. Verify it appears in Admin Inbox; mark resolved then delete.
-9. Check mobile/tablet layouts, TypeScript, tests, console errors, Cloudflare logs, security rules, page indexing and sitemap. The new CMS is client-rendered, not server-prerendered.
+3. Deploy this repository's `firestore.rules` **to the existing named database**, after comparing with any live rules:
+   - Firebase project: `gen-lang-client-0295520231`
+   - Firestore database: `ai-studio-ranknova-c6bc0a00-49ea-4084-aede-e1345d18a608` (not `(default)`).
+   - In Firebase Console, select the named database, open **Rules**, compare with `firestore.rules`, then **Publish**.
+   - Alternatively, from the **repository root**, run `npx firebase-tools@latest login` once, then
+     `npx firebase-tools@latest deploy --only firestore --project gen-lang-client-0295520231`.
+     The repository's `firebase.json` targets **only this named database**. Verify the command output shows the rules released for that database.
+   - **Do not rely only on `--only firestore:rules` for multi-database array configurations** without checking its output: some Firebase CLI versions have silently skipped rules deployment in that configuration.
+   - Publishing CLI rules can overwrite rules previously edited in the Console. Inspect the live rules first; never replace them with `allow read, write: if true`.
+   - Updating files in GitHub alone **never publishes Firestore rules**.
+4. Reload Admin, select **Retest Firebase**. This now checks a public CMS read and an owner-only inbox read directly from Firestore servers. If it reports a permissions error, confirm the correct database's published rules and OTP custom claim before trying any writes.
+5. Reload Admin, open Tool Manager, rename a low-risk installed tool, Save changes, and verify the public homepage/nav/footer update in a separate signed-out session. Revert the rename.
+6. Temporarily hide a low-risk tool and verify its direct in-app route is unavailable. Restore it.
+7. Edit homepage announcement and verify the public change.
+8. Activate Blog CMS, confirm starter-post migration, save a draft, publish, then unpublish and confirm public visibility changes.
+9. Submit a Contact test inquiry through the public form. Verify it appears in Admin Inbox; mark resolved then delete.
+10. Check mobile/tablet layouts, TypeScript, tests, console errors, Cloudflare logs, security rules, page indexing and sitemap. The new CMS is client-rendered, not server-prerendered.
 
 ## Operational limits
 - Cloudflare Worker code deployment, API keys, domain DNS, Firebase Authentication provider settings, Google AdSense approvals, server routing and new tool implementations still require developer/Cloudflare/Firebase actions.
