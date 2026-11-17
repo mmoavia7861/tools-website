@@ -61,7 +61,7 @@ try {
   assert.equal(assetErrors.length, 0, 'Compiled asset 404s: ' + JSON.stringify(assetErrors));
   assert.equal(runtimeErrors.length, 0, 'Homepage JavaScript crashes: ' + JSON.stringify(runtimeErrors));
 
-  await page.locator('header nav button').filter({ hasText: 'QR Generator' }).click();
+  await page.locator('header nav button').filter({ hasText: /QR (Code )?Generator/ }).click();
   assert.equal(new URL(page.url()).pathname, '/tools-website/qr-code-generator/', 'App navigation lost project base path');
   assert.ok((await page.locator('#root').innerText()).includes('QR'), 'QR tool page did not render');
 
