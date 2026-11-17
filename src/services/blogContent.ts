@@ -27,13 +27,15 @@ export function readBlogPost(raw: unknown, id: string): BlogPostItem | null {
 /** Articles remain static until the owner explicitly enables the Firestore CMS.
  * Once managed, only published Firestore articles can appear to visitors.
  */
-export function usePublicBlogPosts(): { posts: BlogPostItem[]; managed: boolean; error: boolean } {
+export function usePublicBlogPosts(): { posts: BlogPostItem[]; managed: boolean; error: boolean; loading: boolean } {
   const [posts, setPosts] = useState<BlogPostItem[]>(STARTER_BLOG_POSTS.filter(p => p.published));
   const [managed, setManaged] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   useEffect(() => onSnapshot(doc(db, 'site_content', 'blog_state'), snapshot => {
     setManaged(snapshot.exists() && snapshot.data()?.managed === true);
-  }, () => setError(true)), []);
+    setLoading(false);
+  }, () => { setError(true); setLoading(false); }), []);
   useEffect(() => {
     if (!managed) { setPosts(STARTER_BLOG_POSTS.filter(p => p.published)); return; }
     // Firestore security rules require this filter for public list queries.
@@ -46,5 +48,5 @@ export function usePublicBlogPosts(): { posts: BlogPostItem[]; managed: boolean;
       () => { setPosts([]); setError(true); }
     );
   }, [managed]);
-  return { posts, managed, error };
+  return { posts, managed, error, loading };
 }
