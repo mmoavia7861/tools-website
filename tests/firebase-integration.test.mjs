@@ -49,7 +49,8 @@ test('Admin inbox reads saved Firestore messages only for authenticated owner', 
   assert.match(admin, /orderBy\('createdAt',\s*'desc'\)/);
   assert.match(admin, /limit\(100\)/);
   assert.match(admin, /updateDoc\(doc\(db,\s*'contact_messages',\s*messageId\),\s*\{\s*status\s*\}\)/);
-  assert.match(admin, /testConnection\(\)/);
+  assert.match(admin, /diagnoseAdminFirestore\(\)/);
+  assert.match(service, /getDocsFromServer\(query\(collection\(db, 'contact_messages'\), limit\(1\)\)\)/);
 });
 
 test('Admin UI reacts to ID token provider changes even when Firebase UID is unchanged', () => {
