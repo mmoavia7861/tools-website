@@ -28,7 +28,7 @@ interface HomeViewProps {
 
 export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
   const home = usePublicHomeSettings();
-  const { posts: blogPosts } = usePublicBlogPosts();
+  const { posts: blogPosts, loading: blogLoading } = usePublicBlogPosts();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const toggleFaq = (index: number) => {
@@ -334,7 +334,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {blogPosts.slice(0, 3).map((post) => (
+            {(blogLoading ? [] : blogPosts.slice(0, 3)).map((post) => (
               <article
                 key={post.id}
                 className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-6 hover:bg-white hover:shadow-md transition duration-200"
