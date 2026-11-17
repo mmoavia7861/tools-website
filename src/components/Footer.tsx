@@ -1,11 +1,13 @@
 import React from 'react';
 import { ShieldCheck, Lock, Sparkles } from 'lucide-react';
+import type { ToolEntry } from '../data/toolCatalog';
 
 interface FooterProps {
   navigate: (path: string) => void;
+  tools: ToolEntry[];
 }
 
-export const Footer: React.FC<FooterProps> = ({ navigate }) => {
+export const Footer: React.FC<FooterProps> = ({ navigate, tools }) => {
   return (
     <footer className="border-t border-slate-200 bg-white text-slate-600 mt-20">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -42,72 +44,12 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
               Online Utilities
             </h3>
             <ul className="mt-3 space-y-2 text-sm">
-              <li>
-                <a
-                  href={`${import.meta.env.BASE_URL}qr-code-generator/`}
-                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/qr-code-generator'); } }}
-                  className="text-slate-600 hover:text-blue-600 transition"
-                >
-                  QR Code Generator
-                </a>
-              </li>
-              <li>
-                <a
-                  href={`${import.meta.env.BASE_URL}compress-pdf/`}
-                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/compress-pdf'); } }}
-                  className="text-slate-600 hover:text-blue-600 transition"
-                >
-                  PDF Compressor
-                </a>
-              </li>
-              <li>
-                <a
-                  href={`${import.meta.env.BASE_URL}image-to-pdf/`}
-                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/image-to-pdf'); } }}
-                  className="text-slate-600 hover:text-blue-600 transition"
-                >
-                  Image to PDF Converter
-                </a>
-              </li>
-              <li>
-                <a
-                  href={`${import.meta.env.BASE_URL}edit-pdf/`}
-                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/edit-pdf'); } }}
-                  className="text-slate-600 hover:text-blue-600 transition"
-                >
-                  PDF Editor & Organizer
-                </a>
-              </li>
-              <li>
-                <a
-                  href={`${import.meta.env.BASE_URL}background-remover/`}
-                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/background-remover'); } }}
-                  className="text-slate-600 hover:text-blue-600 transition"
-                >
-                  AI Background Remover
-                </a>
-              </li>
-              <li>
-                <a
-                  href={`${import.meta.env.BASE_URL}visiting-card-generator/`}
-                  onClick={(event) => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/visiting-card-generator'); } }}
-                  className="text-slate-600 hover:text-blue-600 transition"
-                >
-                  Visiting Card Maker
-                </a>
-              </li>
-              {[
-                { label: 'AI Card Generator', slug: 'ai-card-generator' },
-                { label: 'Wedding Card Maker', slug: 'wedding-card-maker' },
-                { label: 'Birthday Card Maker', slug: 'birthday-card-maker' }
-              ].map(tool => (
-                <li key={tool.slug}>
-                  <a href={import.meta.env.BASE_URL + tool.slug + '/'}
-                    onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate('/' + tool.slug); } }}
-                    className="text-slate-600 hover:text-blue-600 transition">{tool.label}</a>
-                </li>
-              ))}
-            </ul>
+              {tools.slice(0, 10).map(tool => <li key={tool.id}>
+                <a href={import.meta.env.BASE_URL + tool.path.slice(1) + '/'}
+                  onClick={event => { if (!event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate(tool.path); } }}
+                  className="text-slate-600 hover:text-blue-600 transition">{tool.title}</a>
+              </li>)}
+            </ul>       </ul>
           </div>
 
           {/* Company & Resources */}
