@@ -4,7 +4,16 @@ on:
   push:
     paths:
       - 'worker/**'
-      - 'src/components/AdminOtpChallenge.tsx'
+      - 'src/components/Admin*'
+      - 'src/components/ToolAssistant.tsx'
+      - 'src/views/AdminView.tsx'
+      - 'src/views/Blog*.tsx'
+      - 'src/views/HomeView.tsx'
+      - 'src/views/ContactView.tsx'
+      - 'src/services/blogContent.ts'
+      - 'src/services/siteContent.ts'
+      - 'src/data/toolCatalog.ts'
+      - 'src/App.tsx'
       - 'src/utils/adminAccess*'
       - 'src/views/AdminView.tsx'
       - 'src/services/firebase.ts'
