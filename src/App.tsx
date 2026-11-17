@@ -14,6 +14,8 @@ import { CookieBanner } from './components/CookieBanner';
 const PointerEffects = React.lazy(() => import('./components/PointerEffects').then(module => ({ default: module.PointerEffects })));
 const ToolAssistant = React.lazy(() => import('./components/ToolAssistant').then(module => ({ default: module.ToolAssistant })));
 import { HomeView } from './views/HomeView';
+import { canVisitTool, canonicalToolPath, INSTALLED_TOOLS, visibleTools } from './data/toolCatalog';
+import { usePublicToolCatalog } from './services/siteContent';
 const QRGeneratorView = React.lazy(() => import('./views/QRGeneratorView').then(module => ({ default: module.QRGeneratorView })));
 const PDFCompressorView = React.lazy(() => import('./views/PDFCompressorView').then(module => ({ default: module.PDFCompressorView })));
 const ImageToPdfView = React.lazy(() => import('./views/ImageToPdfView').then(module => ({ default: module.ImageToPdfView })));
@@ -43,6 +45,8 @@ const browserPath = () => {
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState<string>(browserPath);
+  const { tools: catalog, loading: catalogLoading } = usePublicToolCatalog();
+  const liveTools = visibleTools(catalog);
 
   // Handle browser back/forward buttons
   useEffect(() => {
@@ -68,8 +72,15 @@ export default function App() {
     // Normalization
     const path = currentPath.replace(/\/+$/, '') || '/';
 
+    // Directory settings are presentation controls, not a code execution engine.
+    // Disabled built-in tools are unlisted and blocked from client-side routes.
+    if (INSTALLED_TOOLS.some(tool => tool.path === canonicalToolPath(path))) {
+      if (catalogLoading) return <div role="status" className="px-6 py-16 text-center">Loading tool availability…</div>;
+      if (!canVisitTool(catalog, path)) return <NotFoundView navigate={navigate} />;
+    }
+
     if (path === '/') {
-      return <HomeView navigate={navigate} />;
+      return <HomeView navigate={navigate} tools={liveTools} />;
     }
 
     if (path === '/qr-code-generator') {
@@ -149,13 +160,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-[#0F172A] font-sans">
-      <Navbar currentPath={currentPath} navigate={navigate} />
+      <Navbar currentPath={currentPath} navigate={navigate} tools={liveTools} />
       <main className="flex-1">
         <React.Suspense fallback={<div role="status" aria-live="polite" className="mx-auto max-w-7xl px-6 py-16 text-center text-slate-600">Loading tool…</div>}>
           {renderCurrentRoute()}
         </React.Suspense>
       </main>
-      <Footer navigate={navigate} />
+      <Footer navigate={navigate} tools={liveTools} />
       <CookieBanner />
       {/* These non-critical enhancements load without blocking the initial page. */}
       <React.Suspense fallback={null}>
