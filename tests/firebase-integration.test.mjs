@@ -47,7 +47,7 @@ test('Admin inbox reads saved Firestore messages only for authenticated owner', 
   assert.match(admin, /if \(!isOwner\) return;/);
   assert.match(admin, /collection\(db,\s*'contact_messages'\)/);
   assert.match(admin, /orderBy\('createdAt',\s*'desc'\)/);
-  assert.match(admin, /limit\(50\)/);
+  assert.match(admin, /limit\(100\)/);
   assert.match(admin, /updateDoc\(doc\(db,\s*'contact_messages',\s*messageId\),\s*\{\s*status\s*\}\)/);
   assert.match(admin, /testConnection\(\)/);
 });
