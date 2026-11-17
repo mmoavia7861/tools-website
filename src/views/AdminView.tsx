@@ -41,7 +41,8 @@ import {
   orderBy,
   limit,
   doc,
-  testConnection
+  diagnoseAdminFirestore,
+  type FirestoreConnectionResult
 } from '../services/firebase';
 import { STARTER_BLOG_POSTS, type BlogPostItem } from '../data/initialContent';
 import { OWNER_EMAIL, isOwnerOtpSession } from '../utils/adminAccess';
@@ -94,7 +95,8 @@ export const AdminView: React.FC = () => {
   const [messageUpdating, setMessageUpdating] = useState('');
   const [inboxSearch, setInboxSearch] = useState('');
   const [inboxFilter, setInboxFilter] = useState<'all' | 'new' | 'read' | 'resolved'>('all');
-  const [firestoreConnected, setFirestoreConnected] = useState<boolean | null>(null);
+  const [firestoreStatus, setFirestoreStatus] = useState<FirestoreConnectionResult | null>(null);
+  const [firestoreChecking, setFirestoreChecking] = useState(false);
 
   const isOwner = isOwnerOtpSession(currentUser?.email, emailVerified, authProvider, otpVerified);
   const filteredMessages = messages.filter(message => {
@@ -170,17 +172,29 @@ export const AdminView: React.FC = () => {
     }
   };
 
+  const checkFirestore = async () => {
+    if (!isOwner || firestoreChecking) return;
+    setFirestoreChecking(true);
+    try {
+      const result = await diagnoseAdminFirestore();
+      setFirestoreStatus(result);
+    } finally {
+      setFirestoreChecking(false);
+    }
+  };
+
   useEffect(() => {
     if (!isOwner) {
-      setFirestoreConnected(null);
+      setFirestoreStatus(null);
       setMessages([]);
       return;
     }
     let cancelled = false;
+    setFirestoreChecking(true);
     void fetchStatus();
-    void testConnection().then(connected => {
-      if (!cancelled) setFirestoreConnected(connected);
-    });
+    void diagnoseAdminFirestore()
+      .then(result => { if (!cancelled) setFirestoreStatus(result); })
+      .finally(() => { if (!cancelled) setFirestoreChecking(false); });
     return () => { cancelled = true; };
   }, [isOwner]);
 
@@ -207,10 +221,8 @@ export const AdminView: React.FC = () => {
         };
       });
       setMessages(records);
-      setFirestoreConnected(true);
     } catch {
       setMessagesError('Unable to read inquiries from Firebase. Check the named Firestore database and deployed owner-only security rules.');
-      setFirestoreConnected(false);
     } finally {
       setMessagesLoading(false);
     }
@@ -647,10 +659,20 @@ export const AdminView: React.FC = () => {
 
                 <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-2xs">
                   <span className="text-xs text-slate-500 uppercase tracking-wider">Firebase Firestore</span>
-                  <p className={`text-lg font-bold mt-1 ${firestoreConnected === true ? 'text-emerald-700' : firestoreConnected === false ? 'text-amber-700' : 'text-slate-900'}`}>
-                    {firestoreConnected === null ? 'Checking…' : firestoreConnected ? 'Connected' : 'Check connection'}
+                  <p role="status" className={`text-lg font-bold mt-1 ${firestoreStatus?.ok ? 'text-emerald-700' : firestoreStatus ? 'text-amber-700' : 'text-slate-900'}`}>
+                    {firestoreChecking ? 'Checking…' : firestoreStatus?.ok ? 'Reads connected' : firestoreStatus ? 'Needs attention' : 'Not tested'}
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">Read-only connection test against the configured database</p>
+                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                    {firestoreStatus?.detail || 'Checking public CMS and OTP-authorized private Firestore reads.'}
+                  </p>
+                  {firestoreStatus && <p className="mt-2 text-[11px] text-slate-500">
+                    Public CMS: {firestoreStatus.publicRead ? 'OK' : 'Failed'} · Private admin inbox: {firestoreStatus.adminRead ? 'OK' : 'Failed'}
+                  </p>}
+                  <button type="button" onClick={() => void checkFirestore()} disabled={firestoreChecking}
+                    className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 disabled:opacity-50">
+                    <RefreshCw className="mr-1 inline h-3.5 w-3.5" />
+                    {firestoreChecking ? 'Testing…' : 'Retest Firebase'}
+                  </button>
                 </div>
 
                 <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-2xs">
@@ -663,6 +685,19 @@ export const AdminView: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {/* Read-only diagnostics; no credentials or test documents are exposed. */}
+              {firestoreStatus && !firestoreStatus.ok && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                <p className="font-semibold">Firebase Firestore configuration needs attention</p>
+                <p className="mt-1">{firestoreStatus.detail}</p>
+                <p className="mt-2 text-xs break-all">Configured Firestore database: {firestoreStatus.databaseId}</p>
+                <a className="mt-2 inline-block text-xs font-semibold text-blue-700 underline"
+                  href="https://console.firebase.google.com/project/gen-lang-client-0295520231/firestore"
+                  target="_blank" rel="noreferrer">
+                  Open Firebase Console and select this database → Rules
+                </a>
+                <p className="mt-2 text-xs">Do not change rules to public read/write. Publish the owner-OTP rules for this exact database, then select Retest Firebase.</p>
+              </div>}
 
               {/* Security & Verification Status */}
               <div className="rounded-2xl bg-white border border-slate-200 p-6 space-y-4">
