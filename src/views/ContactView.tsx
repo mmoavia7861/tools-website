@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Mail, Send, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { SEOHead } from '../components/SEOHead';
 import { db, collection, setDoc, doc } from '../services/firebase';
@@ -15,6 +15,17 @@ export const ContactView: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const draft = sessionStorage.getItem('toolscresta:support-draft');
+      if (draft) {
+        setMessage(draft.slice(0, 900));
+        setCategory('Tool issue');
+        sessionStorage.removeItem('toolscresta:support-draft');
+      }
+    } catch { /* Browser storage might be disabled. Manual contact still works. */ }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
