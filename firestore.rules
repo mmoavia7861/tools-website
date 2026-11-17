@@ -70,11 +70,33 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Site content CMS
+    // Public content only; never store passwords, API keys or service credentials.
+    // All writes require an owner session that passed server-verified email OTP.
     match /site_content/{contentId} {
-      allow get: if true;
-      allow list: if true;
-      allow write: if isAdmin();
+      allow get, list: if true;
+
+      allow create, update: if isAdmin() &&
+        (
+          (contentId == 'tool_catalog' &&
+            incoming().keys().hasOnly(['items', 'updatedAt']) &&
+            incoming().keys().hasAll(['items', 'updatedAt']) &&
+            incoming().items is list && incoming().items.size() <= 60 &&
+            incoming().updatedAt is string && incoming().updatedAt.size() <= 35) ||
+          (contentId == 'homepage' &&
+            incoming().keys().hasOnly(['headline', 'highlight', 'description', 'announcement', 'updatedAt']) &&
+            incoming().keys().hasAll(['headline', 'highlight', 'description', 'announcement', 'updatedAt']) &&
+            incoming().headline is string && incoming().headline.size() > 0 && incoming().headline.size() <= 100 &&
+            incoming().highlight is string && incoming().highlight.size() > 0 && incoming().highlight.size() <= 100 &&
+            incoming().description is string && incoming().description.size() > 0 && incoming().description.size() <= 400 &&
+            incoming().announcement is string && incoming().announcement.size() > 0 && incoming().announcement.size() <= 140 &&
+            incoming().updatedAt is string && incoming().updatedAt.size() <= 35) ||
+          (contentId == 'blog_state' &&
+            incoming().keys().hasOnly(['managed', 'updatedAt']) &&
+            incoming().managed == true &&
+            incoming().updatedAt is string && incoming().updatedAt.size() <= 35) ||
+          (contentId != 'tool_catalog' && contentId != 'homepage' && contentId != 'blog_state')
+        );
+      allow delete: if isAdmin();
     }
 
     // Public visitors may CREATE a contact inquiry, but never read messages.
