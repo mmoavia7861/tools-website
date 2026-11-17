@@ -10,9 +10,9 @@ interface BlogViewProps {
 
 export const BlogView: React.FC<BlogViewProps> = ({ navigate }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const { posts, error: feedError } = usePublicBlogPosts();
+  const { posts, error: feedError, loading } = usePublicBlogPosts();
 
-  const filteredPosts = posts.filter(
+  const filteredPosts = (loading ? [] : posts).filter(
     (post) =>
       post.published &&
       (post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -55,6 +55,7 @@ export const BlogView: React.FC<BlogViewProps> = ({ navigate }) => {
             </div>
           </div>
 
+          {loading && <p role="status" className="mb-5 text-sm text-slate-600">Loading published articles…</p>}
           {feedError && <p role="alert" className="mb-5 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">The blog feed is temporarily unavailable. Please try again later.</p>}
           {/* Posts Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -108,7 +109,7 @@ export const BlogView: React.FC<BlogViewProps> = ({ navigate }) => {
             ))}
           </div>
 
-          {filteredPosts.length === 0 && (
+          {!loading && filteredPosts.length === 0 && (
             <div className="text-center py-12 text-slate-500 text-sm">
               No articles found matching &quot;{searchQuery}&quot;.
             </div>
