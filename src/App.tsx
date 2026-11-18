@@ -47,6 +47,23 @@ export default function App() {
   const [currentPath, setCurrentPath] = useState<string>(browserPath);
   const { tools: catalog, loading: catalogLoading } = usePublicToolCatalog();
   const liveTools = visibleTools(catalog);
+  const [enableOptionalUi, setEnableOptionalUi] = useState(false);
+
+  // Keep decorative effects and the optional chat assistant out of the initial
+  // render and critical network request queue. They become available shortly
+  // after page load without delaying QR/PDF tools or the main navigation.
+  useEffect(() => {
+    let timeout: number | undefined;
+    const schedule = () => {
+      timeout = window.setTimeout(() => setEnableOptionalUi(true), 900);
+    };
+    if (document.readyState === 'complete') schedule();
+    else window.addEventListener('load', schedule, { once: true });
+    return () => {
+      window.removeEventListener('load', schedule);
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, []);
 
   // Handle browser back/forward buttons
   useEffect(() => {
@@ -168,13 +185,13 @@ export default function App() {
       </main>
       <Footer navigate={navigate} tools={liveTools} />
       <CookieBanner />
-      {/* These non-critical enhancements load without blocking the initial page. */}
-      <React.Suspense fallback={null}>
-        <PointerEffects />
-      </React.Suspense>
-      <React.Suspense fallback={null}>
-        <ToolAssistant navigate={navigate} />
-      </React.Suspense>
+      {/* Optional enhancements are loaded only after core page assets finish. */}
+      {enableOptionalUi && (
+        <React.Suspense fallback={null}>
+          <PointerEffects />
+          <ToolAssistant navigate={navigate} />
+        </React.Suspense>
+      )}
     </div>
   );
 }
