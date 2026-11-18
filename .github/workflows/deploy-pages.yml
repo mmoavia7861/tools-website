@@ -92,9 +92,9 @@ jobs:
           test -f dist/pdf-to-word/index.html
           test -f dist/word-to-pdf/index.html
           grep -Fq "${TOOLCRESTA_PAGES_BASE}assets/" dist/index.html
-          grep -Fq "<loc>${TOOLCRESTA_SITE_ORIGIN}${TOOLCRESTA_PAGES_BASE}pdf-to-word/</loc>" dist/sitemap.xml
-          grep -Fq "<loc>${TOOLCRESTA_SITE_ORIGIN}${TOOLCRESTA_PAGES_BASE}word-to-pdf/</loc>" dist/sitemap.xml
-          grep -Fq "Sitemap: ${TOOLCRESTA_SITE_ORIGIN}${TOOLCRESTA_PAGES_BASE}sitemap.xml" dist/robots.txt
+          grep -Fq "<loc>https://toolscresta.com/pdf-to-word/</loc>" dist/sitemap.xml
+          grep -Fq "<loc>https://toolscresta.com/word-to-pdf/</loc>" dist/sitemap.xml
+          grep -Fq "Sitemap: https://toolscresta.com/sitemap.xml" dist/robots.txt
           if grep -Fq '<loc>' dist/sitemap.xml && grep -Fq '/admin/' dist/sitemap.xml; then
             echo "::error::Private admin URL must never be indexed"
             exit 1
@@ -105,7 +105,7 @@ jobs:
           fi
       - name: Prepare SPA fallback
         run: |
-          cp dist/index.html dist/404.html
+          grep -Fq 'name="robots" content="noindex, follow"' dist/404.html
           touch dist/.nojekyll
       - name: Publish into existing Pages main/root without changing Settings
         if: steps.pages.outputs.mode == 'legacy'
