@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { db, collection, doc, onSnapshot, query, where } from './firebase';
 import { STARTER_BLOG_POSTS, type BlogPostItem } from '../data/initialContent';
 
 const text = (value: unknown, max: number) =>
@@ -33,23 +32,48 @@ export function usePublicBlogPosts(): { posts: BlogPostItem[]; managed: boolean;
   const [loading, setLoading] = useState(true);
   const [feedLoading, setFeedLoading] = useState(false);
   const [error, setError] = useState(false);
-  useEffect(() => onSnapshot(doc(db, 'site_content', 'blog_state'), snapshot => {
-    const isManaged = snapshot.exists() && snapshot.data()?.managed === true;
-    if (isManaged) setFeedLoading(true);
-    setManaged(isManaged);
-    setLoading(false);
-  }, () => { setError(true); setLoading(false); }), []);
   useEffect(() => {
-    if (!managed) { setPosts(STARTER_BLOG_POSTS.filter(p => p.published)); setFeedLoading(false); return; }
-    // Firestore security rules require this filter for public list queries.
-    return onSnapshot(query(collection(db, 'blog_posts'), where('published', '==', true)),
-      snapshot => {
-        setPosts(snapshot.docs.map(doc => readBlogPost(doc.data(), doc.id)).filter((post): post is BlogPostItem => post !== null)
-          .sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-        setError(false); setFeedLoading(false);
-      },
-      () => { setPosts([]); setError(true); setFeedLoading(false); }
-    );
+    let disposed = false;
+    let unsubscribe = () => {};
+    void import('./firebase').then(({ db, doc, onSnapshot }) => {
+      if (disposed) return;
+      unsubscribe = onSnapshot(doc(db, 'site_content', 'blog_state'), snapshot => {
+        if (disposed) return;
+        const isManaged = snapshot.exists() && snapshot.data()?.managed === true;
+        if (isManaged) setFeedLoading(true);
+        setManaged(isManaged);
+        setLoading(false);
+      }, () => { if (!disposed) { setError(true); setLoading(false); } });
+    }).catch(() => { if (!disposed) { setError(true); setLoading(false); } });
+    return () => { disposed = true; unsubscribe(); };
+  }, []);
+  useEffect(() => {
+    if (!managed) {
+      setPosts(STARTER_BLOG_POSTS.filter(p => p.published));
+      setFeedLoading(false);
+      return;
+    }
+    let disposed = false;
+    let unsubscribe = () => {};
+    setFeedLoading(true);
+    // Query only published articles so Firestore public rules can safely filter.
+    void import('./firebase').then(({ db, collection, onSnapshot, query, where }) => {
+      if (disposed) return;
+      unsubscribe = onSnapshot(query(collection(db, 'blog_posts'), where('published', '==', true)),
+        snapshot => {
+          if (disposed) return;
+          setPosts(snapshot.docs.map(document => readBlogPost(document.data(), document.id))
+            .filter((post): post is BlogPostItem => post !== null)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+          setError(false); setFeedLoading(false);
+        },
+        () => {
+          if (!disposed) { setPosts([]); setError(true); setFeedLoading(false); }
+        });
+    }).catch(() => {
+      if (!disposed) { setPosts([]); setError(true); setFeedLoading(false); }
+    });
+    return () => { disposed = true; unsubscribe(); };
   }, [managed]);
   return { posts, managed, error, loading: loading || feedLoading };
 }
