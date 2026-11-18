@@ -44,7 +44,7 @@ const routes = [
 const escapeText = str => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 // The primary indexable domain is toolscresta.com (not its GitHub mirror).
 const canonicalOrigin = 'https://toolscresta.com';
-const absoluteUrl = route => canonicalOrigin + route.replace(/^\/|\/$/g, '') + (route === '/' ? '' : '/');
+const absoluteUrl = route => canonicalOrigin + '/' + route.replace(/^\/|\/$/g, '') + (route === '/' ? '' : '/');
 // Honest, route-specific plain text for visitors who have JavaScript disabled.
 // These details explain functions and limitations, not fictional performance claims.
 const routeGuidance = {
