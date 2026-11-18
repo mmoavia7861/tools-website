@@ -39,7 +39,9 @@ for (const path of ['admin/index.html', '404.html']) {
   assert.match(read(path), /<meta name="robots" content="noindex/i, path + ' must not be indexed');
 }
 const homepage = read('index.html');
-const entryJs = homepage.match(/<script[^>]+src="([^"]+\/assets\/index-[^"]+\.js)"/)?.[1];
+const entryJs = [...homepage.matchAll(/<script[^>]+src="([^"]+\\.js)"/g)]
+  .map(match => match[1])
+  .find(url => /\\/assets\\/index-[^/]+\\.js$/.test(url));
 assert.ok(entryJs, 'Compiled main JS script missing from HTML');
 const bundle = entryJs.slice(entryJs.indexOf('/assets/') + 1);
 const bytes = statSync(join(root, bundle)).size;
