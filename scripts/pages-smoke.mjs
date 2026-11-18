@@ -143,7 +143,7 @@ try {
   const sitemapResponse = await page.goto(rootUrl + 'sitemap.xml');
   assert.equal(sitemapResponse?.status(), 200);
   const sitemap = await sitemapResponse?.text();
-  assert.ok(sitemap?.includes('https://mmoavia7861.github.io/tools-website/privacy-policy/'), 'Legal page absent from sitemap');
+  assert.ok(sitemap?.includes('https://toolscresta.com/privacy-policy/'), 'Primary domain legal page absent from sitemap');
   assert.ok(!sitemap?.includes('https://ranknova.app'), 'Unverified other domain remains in sitemap');
   assert.equal(runtimeErrors.length, 0, 'Browser errors after navigation: ' + JSON.stringify(runtimeErrors));
 
