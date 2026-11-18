@@ -17,6 +17,7 @@ try {
       GITHUB_PAGES: 'false',
     },
   });
+  execFileSync(process.execPath, ['scripts/validate-seo-build.mjs'], { stdio: 'inherit' });
   // Fail closed before deployment if HTML points to missing CSS/JS assets.
   // On slow mobile browsers the SEO fallback otherwise appears as plain text.
   const html = readFileSync('dist/index.html', 'utf8');
