@@ -42,21 +42,74 @@ const routes = [
 ];
 
 const escapeText = str => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const absoluteUrl = route => origin + base + route.replace(/^\/|\/$/g, '') + (route === '/' ? '' : '/');
+// The primary indexable domain is toolscresta.com (not its GitHub mirror).
+const canonicalOrigin = 'https://toolscresta.com';
+const absoluteUrl = route => canonicalOrigin + route.replace(/^\/|\/$/g, '') + (route === '/' ? '' : '/');
+// Honest, route-specific plain text for visitors who have JavaScript disabled.
+// These details explain functions and limitations, not fictional performance claims.
+const routeGuidance = {
+  '/qr-code-generator/': ['Choose URL, Wi-Fi, plain text or contact details and preview a static QR code.', 'Adjust its colors and size, then download PNG or SVG. Test printed codes before using them publicly.'],
+  '/compress-pdf/': ['Select a PDF and review its original byte size before processing.', 'The resulting size is measured, not estimated. Some already optimized files cannot be compressed further.'],
+  '/image-to-pdf/': ['Add JPG, PNG or WebP images, select a page layout and choose their order.', 'Preview the PDF before downloading it; very large source images can exhaust memory on older devices.'],
+  '/edit-pdf/': ['Upload a PDF to arrange pages, add text and signature annotations, and preview edits.', 'Download the resulting PDF and check changes in a PDF reader.'],
+  '/background-remover/': ['Select a photo and allow the browser to process its background; first-time AI model downloads may be large.', 'Refine difficult edges manually if necessary. PNG supports transparency, while JPEG does not.'],
+  '/visiting-card-generator/': ['Enter business contact details and select a layout, typography and card size.', 'Check QR codes, spelling and print dimensions before exporting the design.'],
+  '/ai-card-generator/': ['Use editable card templates for visiting, wedding and birthday designs.', 'Optional AI assistance needs an available provider and is not required for free templates.'],
+  '/wedding-card-maker/': ['Choose a wedding invitation design, enter names, date and venue, then preview the result.', 'Verify event details and print dimensions before sharing.'],
+  '/birthday-card-maker/': ['Select a birthday invitation layout and customize the event details.', 'Export a card after checking the date, location and message.'],
+  '/pdf-to-word/': ['Convert text-based PDFs to editable DOCX files; the source PDF should contain selectable text.', 'Scanned documents need OCR and intricate page layouts may change during extraction.'],
+  '/word-to-pdf/': ['Convert basic Word document text into a downloadable PDF.', 'Complex tables, fonts and some non-Latin formatting are not guaranteed to match the source.'],
+  '/compress-video/': ['Choose a supported video and set the available size or quality options.', 'Compression depends on browser codecs and device memory. Verify playback and actual output size.'],
+  '/blog/': ['Read practical tutorials about QR codes, PDF compression and image formats.', 'Browse guides for real scenarios and follow links to related online tools.']
+};
 const navigation = routes.filter(([path]) => !path.startsWith('/blog/')).map(([path, title]) =>
   '<li><a href="' + escapeText(absoluteUrl(path)) + '">' + escapeText(title.split(' | ')[0]) + '</a></li>').join('\n');
 
 for (const [route, title, description, introduction] of routes) {
   const loc = absoluteUrl(route);
-  // Use real initial content in generated HTML for crawlers and visitors with JS unavailable.
+  const help = routeGuidance[route] || [];
+  const usefulText = help.length
+    ? '<section><h2>How this works</h2>' + help.map(paragraph => '<p>' + escapeText(paragraph) + '</p>').join('') + '</section>' : '';
   const fallback = '<div id="root"><main><h1>' + escapeText(title.split(' | ')[0]) +
-    '</h1><p>' + escapeText(introduction) +
-    '</p><nav aria-label="ToolsCresta pages"><ul>' + navigation + '</ul></nav></main></div>';
-  let html = homeHtml
+    '</h1><p>' + escapeText(introduction) + '</p>' + usefulText +
+    '<nav aria-label="ToolsCresta pages"><h2>More tools and guides</h2><ul>' + navigation + '</ul></nav></main></div>';
+  // The schema mirrors visible page content. No review counts or fictitious ratings.
+  const webPageSchema = {
+    '@context': 'https://schema.org', '@type': 'WebPage',
+    name: title, description, url: loc,
+    isPartOf: { '@type': 'WebSite', name: 'ToolsCresta', url: canonicalOrigin + '/' }
+  };
+  const crumbs = route.startsWith('/blog/') && route !== '/blog/'
+    ? [['/', 'Home'], ['/blog/', 'Guides'], [route, title.split(' | ')[0]]]
+    : [['/', 'Home'], ...(route === '/' ? [] : [[route, title.split(' | ')[0]]])];
+  const crumbSchema = route === '/' ? '' : '<script type="application/ld+json">' +
+    JSON.stringify({ '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+      itemListElement: crumbs.map(([path, name], i) => ({
+        '@type': 'ListItem', position: i + 1, name, item: absoluteUrl(path)
+      }))
+    }).replace(/</g, '\\u003c') + '</script>';
+  const tags = [
+    '<link rel="canonical" href="' + escapeText(loc) + '" />',
+    '<meta property="og:title" content="' + escapeText(title) + '" />',
+    '<meta property="og:description" content="' + escapeText(description) + '" />',
+    '<meta property="og:url" content="' + escapeText(loc) + '" />',
+    '<meta property="og:site_name" content="ToolsCresta" />',
+    '<meta property="og:type" content="' + (route.startsWith('/blog/') && route !== '/blog/' ? 'article' : 'website') + '" />',
+    '<meta name="twitter:card" content="summary" />',
+    '<meta name="twitter:title" content="' + escapeText(title) + '" />',
+    '<meta name="twitter:description" content="' + escapeText(description) + '" />',
+    '<script type="application/ld+json">' + JSON.stringify(webPageSchema).replace(/</g, '\\u003c') + '</script>',
+    crumbSchema
+  ].join('\n');
+  const htmlWithoutOldSocialTags = homeHtml
+    .replace(/<meta property="og:(?:title|description|type)"[^>]*>\s*/gi, '')
+    .replace(/<meta name="twitter:card"[^>]*>\s*/gi, '');
+  let html = htmlWithoutOldSocialTags
     .replace(/<title>[\s\S]*?<\/title>/i, '<title>' + escapeText(title) + '</title>')
     .replace(/<meta name="description" content="[^"]*"\s*\/?>/i, '<meta name="description" content="' + escapeText(description) + '" />')
     .replace('<div id="root"></div>', fallback)
-    .replace('</head>', '<link rel="canonical" href="' + escapeText(loc) + '" />\n  </head>');
+    .replace('</head>', tags + '\n</head>');
+
   if (route === '/') {
     writeFileSync(join(root, 'index.html'), html);
   } else {
@@ -75,12 +128,18 @@ const adminHtml = homeHtml
 mkdirSync(join(root, 'admin'), { recursive: true });
 writeFileSync(join(root, 'admin', 'index.html'), adminHtml);
 
-copyFileSync(join(root, 'index.html'), join(root, '404.html'));
+// A real 404 must not look like an indexable copy of the homepage.
+const notFoundHtml = homeHtml
+  .replace(/<title>[\s\S]*?<\/title>/i, '<title>Page not found | ToolsCresta</title>')
+  .replace('<div id="root"></div>', '<div id="root"><main><h1>Page not found</h1><p>This page is unavailable.</p><a href="' + canonicalOrigin + '/">ToolsCresta home</a></main></div>')
+  .replace('</head>', '<meta name="robots" content="noindex, follow" />\n</head>');
+writeFileSync(join(root, '404.html'), notFoundHtml);
 
 const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
   '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
   routes.map(([route]) => '  <url><loc>' + escapeText(absoluteUrl(route)) + '</loc></url>').join('\n') +
   '\n</urlset>\n';
 writeFileSync(join(root, 'sitemap.xml'), xml);
-writeFileSync(join(root, 'robots.txt'), 'User-agent: *\nAllow: ' + base + '\nDisallow: ' + base + 'admin/\n\nSitemap: ' + origin + base + 'sitemap.xml\n');
+// Allow crawlers to read the admin page's noindex header; do not index API routes.
+writeFileSync(join(root, 'robots.txt'), 'User-agent: *\nAllow: ' + base + '\nDisallow: ' + base + 'api/\n\nSitemap: ' + canonicalOrigin + '/sitemap.xml\n');
 console.log('Prepared', routes.length, 'crawlable route entrypoints, sitemap.xml and robots.txt for GitHub Pages.');
