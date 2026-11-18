@@ -1,6 +1,6 @@
 User-agent: *
-Allow: /tools-website/
-Disallow: /tools-website/admin/
-Disallow: /tools-website/api/
+Allow: /
+Disallow: /api/
 
-Sitemap: https://mmoavia7861.github.io/tools-website/sitemap.xml
+# The admin entrypoint has a noindex meta tag; do not block crawlers from seeing it.
+Sitemap: https://toolscresta.com/sitemap.xml
