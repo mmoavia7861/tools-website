@@ -56,7 +56,7 @@ jobs:
       - name: Prepare indexable pages and sitemap
         run: node scripts/prepare-pages-seo.mjs
       - name: Create GitHub Pages SPA fallback
-        run: cp dist/index.html dist/404.html
+        run: grep -Fq 'name="robots" content="noindex, follow"' dist/404.html
       - name: Install Chromium for browser smoke tests
         run: npx playwright install --with-deps chromium
       - name: Verify homepage and working tools routing in browser
