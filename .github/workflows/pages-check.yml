@@ -54,7 +54,9 @@ jobs:
           cp index.source.html index.html
           npm run build
       - name: Prepare indexable pages and sitemap
-        run: node scripts/prepare-pages-seo.mjs
+        run: |
+          node scripts/prepare-pages-seo.mjs
+          node scripts/validate-seo-build.mjs
       - name: Create GitHub Pages SPA fallback
         run: grep -Fq 'name="robots" content="noindex, follow"' dist/404.html
       - name: Install Chromium for browser smoke tests
