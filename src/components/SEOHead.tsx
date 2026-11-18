@@ -4,49 +4,49 @@ export interface SEOProps {
   title: string;
   description: string;
   canonicalPath?: string;
-  jsonLd?: Record<string, any>;
+  jsonLd?: Record<string, unknown>;
+}
+
+const PRIMARY_ORIGIN = 'https://toolscresta.com';
+
+function upsertMeta(attribute: 'name' | 'property', key: string, content: string): void {
+  let element = document.head.querySelector<HTMLMetaElement>(`meta[${attribute}="${key}"]`);
+  if (!element) {
+    element = document.createElement('meta');
+    element.setAttribute(attribute, key);
+    document.head.appendChild(element);
+  }
+  element.content = content;
 }
 
 export const SEOHead: React.FC<SEOProps> = ({
-  title,
-  description,
-  canonicalPath = '',
-  jsonLd
+  title, description, canonicalPath = '', jsonLd
 }) => {
   useEffect(() => {
     document.title = title;
-
-    // Update meta description
-    let metaDesc = document.querySelector('meta[name="description"]');
-    if (!metaDesc) {
-      metaDesc = document.createElement('meta');
-      metaDesc.setAttribute('name', 'description');
-      document.head.appendChild(metaDesc);
-    }
-    metaDesc.setAttribute('content', description);
-
-    // Update OpenGraph tags
-    let ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle) ogTitle.setAttribute('content', title);
-
-    let ogDesc = document.querySelector('meta[property="og:description"]');
-    if (ogDesc) ogDesc.setAttribute('content', description);
-
-    // Canonical link
-    const origin = window.location.origin;
-    const basePrefix = import.meta.env.BASE_URL.replace(/\/$/, '');
     const routePath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
-    const normalizedPath = routePath === '/' ? '/' : `${routePath.replace(/\/$/, '')}/`;
-    const fullCanonical = `${origin}${basePrefix}${normalizedPath}`;
-    let canonical = document.querySelector('link[rel="canonical"]');
+    const normalized = routePath === '/' ? '/' : `${routePath.replace(/\/+$/, '')}/`;
+    // Always prefer the user-owned production domain over GitHub Pages or workers.dev mirrors.
+    const canonicalUrl = PRIMARY_ORIGIN + normalized;
+    let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!canonical) {
       canonical = document.createElement('link');
-      canonical.setAttribute('rel', 'canonical');
+      canonical.rel = 'canonical';
       document.head.appendChild(canonical);
     }
-    canonical.setAttribute('href', fullCanonical);
+    canonical.href = canonicalUrl;
 
-    // JSON-LD structured data
+    upsertMeta('name', 'description', description);
+    upsertMeta('property', 'og:title', title);
+    upsertMeta('property', 'og:description', description);
+    upsertMeta('property', 'og:url', canonicalUrl);
+    upsertMeta('property', 'og:site_name', 'ToolsCresta');
+    upsertMeta('property', 'og:type', normalized.startsWith('/blog/') ? 'article' : 'website');
+    upsertMeta('name', 'twitter:card', 'summary');
+    upsertMeta('name', 'twitter:title', title);
+    upsertMeta('name', 'twitter:description', description);
+
+    // React renders plain text content; never inject user-supplied HTML as structured data.
     let scriptTag = document.getElementById('toolscresta-jsonld') as HTMLScriptElement | null;
     if (jsonLd) {
       if (!scriptTag) {
@@ -55,7 +55,7 @@ export const SEOHead: React.FC<SEOProps> = ({
         scriptTag.type = 'application/ld+json';
         document.head.appendChild(scriptTag);
       }
-      scriptTag.textContent = JSON.stringify(jsonLd);
+      scriptTag.textContent = JSON.stringify(jsonLd).replace(/</g, '\\u003c');
     } else if (scriptTag) {
       scriptTag.remove();
     }
