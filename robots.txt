@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /tools-website/
-Disallow: /tools-website/admin/
+Disallow: /tools-website/api/
 
-Sitemap: https://mmoavia7861.github.io/tools-website/sitemap.xml
+Sitemap: https://toolscresta.com/sitemap.xml
