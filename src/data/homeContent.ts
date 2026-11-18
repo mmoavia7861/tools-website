@@ -26,15 +26,15 @@ export const HOME_BLOG_PREVIEWS = [
 export const FAQ_ITEMS = [
   {
     q: 'Does ToolsCresta store or retain my uploaded files?',
-    a: 'No. ToolsCresta operates with a privacy-by-default architecture. The QR Code Generator runs 100% inside your browser. The PDF Compressor performs structural optimization on-device whenever possible; any server-assisted processing uses isolated temporary memory and deletes all files immediately after processing. We never store your documents or images in databases.'
+    a: 'Many ToolsCresta utilities process files in your browser. Some optional services may transmit data for server-side processing. Please check the privacy notice shown by each tool before uploading sensitive content.'
   },
   {
     q: 'Is ToolsCresta completely free to use?',
-    a: 'Yes. All three core tools—QR Code Generator, PDF Compressor, and AI Background Remover—are free to use without registration, subscriptions, or watermarks.'
+    a: 'The core browser-based QR, PDF and image tools are available without a subscription. Some optional AI or server-assisted features may have usage limits or need a configured provider.'
   },
   {
     q: 'Why does the QR Code Generator not provide redirect links?',
-    a: 'ToolsCresta encodes static QR codes directly into your browser. Static QR codes do not pass through intermediate redirect tracking servers, meaning your QR codes will never break, expire, or harvest analytics on people who scan them.'
+    a: 'ToolsCresta encodes a static QR pattern directly in your browser, without a ToolsCresta redirect tracker. The QR image itself does not expire, but a website URL inside it can stop working if the destination changes or goes offline.'
   },
   {
     q: 'Why didn\'t my PDF compress to a smaller size?',
