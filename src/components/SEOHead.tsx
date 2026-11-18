@@ -5,6 +5,7 @@ export interface SEOProps {
   description: string;
   canonicalPath?: string;
   jsonLd?: Record<string, unknown>;
+  noIndex?: boolean;
 }
 
 const PRIMARY_ORIGIN = 'https://toolscresta.com';
@@ -20,10 +21,16 @@ function upsertMeta(attribute: 'name' | 'property', key: string, content: string
 }
 
 export const SEOHead: React.FC<SEOProps> = ({
-  title, description, canonicalPath = '', jsonLd
+  title, description, canonicalPath = '', jsonLd, noIndex = false
 }) => {
   useEffect(() => {
     document.title = title;
+    if (noIndex) {
+      upsertMeta('name', 'robots', 'noindex, follow');
+      document.head.querySelector('meta[name="robots"]')?.setAttribute('data-toolscresta-noindex', 'true');
+    } else {
+      document.head.querySelector('meta[name="robots"][data-toolscresta-noindex="true"]')?.remove();
+    }
     const routePath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
     const normalized = routePath === '/' ? '/' : `${routePath.replace(/\/+$/, '')}/`;
     // Always prefer the user-owned production domain over GitHub Pages or workers.dev mirrors.
@@ -59,7 +66,7 @@ export const SEOHead: React.FC<SEOProps> = ({
     } else if (scriptTag) {
       scriptTag.remove();
     }
-  }, [title, description, canonicalPath, jsonLd]);
+  }, [title, description, canonicalPath, jsonLd, noIndex]);
 
   return null;
 };
