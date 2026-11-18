@@ -86,6 +86,7 @@ jobs:
           cp index.source.html index.html
           npm run build
           node scripts/prepare-pages-seo.mjs
+          node scripts/validate-seo-build.mjs
           test -d dist/assets
           test -f dist/sitemap.xml
           test -f dist/robots.txt
