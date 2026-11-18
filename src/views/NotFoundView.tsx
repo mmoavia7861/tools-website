@@ -13,6 +13,7 @@ export const NotFoundView: React.FC<NotFoundViewProps> = ({ navigate }) => {
         title="404 — Page Not Found | ToolsCresta"
         description="The requested page could not be found."
         canonicalPath="/404"
+        noIndex
       />
 
       <div className="py-24 bg-[#F8FAFC] flex flex-col items-center justify-center text-center px-4">
