@@ -39,7 +39,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'ToolsCresta',
-    url: typeof window !== 'undefined' ? new URL(import.meta.env.BASE_URL, window.location.origin).href : 'https://toolscresta.com/',
+    url: 'https://toolscresta.com/',
     description: home.description,
     publisher: {
       '@type': 'Organization',
@@ -50,7 +50,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
   return (
     <>
       <SEOHead
-        title={`${home.headline} ${home.highlight} | ToolsCresta`}
+        title="ToolsCresta — Free Online QR, PDF & Image Tools"
         description={home.description}
         canonicalPath="/"
         jsonLd={jsonLd}
@@ -103,7 +103,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
             <div className="flex items-center gap-2.5 rounded-xl bg-white/80 p-3 border border-slate-100 shadow-xs">
               <EyeOff className="h-5 w-5 text-emerald-600 shrink-0" />
               <div className="text-xs">
-                <p className="font-semibold text-slate-900">Zero Storage</p>
+                <p className="font-semibold text-slate-900">File Privacy</p>
                 <p className="text-slate-500">See each tool's policy</p>
               </div>
             </div>
@@ -149,7 +149,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ navigate, tools }) => {
               Essential Production Tools
             </h2>
             <p className="mt-2 text-slate-600 text-sm sm:text-base">
-              Each utility is engineered for single-purpose excellence, honest output metrics, and total client privacy.
+              Explore purpose-built QR, PDF, image and card tools. Check each tool’s supported formats, limitations and privacy notes.
             </p>
           </div>
 
